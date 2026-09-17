@@ -78,7 +78,16 @@ def expect_screen(screen: str, timeout: float = 15.0) -> bool:
 def launch_to_menu(force: bool = False) -> bool:
     helpers.connect()
     helpers.launch_app(force=force)
-    return expect_screen("menu")
+    if expect_screen("menu", timeout=3.0):
+        return True
+    if is_on("back_game"):
+        tap("back_game")
+    if expect_screen("menu", timeout=4.0):
+        return True
+    # Leaving a table can open a cross-promo ad. Relaunching FreeCell is the
+    # deterministic recovery path; it does not alter QA state.
+    helpers.launch_app(force=True)
+    return expect_screen("menu", timeout=8.0)
 
 
 def open_dev_panel() -> bool:
@@ -112,6 +121,23 @@ def complete_game() -> bool:
     """Complete the active table through the Synthetic Win panel."""
     if not tap("qa_badge", settle=1.0) or not wait_for("qa_panel"):
         return False
-    if not tap("qa_90_99", settle=0.5):
+    # The panel rows are wide, but the matched crop's centre falls between
+    # controls on this device. These points are re-measured from the captured
+    # 1290x2796 panel and are kept separate from the template assertions.
+    if not is_on("qa_90_99") or not is_on("qa_win"):
         return False
-    return tap("qa_win", settle=4.0) and expect_screen("victory")
+    helpers.tap((1030, 1765), settle=0.5)
+    helpers.tap((680, 1747), settle=4.0)
+    return expect_screen("victory")
+
+
+def start_game(level: str = "easy") -> bool:
+    """Open Play, choose a FreeCell level, and accept an abandon prompt."""
+    if not tap("menu_play"):
+        return False
+    if not wait_for(f"difficulty_{level}"):
+        return False
+    if not tap(f"difficulty_{level}", settle=2.0):
+        return False
+    helpers.accept_alert()
+    return expect_screen("table", timeout=12.0)

@@ -59,6 +59,23 @@ def current_session() -> str:
     return _SESSION_ID
 
 
+def accept_alert() -> bool:
+    """Accept a native confirmation if WDA currently exposes one."""
+    response = requests.get(
+        f"{config.WDA_URL}/session/{current_session()}/alert/text",
+        timeout=8,
+    )
+    if response.status_code != 200 or not response.json().get("value"):
+        return False
+    accepted = requests.post(
+        f"{config.WDA_URL}/session/{current_session()}/alert/accept",
+        timeout=8,
+    )
+    accepted.raise_for_status()
+    time.sleep(1.5)
+    return True
+
+
 def rapid_tap(point: tuple[int, int], times: int = 10, gap_ms: int = 45) -> bool:
     """Send a hidden-gesture tap burst as one on-device W3C action."""
     from PIL import Image

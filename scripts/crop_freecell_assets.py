@@ -14,8 +14,8 @@ ASSETS = ROOT / "assets"
 # Coordinates are capture pixels for the connected 1290x2796 iPhone. Crops are
 # deliberately small semantic anchors, not whole-screen baselines.
 CROPS = {
-    "screen_menu": ("qa_about_recovered", (850, 1150, 1250, 1500)),
-    "menu_play": ("qa_about_recovered", (850, 1150, 1250, 1500)),
+    "screen_menu": ("qa_menu_enabled", (950, 1270, 1150, 1450)),
+    "menu_play": ("qa_menu_enabled", (950, 1270, 1150, 1450)),
     "menu_stats": ("qa_about_recovered", (800, 1550, 1250, 1850)),
     "menu_options": ("qa_about_recovered", (800, 1800, 1250, 2100)),
     "menu_help": ("qa_about_recovered", (800, 2050, 1250, 2300)),
@@ -31,6 +31,7 @@ CROPS = {
     "screen_play": ("qa_picker_clean", (850, 1150, 1250, 1500)),
     "difficulty_easy": ("qa_picker_clean", (850, 1150, 1250, 1450)),
     "screen_table": ("qa_table_started", (0, 250, 1290, 900)),
+    "back_game": ("qa_table_started", (0, 290, 260, 410)),
     "table_foundations": ("qa_table_started", (0, 450, 700, 850)),
     "table_cells": ("qa_table_started", (650, 450, 1290, 850)),
     "tableau": ("qa_table_started", (0, 850, 1290, 1550)),
@@ -41,6 +42,7 @@ CROPS = {
     "qa_panel": ("qa_panel_table", (400, 850, 1250, 2000)),
     "qa_90_99": ("qa_after_percent", (850, 1600, 1250, 1850)),
     "qa_win": ("qa_after_percent", (550, 1600, 850, 1850)),
+    "screen_victory": ("screen_victory", (400, 850, 950, 1800)),
     "victory_title": ("screen_victory", (400, 850, 950, 1800)),
     "victory_menu": ("screen_victory", (1000, 250, 1270, 500)),
 }
