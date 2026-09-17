@@ -25,8 +25,8 @@ def connect() -> None:
 def launch_app(force: bool = False) -> None:
     """Launch FreeCell through WDA, never Airtest's iOS start_app."""
     response = requests.post(
-        f"{config.WDA_URL}/wda/apps/{config.BUNDLE_ID}",
-        json={"shouldLaunch": True, "forceAppLaunch": force},
+        f"{config.WDA_URL}/wda/apps/launch",
+        json={"bundleId": config.BUNDLE_ID, "shouldLaunch": True, "forceAppLaunch": force},
         timeout=15,
     )
     response.raise_for_status()

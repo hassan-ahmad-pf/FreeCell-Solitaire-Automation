@@ -8,7 +8,6 @@ the screen names printed by the script before cropping assets.
 from __future__ import annotations
 
 import sys
-import time
 
 import config
 import helpers
