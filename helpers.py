@@ -1,6 +1,7 @@
 """Small WDA/Airtest helpers shared by the FreeCell tests."""
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -8,6 +9,9 @@ import requests
 from airtest.core.api import connect_device, snapshot, touch
 
 import config
+
+
+_SESSION_ID: str | None = None
 
 
 def wda_status() -> dict:
@@ -25,11 +29,21 @@ def connect() -> None:
 def launch_app(force: bool = False) -> None:
     """Launch FreeCell through WDA, never Airtest's iOS start_app."""
     response = requests.post(
-        f"{config.WDA_URL}/wda/apps/launch",
-        json={"bundleId": config.BUNDLE_ID, "shouldLaunch": True, "forceAppLaunch": force},
+        f"{config.WDA_URL}/session",
+        json={
+            "capabilities": {
+                "alwaysMatch": {
+                    "bundleId": config.BUNDLE_ID,
+                    "forceAppLaunch": force,
+                    "shouldTerminateApp": False,
+                }
+            }
+        },
         timeout=15,
     )
     response.raise_for_status()
+    global _SESSION_ID
+    _SESSION_ID = response.json()["value"]["sessionId"]
     time.sleep(2.5)
 
 
@@ -37,6 +51,47 @@ def tap(point: tuple[int, int], settle: float = 1.0) -> None:
     touch(point)
     if settle:
         time.sleep(settle)
+
+
+def current_session() -> str:
+    if not _SESSION_ID:
+        raise RuntimeError("launch_app() must run before WDA actions")
+    return _SESSION_ID
+
+
+def rapid_tap(point: tuple[int, int], times: int = 10, gap_ms: int = 45) -> bool:
+    """Send a hidden-gesture tap burst as one on-device W3C action."""
+    from PIL import Image
+
+    pixel_width = Image.open(screenshot("_qa_scale_probe")).width
+    point_width = requests.get(
+        f"{config.WDA_URL}/session/{current_session()}/window/size",
+        timeout=15,
+    ).json()["value"]["width"]
+    scale = max(pixel_width / float(point_width), 1.0)
+    x, y = int(point[0] / scale), int(point[1] / scale)
+    actions = [{"type": "pointerMove", "duration": 0, "x": x, "y": y}]
+    for _ in range(times):
+        actions.extend((
+            {"type": "pointerDown", "button": 0},
+            {"type": "pause", "duration": 25},
+            {"type": "pointerUp", "button": 0},
+            {"type": "pause", "duration": gap_ms},
+        ))
+    response = requests.post(
+        f"{config.WDA_URL}/session/{current_session()}/actions",
+        data=json.dumps({"actions": [{
+            "type": "pointer",
+            "id": "freecell-qa",
+            "parameters": {"pointerType": "touch"},
+            "actions": actions,
+        }]}),
+        headers={"Content-Type": "application/json"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    time.sleep(1.5)
+    return True
 
 
 def screenshot(name: str) -> Path:

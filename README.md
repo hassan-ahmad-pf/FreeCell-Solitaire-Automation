@@ -26,7 +26,14 @@ export DEVICE_UDID=00008130-00010D283A31001C
 export WDA_PRODUCTS=/tmp/wda-freecell-build/Build/Products
 ```
 
-Start WDA only after the signed local build exists:
+If a signed runner is already installed on the phone, attach to it without
+reinstalling the repository's incompatible WDA artifact:
+
+```bash
+WDA_ATTACH=1 ./scripts/wda.sh "$DEVICE_UDID"
+```
+
+For a newly signed local runner, use:
 
 ```bash
 WDA_PRODUCTS="$WDA_PRODUCTS" ./scripts/wda.sh "$DEVICE_UDID"

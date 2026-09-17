@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from airtest.core.api import exists, touch
+from airtest.core.api import exists, text, touch
 from airtest.core.cv import Template
 
 import config
@@ -82,21 +82,22 @@ def launch_to_menu(force: bool = False) -> bool:
 
 
 def open_dev_panel() -> bool:
-    """Perform the confirmed FreeCell QA gesture once crops are available."""
-    if is_on("qa_badge"):
+    """Enable QA mode through FreeCell's confirmed hidden flow."""
+    if is_on("qa_watermark"):
         return True
     if not is_on("about_emblem"):
         if not tap("menu_about"):
             return False
         if not expect_screen("about"):
             return False
+    if not tap("about_version"):
+        return False
     point = find("about_emblem")
     if not point:
         return False
-    for _ in range(config.QA_TAPS):
-        touch(point)
-        time.sleep(0.08)
-    return wait_for("qa_badge")
+    helpers.rapid_tap(point, times=config.QA_TAPS)
+    text(config.QA_CODE, enter=False)
+    return wait_for("qa_enabled")
 
 
 def enter_qa_code() -> bool:
@@ -108,6 +109,9 @@ def enter_qa_code() -> bool:
 
 
 def complete_game() -> bool:
-    if not is_on("qa_panel"):
+    """Complete the active table through the Synthetic Win panel."""
+    if not tap("qa_badge", settle=1.0) or not wait_for("qa_panel"):
         return False
-    return tap("qa_complete_game", settle=3.0) and expect_screen("victory")
+    if not tap("qa_90_99", settle=0.5):
+        return False
+    return tap("qa_win", settle=4.0) and expect_screen("victory")
