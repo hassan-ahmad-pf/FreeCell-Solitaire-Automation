@@ -75,10 +75,17 @@ def pixel_scale() -> float:
     from PIL import Image
 
     pixel_width = Image.open(screenshot("_qa_scale_probe")).width
-    point_width = requests.get(
+    data = requests.get(
         f"{config.WDA_URL}/session/{current_session()}/window/size",
         timeout=15,
-    ).json()["value"]["width"]
+    ).json().get("value")
+    if not isinstance(data, dict) or "width" not in data:
+        launch_app(force=False, settle=1.0)
+        data = requests.get(
+            f"{config.WDA_URL}/session/{current_session()}/window/size",
+            timeout=15,
+        ).json().get("value") or {}
+    point_width = data["width"]
     _PIXEL_SCALE = max(pixel_width / float(point_width), 1.0)
     return _PIXEL_SCALE
 
@@ -116,20 +123,129 @@ def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
     return True
 
 
+def wda_swipe(start: tuple[int, int], end: tuple[int, int],
+              duration_ms: int = 400, settle: float = 0.5) -> bool:
+    """Swipe in screenshot-pixel space through WDA (divides by pixel_scale)."""
+    x1, y1 = _wda_pointer(start)
+    x2, y2 = _wda_pointer(end)
+    actions = {
+        "actions": [{
+            "type": "pointer",
+            "id": "freecell-wda-swipe",
+            "parameters": {"pointerType": "touch"},
+            "actions": [
+                {"type": "pointerMove", "duration": 0, "x": x1, "y": y1},
+                {"type": "pointerDown", "button": 0},
+                {"type": "pause", "duration": 40},
+                {"type": "pointerMove", "duration": duration_ms, "x": x2, "y": y2},
+                {"type": "pointerUp", "button": 0},
+            ],
+        }]
+    }
+    response = requests.post(
+        f"{config.WDA_URL}/session/{current_session()}/actions",
+        data=json.dumps(actions),
+        headers={"Content-Type": "application/json"},
+        timeout=15,
+    )
+    response.raise_for_status()
+    if settle:
+        time.sleep(settle)
+    return True
+
+
+def active_app() -> str:
+    """Foreground bundle id, or '' if WDA will not say."""
+    paths = []
+    try:
+        paths.append(f"/session/{current_session()}/wda/activeAppInfo")
+    except RuntimeError:
+        pass
+    paths.append("/wda/activeAppInfo")
+    for path in paths:
+        try:
+            value = requests.get(f"{config.WDA_URL}{path}", timeout=8).json().get("value") or {}
+            return value.get("bundleId") or ""
+        except Exception:  # noqa: BLE001
+            continue
+    return ""
+
+
+def in_app() -> bool:
+    return active_app() == config.BUNDLE_ID
+
+
+def home(settle: float = 2.0) -> bool:
+    """Press Home so the app can write state before a kill. True if it left."""
+    try:
+        requests.post(f"{config.WDA_URL}/wda/homescreen", json={}, timeout=15)
+    except Exception:  # noqa: BLE001
+        return False
+    time.sleep(settle)
+    return not in_app()
+
+
+# XCUIApplicationState: 0 unknown, 1 not running, 2 background, 3 background
+# (suspended), 4 foreground.
+APP_NOT_RUNNING = 1
+
+
+def app_state() -> int:
+    """FreeCell's XCUIApplicationState, or -1 if WDA will not say."""
+    body = {"bundleId": config.BUNDLE_ID}
+    paths = []
+    try:
+        paths.append(f"/session/{current_session()}/wda/apps/state")
+    except RuntimeError:
+        pass
+    paths.append("/wda/apps/state")
+    for path in paths:
+        try:
+            value = requests.post(
+                f"{config.WDA_URL}{path}", json=body, timeout=10,
+            ).json().get("value")
+            return int(value)
+        except Exception:  # noqa: BLE001
+            continue
+    return -1
+
+
 def terminate() -> None:
-    """Best-effort kill so the next launch is cold."""
+    """Kill the FreeCell process. It must not stay resident in the background."""
     try:
         sid = current_session()
     except RuntimeError:
-        return
-    try:
-        requests.post(
-            f"{config.WDA_URL}/session/{sid}/wda/apps/terminate",
-            json={"bundleId": config.BUNDLE_ID},
-            timeout=20,
-        )
-    except Exception:  # noqa: BLE001
-        pass
+        sid = None
+    paths = []
+    if sid:
+        paths.append(f"/session/{sid}/wda/apps/terminate")
+    paths.append("/wda/apps/terminate")
+    for path in paths:
+        try:
+            requests.post(
+                f"{config.WDA_URL}{path}",
+                json={"bundleId": config.BUNDLE_ID},
+                timeout=20,
+            )
+            break
+        except Exception:  # noqa: BLE001
+            continue
+
+
+def kill_app() -> bool:
+    """Terminate FreeCell and wait until it is not running (not just backgrounded)."""
+    terminate()
+    for _ in range(20):
+        state = app_state()
+        if state == APP_NOT_RUNNING or state == 0:
+            return True
+        if state == -1 and not in_app():
+            time.sleep(0.3)
+            terminate()
+            return not in_app()
+        time.sleep(0.3)
+        terminate()
+    return app_state() in (APP_NOT_RUNNING, 0)
 
 
 def alert_text() -> str:

@@ -47,7 +47,9 @@ TESTS = [
     "verifyDaily",
     "verifyPlay",
     "verifyGamePlay",
+    "verifyRelaunch",
     "verify_qa_victory",
+    "verifySoloStats",
 ]
 
 REQUIRED = [
@@ -63,11 +65,21 @@ REQUIRED = [
     "screen_daily",
     "daily_back",
     "screen_stats",
+    "stats_solo_tab",
+    "stats_daily_tab",
+    "stats_best_zero",
+    "stats_easy_none",
+    "reset_stats",
+    "reset_solo_stats",
+    "reset_yes",
     "screen_options",
     "screen_help",
     "screen_about",
     "screen_more_games",
     "screen_choose_look",
+    "look_close",
+    "look_surface_tab",
+    "look_cards_tab",
     "screen_play",
     "difficulty_easy",
     "screen_table",
@@ -95,7 +107,11 @@ def preflight() -> list[str]:
     try:
         helpers.wda_status()
     except Exception as exc:  # noqa: BLE001
-        problems.append(f"WDA is not reachable at {config.WDA_URL}: {exc}")
+        problems.append(
+            f"WDA is not reachable at {config.WDA_URL}: {exc}. "
+            "Start it with ./scripts/wda.sh (uses the signed build in wda/, "
+            "phone unlocked and online)."
+        )
     return problems
 
 

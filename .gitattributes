@@ -1,0 +1,5 @@
+# Signed WDA is a code-signed binary tree. Line-ending conversion would
+# invalidate the signature and iOS would refuse to install it.
+wda/** binary
+wda/*.md text diff
+*.png binary

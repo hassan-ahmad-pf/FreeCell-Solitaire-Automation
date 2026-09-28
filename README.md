@@ -13,30 +13,15 @@ FreeCell-specific assertions.
 
 ## Current status
 
-The FreeCell app is installed on the development phone. The initial screen is a
-Terms & Conditions / Privacy Policy card. Before device walkthroughs can run,
-WDA must be rebuilt and signed for the phone's UDID. The committed Spider WDA
-profile does not include that device.
+The signed WDA for this phone lives in [`wda/`](wda/README.md). `scripts/wda.sh`
+finds it automatically — do not point `WDA_PRODUCTS` at `/tmp`.
 
 ## Setup
 
 ```bash
 ./scripts/setup.sh
 export DEVICE_UDID=00008130-00010D283A31001C
-export WDA_PRODUCTS=/tmp/wda-freecell-build/Build/Products
-```
-
-If a signed runner is already installed on the phone, attach to it without
-reinstalling the repository's incompatible WDA artifact:
-
-```bash
-WDA_ATTACH=1 ./scripts/wda.sh "$DEVICE_UDID"
-```
-
-For a newly signed local runner, use:
-
-```bash
-WDA_PRODUCTS="$WDA_PRODUCTS" ./scripts/wda.sh "$DEVICE_UDID"
+./scripts/wda.sh          # phone UNLOCKED and online; leave running
 ```
 
 Then run the smoke test or the full regression:
