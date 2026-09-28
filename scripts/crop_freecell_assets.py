@@ -15,13 +15,22 @@ ASSETS = ROOT / "assets"
 # deliberately small semantic anchors, not whole-screen baselines.
 CROPS = {
     "screen_menu": ("qa_menu_enabled", (950, 1270, 1150, 1450)),
-    "menu_play": ("qa_menu_enabled", (950, 1270, 1150, 1450)),
-    "menu_stats": ("qa_about_recovered", (800, 1550, 1250, 1850)),
-    "menu_options": ("qa_about_recovered", (800, 1800, 1250, 2100)),
-    "menu_help": ("qa_about_recovered", (800, 2050, 1250, 2300)),
-    "menu_about": ("qa_about_recovered", (400, 2200, 900, 2450)),
-    "more_games": ("qa_about_recovered", (0, 1550, 500, 2100)),
-    "choose_look": ("qa_about_recovered", (0, 1850, 500, 2200)),
+    "menu_play": ("subsequent_launch", (900, 1240, 1260, 1420)),
+    "menu_daily": ("subsequent_launch", (900, 1420, 1260, 1600)),
+    "menu_stats": ("subsequent_launch", (760, 1600, 1260, 1780)),
+    "menu_options": ("subsequent_launch", (740, 1780, 1260, 2000)),
+    "menu_help": ("subsequent_launch", (900, 2000, 1260, 2200)),
+    "menu_about": ("subsequent_launch", (430, 2180, 860, 2360)),
+    "more_games": ("subsequent_launch", (0, 1520, 420, 1780)),
+    "choose_look": ("subsequent_launch", (0, 1780, 420, 2080)),
+    "page_back": ("miss_145_about", (0, 160, 220, 300)),
+    "look_close": ("screen_choose_look", (1080, 680, 1260, 860)),
+    "daily_back": ("Daily", (0, 170, 300, 340)),
+    "screen_daily": ("Daily", (160, 620, 1130, 1000)),
+    "difficulty_medium": ("miss_165_picker", (760, 1380, 1260, 1540)),
+    "difficulty_hard": ("miss_165_picker", (760, 1540, 1260, 1680)),
+    "difficulty_expert": ("miss_165_picker", (760, 1680, 1260, 1860)),
+    "difficulty_master": ("miss_165_picker", (760, 1860, 1260, 2000)),
     "screen_stats": ("screen_stats", (400, 100, 950, 350)),
     "screen_options": ("screen_options", (400, 100, 950, 350)),
     "screen_help": ("screen_help", (250, 700, 1000, 1050)),
@@ -33,11 +42,11 @@ CROPS = {
     "screen_options_bottom": ("screen_options_bottom", (0, 650, 1290, 2100)),
     "screen_play": ("qa_picker_clean", (850, 1150, 1250, 1500)),
     "difficulty_easy": ("qa_picker_clean", (850, 1150, 1250, 1450)),
-    "screen_table": ("qa_table_started", (0, 250, 1290, 900)),
+    "screen_table": ("GamePlayTable", (0, 380, 900, 560)),
     "back_game": ("qa_table_started", (0, 290, 260, 410)),
     "table_foundations": ("qa_table_started", (0, 450, 700, 850)),
-    "table_cells": ("qa_table_started", (650, 450, 1290, 850)),
-    "tableau": ("qa_table_started", (0, 850, 1290, 1550)),
+    "table_cells": ("GamePlayTable", (680, 580, 1280, 760)),
+    "tableau": ("GamePlayTable", (0, 2020, 1290, 2180)),
     "about_emblem": ("qa_about_build_info", (500, 450, 800, 800)),
     "about_version": ("qa_about_build_info", (350, 1150, 950, 1400)),
     "qa_watermark": ("qa_menu_enabled", (0, 150, 500, 650)),
@@ -45,27 +54,38 @@ CROPS = {
     "qa_panel": ("qa_panel_table", (400, 850, 1250, 2000)),
     "qa_90_99": ("qa_after_percent", (850, 1600, 1250, 1850)),
     "qa_win": ("qa_after_percent", (550, 1600, 850, 1850)),
-    "screen_victory": ("screen_victory", (400, 850, 950, 1800)),
-    "victory_title": ("screen_victory", (400, 850, 950, 1800)),
+    "screen_victory": ("freecell_victory", (100, 1100, 1190, 1260)),
+    "victory_title": ("freecell_victory", (380, 930, 910, 1030)),
     "victory_menu": ("screen_victory", (1000, 250, 1270, 500)),
+    # First-launch gates, cropped from the 279 walkthrough. WDA cannot see
+    # these; they are image-matched only.
+    "tc_continue": ("walk_05_after_privacy", (470, 1688, 820, 1788)),
+    "tc_terms_link": ("walk_05_after_privacy", (280, 1205, 990, 1320)),
+    "tc_privacy_link": ("walk_05_after_privacy", (280, 1345, 990, 1475)),
+    "tc_terms_page": ("walk_02_terms_page", (390, 1420, 910, 1500)),
+    "tc_privacy_page": ("walk_04_privacy_page", (400, 1230, 890, 1300)),
+    "tc_web_close": ("walk_02_terms_page", (20, 140, 160, 280)),
+    "att_prompt": ("walk_06_after_continue", (180, 1220, 1110, 1430)),
+    "att_allow": ("walk_06_after_continue", (450, 1845, 840, 1915)),
 }
 
 
 def main() -> int:
     ASSETS.mkdir(parents=True, exist_ok=True)
     missing = []
+    created = 0
     for name, (source, box) in CROPS.items():
         path = LOG / f"{source}.png"
         if not path.exists():
-            missing.append(str(path))
+            missing.append(f"{name} <- {path.name}")
             continue
         Image.open(path).crop(box).save(ASSETS / f"{name}.png")
+        created += 1
     if missing:
         print("Missing source captures:")
         print("\n".join(missing))
-        return 2
-    print(f"Created {len(CROPS)} FreeCell assets in {ASSETS}")
-    return 0
+    print(f"Created {created} FreeCell assets in {ASSETS}")
+    return 2 if missing else 0
 
 
 if __name__ == "__main__":

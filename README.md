@@ -39,11 +39,19 @@ For a newly signed local runner, use:
 WDA_PRODUCTS="$WDA_PRODUCTS" ./scripts/wda.sh "$DEVICE_UDID"
 ```
 
-Then run the smoke test:
+Then run the smoke test or the full regression:
 
 ```bash
 ./.venv/bin/python tests/connect_check.py
+DEVICE_UDID=00008130-00010D283A31001C ./.venv/bin/python -u tests/run_all.py
 ```
+
+`tests/run_all.py` is the regression. It does not need you to say first vs
+subsequent launch: `verifyFirstLaunch` walks the policy links only when the
+T&C card is on screen, then the runner puts the phone in Airplane Mode and
+turns Wi-Fi off so interstitials cannot interrupt the rest. Start WDA while
+the phone is still online; do not restart WDA after the suite goes offline.
+`SKIP_OFFLINE=1` leaves the network up.
 
 ## Capture-first workflow
 

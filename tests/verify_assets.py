@@ -33,6 +33,20 @@ REQUIRED = (
     "screen_victory",
     "victory_title",
     "victory_menu",
+    "menu_daily",
+    "screen_daily",
+    "daily_back",
+    "menu_stats",
+    "menu_options",
+    "menu_help",
+    "menu_about",
+    "more_games",
+    "choose_look",
+    "about_emblem",
+    "about_version",
+    "tc_continue",
+    "att_prompt",
+    "att_allow",
 )
 
 
