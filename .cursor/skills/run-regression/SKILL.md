@@ -53,3 +53,7 @@ PYTHONPATH="$PWD" /Users/hassan/Automation-FA/Spider-Solitaire-Automation/.venv/
 
 Report the printed PASS/FAIL table. Do not treat a first-launch skip as a failure.
 Do not start with `verifySubsequentLaunch` — that case is attach-only and fails if the gates are up.
+
+`run_all.py` does not compare screenshots. The Obj-C visual reference is
+`baselines/` (see the README's "Obj-C baselines"). Never promote a Unity
+capture into it; `scripts/update_baselines.py` refuses anything but 7.42.5 (279).

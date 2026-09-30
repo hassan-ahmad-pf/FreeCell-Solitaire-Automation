@@ -1,0 +1,321 @@
+{
+  "screens": {
+    "FirstLaunchTerms": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.062,
+      "settled": true,
+      "captured": "2026-10-01T00:54:14"
+    },
+    "TermsPage": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:54:49"
+    },
+    "PrivacyPage": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:55:01"
+    },
+    "StatsSoloEmpty": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:56:05"
+    },
+    "StatsSoloBottom": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:56:25"
+    },
+    "ResetSoloDialog": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:56:32"
+    },
+    "StatsDailyEmpty": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:56:58"
+    },
+    "StatsDailyBottom": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:57:18"
+    },
+    "MainMenu": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.43,
+      "settled": false,
+      "captured": "2026-10-01T00:57:43"
+    },
+    "AboutTop": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:57:55"
+    },
+    "AdFreePrompt": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:58:02"
+    },
+    "FeedbackAlert": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:58:12"
+    },
+    "AboutVersion": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:58:22"
+    },
+    "FAQTop": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:58:31"
+    },
+    "FAQBottom": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:59:25"
+    },
+    "FAQSolo": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:59:36"
+    },
+    "FAQDaily": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T00:59:47"
+    },
+    "HelpTop": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:01:09"
+    },
+    "HelpMid": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:01:16"
+    },
+    "HelpBottom": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:01:47"
+    },
+    "OptionsTop": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:02:20"
+    },
+    "OptionsMid": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:02:27"
+    },
+    "OptionsBottom": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:02:41"
+    },
+    "ChooseLookSurface": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:03:31"
+    },
+    "ChooseLookCards": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:03:39"
+    },
+    "PlayPicker": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.889,
+      "settled": false,
+      "captured": "2026-10-01T01:04:07"
+    },
+    "LastScoreNotice": {
+      "source": "objc_pass2",
+      "shot": 3,
+      "volatile_pct": 0.065,
+      "settled": true,
+      "captured": "2026-10-01T01:04:16"
+    },
+    "LastScore": {
+      "source": "objc_pass2",
+      "shot": 3,
+      "volatile_pct": 0.047,
+      "settled": true,
+      "captured": "2026-10-01T01:04:24"
+    },
+    "TableDeal": {
+      "source": "objc_pass2",
+      "shot": 3,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:04:48"
+    },
+    "TableDrawer": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:04:58"
+    },
+    "PlayPickerResume": {
+      "source": "objc_pass2",
+      "shot": 3,
+      "volatile_pct": 2.971,
+      "settled": false,
+      "captured": "2026-10-01T01:05:29"
+    },
+    "AbandonPrompt": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.113,
+      "settled": true,
+      "captured": "2026-10-01T01:05:40"
+    },
+    "TableRichOff": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:06:18"
+    },
+    "TableRankStripOff": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:07:22"
+    },
+    "DailyTutorial1": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.238,
+      "settled": true,
+      "captured": "2026-10-01T01:08:14"
+    },
+    "DailyTutorial2": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.018,
+      "settled": true,
+      "captured": "2026-10-01T01:08:21"
+    },
+    "DailyCalendar": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:08:32"
+    },
+    "DailyTable": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:08:41"
+    },
+    "MoreGamesTop": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 13.342,
+      "settled": false,
+      "captured": "2026-10-01T01:09:16"
+    },
+    "MoreGamesScrolled": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 17.232,
+      "settled": false,
+      "captured": "2026-10-01T01:09:43"
+    },
+    "Victory": {
+      "source": "objc_pass2",
+      "shot": 2,
+      "volatile_pct": 1.828,
+      "settled": true,
+      "captured": "2026-10-01T01:11:07"
+    },
+    "MainMenuAfterWin": {
+      "source": "objc_pass2",
+      "shot": 3,
+      "volatile_pct": 2.24,
+      "settled": true,
+      "captured": "2026-10-01T01:11:53"
+    },
+    "StatsSoloAfterWin": {
+      "source": "objc_pass2",
+      "shot": 1,
+      "volatile_pct": 0.0,
+      "settled": true,
+      "captured": "2026-10-01T01:12:10"
+    }
+  },
+  "identity": {
+    "bundle_id": "com.fingerarts.FreeCell",
+    "name": "FreeCell",
+    "version": "7.42.5",
+    "build": "279",
+    "model": "iPhone16,2",
+    "ios": "27.0",
+    "size": [
+      1290,
+      2796
+    ],
+    "started": "2026-10-01T00:53:42"
+  },
+  "promoted": "2026-10-01T03:09:40",
+  "daily_date": "2026-10-01",
+  "daily_level": "Medium"
+}

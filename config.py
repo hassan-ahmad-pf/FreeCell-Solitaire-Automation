@@ -22,6 +22,12 @@ ASSETS = Path(os.environ.get("ASSETS", ROOT / "assets"))
 LOG = Path(os.environ.get("LOG", ROOT / "log"))
 WDA_PRODUCTS = os.environ.get("WDA_PRODUCTS", "").strip()
 
+# The Obj-C reference set. Only a capture of this build may be promoted into
+# it — the Unity port is compared against it, never baselined into it.
+BASELINES = Path(os.environ.get("BASELINES", ROOT / "baselines"))
+OBJC_VERSION = "7.42.5"          # CFBundleShortVersionString
+OBJC_BUILD = "279"               # CFBundleVersion; About prints "279 60706F"
+
 QA_CODE = os.environ.get("QA_CODE", "943010")
 QA_TAPS = int(os.environ.get("QA_TAPS", "10"))
 
