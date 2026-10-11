@@ -24,6 +24,8 @@ REQUIRED = (
     "table_foundations",
     "table_cells",
     "tableau",
+    "hint_undo",
+    "hint_hints",
     "back_game",
     "qa_watermark",
     "qa_badge",

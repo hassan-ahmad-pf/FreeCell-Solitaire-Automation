@@ -1,0 +1,211 @@
+"""Spider's regression suite, mapped onto the FreeCell prod build.
+
+Case IDs, titles and sections are Spider's own (reference/spider/docs/
+testrail/cases.py, identical to the Spider repo), with the game name swapped.
+RUN_ORDER is Spider's tests/run_all.py TESTS (the main suite), then Spider's
+six standalone tests (STANDALONE) in the order of Spider's report catalog.
+
+Each Spider test is one of:
+  run  — a FreeCell port in tests/spider_suite/<module>.py
+  dev  — needs the dev build (QA code / Synthetic Win / Dev Panel); skipped
+
+LATER lists the cases whose Spider behaviour FreeCell does not have. They
+stay in the report and are filled in later against FreeCell's own gameplay.
+"""
+from __future__ import annotations
+
+import importlib.util
+import os
+import re
+from collections import OrderedDict
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SPIDER_CASES = os.path.join(ROOT, "reference", "spider", "docs", "testrail", "cases.py")
+
+DEV_REASON = "needs the dev build"
+
+# (Spider test, FreeCell module or None, kind, case ids, skip reason)
+RUN_ORDER = [
+    ("installFromTestFlight", None, "dev", ["FL-06"],
+     "needs the dev build (TestFlight odd build)"),
+    ("verifyFirstLaunch", "verifyFirstLaunch", "run",
+     ["FL-01", "FL-02", "FL-03", "FL-04", "FL-05"], ""),
+    ("verifyMainMenu", "verifyMainMenu", "run", ["MM-01"], ""),
+    ("verifyStatsPage", "verifyStatsPage", "run", ["ST-01", "ST-03", "ST-04"], ""),
+    ("verifyOptions", "verifyOptions", "run",
+     ["OP-01", "OP-03", "OP-04", "OP-05", "OP-06", "OP-07"], ""),
+    ("verifyHelpShift", "verifyHelpShift", "run", ["HS-02"], ""),
+    ("verifyHelpPage", "verifyHelpPage", "run", ["HP-01", "HP-02", "HP-03"], ""),
+    ("verifySpiderLogo", "verifyFreeCellLogo", "run",
+     ["AB-01", "AB-03", "AB-04", "AB-05", "AB-06"], ""),
+    ("verifyMoreGamesBtn", "verifyMoreGamesBtn", "run", ["MG-01", "MG-02", "MG-03"], ""),
+    ("verifyPlay", "verifyPlay", "run", ["PL-01", "PL-02", "PL-03"], ""),
+    ("verifyAbandonNo", "verifyAbandonNo", "run", ["PL-04"], ""),
+    ("verifyRelaunch", "verifyRelaunch", "run", ["RL-01", "RL-02"], ""),
+    ("openDebugTools", None, "dev", ["QA-02", "QA-03", "QA-04"],
+     "needs the dev build (the prod build has no QA entry point)"),
+    ("verifyGamePlay", "verifyGamePlay", "run",
+     ["GP-01", "GP-02", "GP-03", "GP-04", "GP-05", "GP-06",
+      "GP-07", "GP-08", "GP-09", "GP-10", "GP-11", "GP-14"], ""),
+    ("verifyVictory", None, "dev", ["VI-01", "VI-02", "VI-03", "VI-04"],
+     "needs the dev build (Complete Game / Synthetic Win)"),
+    ("verifyDifficultyLevels", None, "dev", ["DL-01", "DL-02", "DL-03", "DL-04"],
+     "needs the dev build (each level is completed with Synthetic Win)"),
+    ("verifyMoreGamesIcons", None, "dev",
+     ["PI-01", "PI-02", "PI-03", "PI-04", "PI-05", "PI-06"],
+     "needs the dev build (the promo strip is drawn only after a won game)"),
+    ("verifyResetCancelled", "verifyResetCancelled", "run", ["RS-03"], ""),
+    ("resetStats", "resetStats", "run", ["RS-01", "RS-02"], ""),
+    ("verifyHelpShiftOnline", "verifyHelpShiftOnline", "run", ["HS-01"], ""),
+    ("verifyChooseLook", "verifyChooseLook", "run",
+     ["CL-01", "CL-03", "CL-04", "CL-05"], ""),
+    ("verifyAds", None, "dev",
+     ["AD-01", "AD-02", "AD-03", "AD-04", "AD-06", "AD-07"],
+     "needs the dev build (Dev Panel → Max Debugger pins AppLovin)"),
+    ("triggerAdPoints", "triggerAdPoints", "dev",
+     ["TA-01", "TA-02", "TA-03", "TA-04", "TA-05",
+      "TA-06", "TA-07", "TA-08", "TA-09", "TA-10"],
+     "needs the dev build (prod serves live ads; some playables have no "
+     "close control, so the run cannot stay unattended)"),
+    ("visitLastScore", None, "dev", ["LS-01", "LS-02", "LS-03", "LS-04", "LS-05"],
+     "needs the dev build (Last Score needs a win; prod has no Synthetic Win)"),
+    ("verifyAdFreeVersion", "verifyAdFreeVersion", "run",
+     ["AF-01", "AF-02", "AF-03", "AF-04"], ""),
+    ("submitFeedback", "submitFeedback", "run",
+     ["FB-02", "FB-03", "FB-04", "FB-05", "FB-06"], ""),
+]
+
+# Cases inside a run test that cannot run on the prod build.
+DEV_CASES = OrderedDict()
+
+# Spider's run_all.py leaves these out of TESTS and runs each only when it is
+# named ("run_all.py verifyAds"); see the note above Spider's TESTS.
+STANDALONE = (
+    "verifyChooseLook", "verifyAds", "triggerAdPoints", "visitLastScore",
+    "verifyAdFreeVersion", "submitFeedback",
+)
+
+# Spider's promo-strip test brings the phone online; the reset tests and
+# Contact Us online run after that transition, so the runner makes it even
+# when the test itself is skipped.
+ONLINE_FROM = "verifyMoreGamesIcons"
+
+# Run cases that need the network. FL-02..05 also need a fresh install: the
+# Terms card shows once per install and its policy pages load online.
+ONLINE_CASES = (
+    "FL-02", "FL-03", "FL-04", "FL-05", "HS-01",
+    "AF-01", "AF-02", "AF-03", "AF-04",
+    "FB-02", "FB-03", "FB-04", "FB-05", "FB-06",
+)
+
+# Spider behaviour FreeCell does not have — filled in later.
+LATER = OrderedDict([
+    ("OP-07", "FreeCell difference — FreeCell's Options have no Use Hearts"),
+    ("GP-02", "FreeCell difference — FreeCell has no stock pile to deal from"),
+    ("GP-08", "FreeCell difference — FreeCell has no Use Hearts"),
+    ("GP-09", "FreeCell difference — FreeCell has no Use Hearts"),
+    ("PI-05", "FreeCell difference — FreeCell's promo strip has no FreeCell "
+              "icon (it is this app)"),
+])
+
+# Where the FreeCell build words a step differently from Spider.
+ADAPTED = OrderedDict([
+    ("MM-01", "FreeCell's logo is the crown; the menu also has Daily"),
+    ("PL-02", "FreeCell's five levels are Easy, Medium, Hard, Expert, Master"),
+    ("RL-01", "after many force-quits FreeCell reopens a game in progress on its main "
+              "menu instead of the table; then Play → Resume must bring back the exact board"),
+    ("RL-02", "after many force-quits FreeCell reopens a game in progress on its main "
+              "menu instead of the table; then Play → Resume must bring back the exact board"),
+    ("GP-03", "undoes a card move — FreeCell has no stock deal"),
+    ("AF-03", "lands on FreeCell's ad-free build"),
+    ("AF-04", "FreeCell resumes on its main menu, not About — it does that after "
+              "any trip to the background; still running is the resume proof"),
+    ("MG-02", "the swiped list shows Card Games and Spiderette"),
+])
+
+# FreeCell wording where swapping the game name is not enough.
+TITLE_OVERRIDES = {
+    "MG-02": "More Games - Swipe reveals Card Games and Spiderette",
+    "AF-04": "Ad-free - Status-bar back resumes FreeCell",
+}
+
+
+def _load_spider_cases() -> list[dict]:
+    spec = importlib.util.spec_from_file_location("spider_cases", SPIDER_CASES)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.CASES
+
+
+def _freecell(text: str) -> str:
+    text = text.replace("Spider Solitaire Unity", "FreeCell Solitaire")
+    return re.sub(r"\bSpider\b", "FreeCell", text)
+
+
+CASES = [
+    dict(case,
+         title=TITLE_OVERRIDES.get(case["id"]) or _freecell(case["title"]),
+         section=_freecell(case["section"]))
+    for case in _load_spider_cases()
+]
+TITLES = {case["id"]: case["title"] for case in CASES}
+SECTIONS = {case["id"]: case["section"].split(" > ")[-1] for case in CASES}
+
+
+def owner(cid: str) -> str:
+    for spider, _module, _kind, ids, _why in RUN_ORDER:
+        if cid in ids:
+            return spider
+    return ""
+
+
+def entry(spider: str):
+    for item in RUN_ORDER:
+        if item[0] == spider:
+            return item
+    return None
+
+
+def runnable_ids(ids: list[str]) -> list[str]:
+    return [cid for cid in ids if cid not in LATER and cid not in DEV_CASES]
+
+
+def counts() -> dict:
+    executed = dev = later = 0
+    for _spider, _module, kind, ids, _why in RUN_ORDER:
+        for cid in ids:
+            if cid in LATER:
+                later += 1
+            elif kind == "dev" or cid in DEV_CASES:
+                dev += 1
+            else:
+                executed += 1
+    return {"run": executed, "dev build": dev, "later": later}
+
+
+def validate() -> dict:
+    ids = [case["id"] for case in CASES]
+    mapped: list[str] = []
+    for spider, module, kind, cids, why in RUN_ORDER:
+        if kind == "run" and not module:
+            raise ValueError(f"{spider}: a run entry needs a FreeCell module")
+        if kind == "dev" and not why:
+            raise ValueError(f"{spider}: a dev entry needs a reason")
+        mapped.extend(cids)
+    dup = sorted({cid for cid in mapped if mapped.count(cid) > 1})
+    if dup:
+        raise ValueError(f"mapped twice: {dup}")
+    unknown = sorted(set(mapped) - set(ids))
+    if unknown:
+        raise ValueError(f"not Spider cases: {unknown}")
+    unmapped = sorted(set(ids) - set(mapped))
+    if unmapped:
+        raise ValueError(f"Spider cases with no parent: {unmapped}")
+    stray = sorted((set(LATER) | set(DEV_CASES) | set(ADAPTED)) - set(ids))
+    if stray:
+        raise ValueError(f"notes for unknown cases: {stray}")
+    return counts()
+
+
+if __name__ == "__main__":
+    print(f"{len(CASES)} Spider cases: {validate()}")

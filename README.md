@@ -38,6 +38,49 @@ turns Wi-Fi off so interstitials cannot interrupt the rest. Start WDA while
 the phone is still online; do not restart WDA after the suite goes offline.
 `SKIP_OFFLINE=1` leaves the network up.
 
+FreeCell is never on screen while the network is up, because an ad it
+loads then shows later in the offline run. Going online closes FreeCell
+first (Home, then kill) and leaves it closed; going offline kills it once
+the radios are off unless they were already known to be off. The runner
+goes offline before the first case and online only at the end, after
+closing FreeCell. `verifyFirstLaunch` goes online itself only when a
+fresh install's Terms card is up (its policy links load web pages).
+
+`verifyRichFeaturesOn` and `verifyRichFeaturesOff` follow GamePlay. ON goes
+main menu → Options, scrolls to Rich Features, turns it on only if it is
+off, then plays Easy and requires the timer, score, multiplier and the move
+counter beside "menu". OFF deals Easy, keeps that frame as the ON reference,
+turns Rich Features off through the table's menu → options, and requires
+all four gone on the same deal, then turns it back ON the same way and
+requires all four back (`log/RichFeaturesCompare.png`). Both switch cases
+read the switch state on Options at every step, and table frames are taken
+once the deal animation that replays after Options has stopped.
+
+`verifyRankStrip` follows the same steps for Rank Strip: it reads the switch
+on the main menu's Options, turns it on only if it is off, and plays Easy.
+Then every run checks both directions on the same deal through the table's
+menu → options: reads ON → tap → reads OFF → the A…K strip is gone, then
+reads OFF → tap → reads ON → the strip is back. Each switch state is
+captured on Options (`log/RankStripOption*.png`) and the three tables sit
+side by side in `log/RankStripCompare.png`. Table frames are taken once the
+deal animation that replays after Options has stopped. The red "Test
+Banner" debug button sits over the switch column near the bottom of
+Options, so a row is nudged up the page before its switch is tapped.
+
+`verifySoloStats` runs after Relaunch and `verify_qa_victory` is last. Solo
+shows only the best score, so any earlier win would outrank the one Solo
+Stats checks; it always resets Solo first and requires none/0 (both empty
+crops at >= 0.95 on their own rows — anywhere else they match populated
+pages too), wins Easy, requires the
+victory **current** score to be Solo's best score (the victory "best"
+column is this week's ranking, which Reset Solo does not clear), then
+resets Solo and requires none/0.
+
+`verifyRelaunch` is in that suite (after Rank Strip, before Solo Stats). It Homes,
+kills the FreeCell process, launches again, and passes when the gameplay
+screen is back. The runner then taps Back so later cases start from the
+menu.
+
 ## Capture-first workflow
 
 FreeCell assets are not copied from Spider. Capture the fresh install and every

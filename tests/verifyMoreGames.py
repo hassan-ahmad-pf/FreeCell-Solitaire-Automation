@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import sys
 
-from airtest.core.api import swipe
-
 import freecell_ui as ui
 
 
@@ -15,7 +13,7 @@ def run() -> None:
     ui.expect(ui.expect_screen("more_games"),
               "tapping More Games did not open the More Games stage")
     shot = ui.shoot("MoreGames")
-    swipe((645, 2100), (645, 700), duration=0.6)
+    ui.scroll()
     scrolled = ui.shoot("MoreGamesScrolled")
     ui.expect(ui.to_menu(), "could not return to the menu after More Games")
     print(f"PASS: More Games opened, scrolled, and returned — {shot}, {scrolled}")

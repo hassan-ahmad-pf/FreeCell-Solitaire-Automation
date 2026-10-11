@@ -1,18 +1,44 @@
-"""Small WDA/Airtest helpers shared by the FreeCell tests."""
+"""Small WDA helpers shared by the FreeCell tests.
+
+Matching, screenshots, taps and swipes go through WDA HTTP. Airtest's iOS
+driver is not used on the hot path — its recover relaunches XCTest and
+kills the runner we started with scripts/wda.sh.
+"""
 from __future__ import annotations
 
+import base64
 import json
+import os
+import shutil
+import subprocess
 import time
 from pathlib import Path
 
 import requests
-from airtest.core.api import connect_device, snapshot, touch
 
 import config
 
 
 _SESSION_ID: str | None = None
 _PIXEL_SCALE: float | None = None
+
+LINK_ERRORS = (
+    "re-acquire session",
+    "no such session",
+    "invalid session",
+    "session does not exist",
+    "closed connection",
+    "connection aborted",
+    "connection reset",
+    "connection refused",
+    "failed to establish",
+    "max retries exceeded",
+)
+
+
+def is_link_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return any(token in msg for token in LINK_ERRORS)
 
 
 def wda_status() -> dict:
@@ -22,9 +48,136 @@ def wda_status() -> dict:
     return response.json()
 
 
+def wait_for_status(timeout: float = 15.0, gap: float = 0.45) -> dict | None:
+    """Poll /status. Does not touch iproxy or XCTest — a terminate blinks HTTP."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            return wda_status()
+        except Exception:  # noqa: BLE001
+            time.sleep(gap)
+    return None
+
+
+def drop_session() -> None:
+    """Forget the cached session. Terminate of FreeCell invalidates it."""
+    global _SESSION_ID
+    _SESSION_ID = None
+
+
+def restart_iproxy() -> None:
+    """Re-forward 8100. Does not relaunch xcodebuild (that needs the network)."""
+    port = "8100"
+    try:
+        listeners = subprocess.check_output(
+            ["lsof", "-ti", f"TCP:{port}", "-sTCP:LISTEN"],
+            text=True,
+        ).split()
+    except Exception:  # noqa: BLE001
+        listeners = []
+    for pid in listeners:
+        subprocess.run(["kill", pid], check=False)
+    iproxy = shutil.which("iproxy") or "/opt/homebrew/bin/iproxy"
+    udid = config.DEVICE_UDID
+    cmd = [iproxy, f"{port}:8100"]
+    if udid:
+        cmd.extend(["-u", udid])
+    subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    time.sleep(0.8)
+
+
+def ensure_link() -> dict:
+    """WDA HTTP must answer. Wait out a blink before touching iproxy.
+
+    Killing FreeCell drops the session and USB mux can reset for a few
+    seconds. Restarting iproxy on the first failure races the recovering
+    runner and takes the rest of the suite down.
+    """
+    last: Exception | None = None
+    got = wait_for_status(timeout=10.0)
+    if got:
+        return got
+    for _ in range(2):
+        restart_iproxy()
+        got = wait_for_status(timeout=6.0)
+        if got:
+            return got
+        try:
+            return wda_status()
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+    raise RuntimeError(f"WDA HTTP is down after iproxy restart: {last}")
+
+
+def recover_after_app_kill() -> bool:
+    """After terminate, wait for HTTP. Restart iproxy only if it stays down."""
+    drop_session()
+    if wait_for_status(timeout=15.0):
+        return True
+    print("  WDA HTTP still down after the kill — restarting iproxy only",
+          flush=True)
+    restart_iproxy()
+    return wait_for_status(timeout=8.0) is not None
+
+
+def start_wda() -> bool:
+    """Start the detached in-repo runner. Phone must be online and unlocked."""
+    root = Path(__file__).resolve().parent
+    script = root / "scripts" / "wda.sh"
+    env = os.environ.copy()
+    env.setdefault("DEVELOPER_DIR", "/Applications/Xcode.app/Contents/Developer")
+    udid = config.DEVICE_UDID
+    if udid:
+        env["DEVICE_UDID"] = udid
+    cmd = [str(script)]
+    if udid:
+        cmd.append(udid)
+    print("  starting ./scripts/wda.sh (detached)", flush=True)
+    result = subprocess.run(cmd, cwd=str(root), env=env, timeout=180)
+    return result.returncode == 0 and wait_for_status(timeout=8.0) is not None
+
+
+def revive_wda() -> bool:
+    """If the on-device runner died, start wda.sh. Needs the phone online."""
+    if wait_for_status(timeout=3.0):
+        return True
+    print("  WDA runner is down — restarting it (phone must be online)",
+          flush=True)
+    return start_wda()
+
+
 def connect() -> None:
-    """Attach Airtest to the already-running WDA session."""
-    connect_device(config.DEVICE_URI)
+    """Confirm the already-running WDA. Never ask Airtest to launch XCTest."""
+    ensure_link()
+
+
+def ensure_session(settle: float = 0.4) -> str:
+    """Reuse the WDA session or mint a new one against the live runner."""
+    global _SESSION_ID
+    if _SESSION_ID:
+        try:
+            response = requests.get(
+                f"{config.WDA_URL}/session/{_SESSION_ID}",
+                timeout=5,
+            )
+            if response.status_code == 200:
+                return _SESSION_ID
+        except Exception:  # noqa: BLE001
+            pass
+        _SESSION_ID = None
+    return launch_app(force=False, settle=settle)
+
+
+def reconnect() -> str:
+    """Recover a dropped socket/session without touching XCTest."""
+    print("  reconnecting WDA over HTTP (no XCTest relaunch)", flush=True)
+    ensure_link()
+    return ensure_session(settle=0.8)
 
 
 def launch_app(force: bool = False, bundle_id: str | None = None,
@@ -33,6 +186,7 @@ def launch_app(force: bool = False, bundle_id: str | None = None,
 
     Defaults to FreeCell. Pass another bundle (Settings) for radio control.
     """
+    ensure_link()
     response = requests.post(
         f"{config.WDA_URL}/session",
         json={
@@ -55,15 +209,16 @@ def launch_app(force: bool = False, bundle_id: str | None = None,
 
 
 def tap(point: tuple[int, int], settle: float = 1.0) -> None:
-    """Tap a point already in Airtest's screenshot coordinate space."""
-    touch(point)
-    if settle:
-        time.sleep(settle)
+    """Tap a screenshot-pixel point through WDA."""
+    wda_tap(point, settle=settle)
 
 
 def current_session() -> str:
-    if not _SESSION_ID:
-        raise RuntimeError("launch_app() must run before WDA actions")
+    return ensure_session(settle=0.3)
+
+
+def cached_session() -> str | None:
+    """The last launch's session id, or None. Never checks or mints one."""
     return _SESSION_ID
 
 
@@ -97,6 +252,7 @@ def _wda_pointer(pixel: tuple[int, int]) -> tuple[int, int]:
 
 def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
     """Tap screenshot-pixel coordinates through WDA (divides by pixel_scale)."""
+    ensure_session()
     x, y = _wda_pointer(pixel)
     actions = {
         "actions": [{
@@ -123,9 +279,21 @@ def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
     return True
 
 
+def type_keys(text: str) -> bool:
+    """Type into the current first responder through WDA, not Airtest."""
+    sid = ensure_session()
+    response = requests.post(
+        f"{config.WDA_URL}/session/{sid}/wda/keys",
+        json={"value": list(text)},
+        timeout=15,
+    )
+    return response.status_code == 200
+
+
 def wda_swipe(start: tuple[int, int], end: tuple[int, int],
               duration_ms: int = 400, settle: float = 0.5) -> bool:
     """Swipe in screenshot-pixel space through WDA (divides by pixel_scale)."""
+    ensure_session()
     x1, y1 = _wda_pointer(start)
     x2, y2 = _wda_pointer(end)
     actions = {
@@ -155,13 +323,14 @@ def wda_swipe(start: tuple[int, int], end: tuple[int, int],
 
 
 def active_app() -> str:
-    """Foreground bundle id, or '' if WDA will not say."""
-    paths = []
-    try:
-        paths.append(f"/session/{current_session()}/wda/activeAppInfo")
-    except RuntimeError:
-        pass
-    paths.append("/wda/activeAppInfo")
+    """Foreground bundle id, or '' if WDA will not say.
+
+    Never mints a session — that would relaunch FreeCell while kill_app
+    is asking whether the process is dead.
+    """
+    paths = ["/wda/activeAppInfo"]
+    if _SESSION_ID:
+        paths.insert(0, f"/session/{_SESSION_ID}/wda/activeAppInfo")
     for path in paths:
         try:
             value = requests.get(f"{config.WDA_URL}{path}", timeout=8).json().get("value") or {}
@@ -191,35 +360,76 @@ APP_NOT_RUNNING = 1
 
 
 def app_state() -> int:
-    """FreeCell's XCUIApplicationState, or -1 if WDA will not say."""
+    """FreeCell's XCUIApplicationState, or -1 if WDA will not say.
+
+    -1 is unknown, not 'still running'. Prefer an existing Settings
+    session. Never mint a FreeCell session here — that relaunches the
+    app we just killed. Session-less /wda/apps/state is broken on this WDA.
+    """
     body = {"bundleId": config.BUNDLE_ID}
     paths = []
-    try:
-        paths.append(f"/session/{current_session()}/wda/apps/state")
-    except RuntimeError:
-        pass
+    if _SESSION_ID:
+        paths.append(f"/session/{_SESSION_ID}/wda/apps/state")
     paths.append("/wda/apps/state")
     for path in paths:
         try:
-            value = requests.post(
+            payload = requests.post(
                 f"{config.WDA_URL}{path}", json=body, timeout=10,
-            ).json().get("value")
+            ).json()
+            value = payload.get("value")
+            if isinstance(value, dict):
+                value = value.get("state", value.get("value"))
             return int(value)
         except Exception:  # noqa: BLE001
             continue
     return -1
 
 
+def installed_build() -> tuple[str, str] | None:
+    """``(version, build)`` of the installed FreeCell, or None if unreadable."""
+    import sys
+
+    cmd = [sys.executable, "-m", "tidevice"]
+    if config.DEVICE_UDID:
+        cmd += ["--udid", config.DEVICE_UDID]
+    try:
+        out = subprocess.run(cmd + ["appinfo", "--json", config.BUNDLE_ID],
+                             capture_output=True, text=True, timeout=30).stdout
+        info = json.loads(out)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    if not isinstance(info, dict) or not info.get("CFBundleIdentifier"):
+        return None
+    return (str(info.get("CFBundleShortVersionString", "")),
+            str(info.get("CFBundleVersion", "")))
+
+
+def os_version() -> str:
+    """The device's iOS version, e.g. "27.0.1". "" if unreadable."""
+    try:
+        status = wda_status()
+        return str(status.get("value", status)["os"]["version"])
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def device_model() -> str:
+    """The model IDENTIFIER, e.g. "iPhone16,2" (not the marketing name)."""
+    cmd = ["ideviceinfo", "-k", "ProductType"]
+    if config.DEVICE_UDID:
+        cmd[1:1] = ["-u", config.DEVICE_UDID]
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 def terminate() -> None:
     """Kill the FreeCell process. It must not stay resident in the background."""
-    try:
-        sid = current_session()
-    except RuntimeError:
-        sid = None
-    paths = []
-    if sid:
-        paths.append(f"/session/{sid}/wda/apps/terminate")
-    paths.append("/wda/apps/terminate")
+    paths = ["/wda/apps/terminate"]
+    if _SESSION_ID:
+        paths.insert(0, f"/session/{_SESSION_ID}/wda/apps/terminate")
     for path in paths:
         try:
             requests.post(
@@ -230,22 +440,60 @@ def terminate() -> None:
             break
         except Exception:  # noqa: BLE001
             continue
+    drop_session()
+
+
+def _attach_settings() -> str | None:
+    """Mint a Settings session so we can read FreeCell without launching it.
+
+    This WDA's session-less /wda/apps/state does not work. A FreeCell
+    session after terminate would relaunch the game we just killed.
+    """
+    try:
+        return launch_app(
+            force=False,
+            bundle_id="com.apple.Preferences",
+            settle=0.5,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"  WARNING: Settings session failed: {exc}", flush=True)
+        return None
 
 
 def kill_app() -> bool:
-    """Terminate FreeCell and wait until it is not running (not just backgrounded)."""
+    """Terminate FreeCell and wait until it is not running (not just backgrounded).
+
+    After terminate, WDA HTTP often blinks. Wait it out, then ask for
+    state through Settings — never through a FreeCell session. A
+    persistent -1 means WDA will not say, not that the process survived.
+    """
     terminate()
-    for _ in range(20):
-        state = app_state()
-        if state == APP_NOT_RUNNING or state == 0:
+    if wait_for_status(timeout=15.0) is None:
+        recover_after_app_kill()
+    _attach_settings()
+    last = -1
+    for _ in range(16):
+        last = app_state()
+        if last in (APP_NOT_RUNNING, 0):
+            print(f"  FreeCell process is dead (state {last})")
+            drop_session()
             return True
-        if state == -1 and not in_app():
-            time.sleep(0.3)
-            terminate()
-            return not in_app()
-        time.sleep(0.3)
+        if last == -1:
+            if _SESSION_ID is None:
+                _attach_settings()
+            time.sleep(0.4)
+            continue
+        print(f"  FreeCell still running (state {last}) — terminate again")
         terminate()
-    return app_state() in (APP_NOT_RUNNING, 0)
+        wait_for_status(timeout=8.0)
+        _attach_settings()
+        time.sleep(0.3)
+    drop_session()
+    if last in (2, 3, 4):
+        return False
+    print("  FreeCell state unknown after terminate (WDA will not say) "
+          "— treating as killed, not as still running")
+    return True
 
 
 def alert_text() -> str:
@@ -276,6 +524,69 @@ def accept_alert() -> bool:
     return True
 
 
+def alert_buttons() -> list[str]:
+    """Button labels of the current native alert, left to right; [] if none."""
+    try:
+        response = requests.get(
+            f"{config.WDA_URL}/session/{current_session()}/wda/alert/buttons",
+            timeout=8,
+        )
+        value = response.json().get("value") if response.ok else None
+    except Exception:  # noqa: BLE001
+        return []
+    return [str(b) for b in value] if isinstance(value, list) else []
+
+
+def answer_alert(name: str, settle: float = 1.2) -> bool:
+    """Press the alert button labelled *name* ("No", "OK", "Show Me"...)."""
+    if not alert_text():
+        return False
+    for verb in ("accept", "dismiss"):
+        try:
+            response = requests.post(
+                f"{config.WDA_URL}/session/{current_session()}/alert/{verb}",
+                json={"name": name}, timeout=8,
+            )
+        except Exception:  # noqa: BLE001
+            return False
+        if response.ok:
+            time.sleep(settle)
+            return True
+    return False
+
+
+ATT_TEXT = "track your activity"
+
+
+def allow_tracking(sid: str | None = None) -> bool:
+    """Press Allow on FreeCell's tracking (ATT) prompt if WDA can read it.
+
+    iOS draws it out of process, and it follows the phone into Settings
+    while the radios change, where it swallows every switch tap. Allow,
+    not "Ask App Not to Track": the app wants tracking granted before a
+    first launch goes through. Pass *sid* when a fresh session would
+    launch FreeCell.
+    """
+    sid = sid or current_session()
+    try:
+        response = requests.get(
+            f"{config.WDA_URL}/session/{sid}/alert/text", timeout=8)
+        text = (response.json().get("value") or "") if response.ok else ""
+        if not isinstance(text, str) or ATT_TEXT not in text.lower():
+            return False
+        accepted = requests.post(
+            f"{config.WDA_URL}/session/{sid}/alert/accept",
+            json={"name": "Allow"},
+            timeout=8,
+        )
+    except Exception:  # noqa: BLE001
+        return False
+    time.sleep(1.5)
+    if accepted.ok:
+        print("  answered the tracking prompt: Allow", flush=True)
+    return accepted.ok
+
+
 def rapid_tap(point: tuple[int, int], times: int = 10, gap_ms: int = 45) -> bool:
     """Send a hidden-gesture tap burst as one on-device W3C action."""
     x, y = _wda_pointer(point)
@@ -303,11 +614,28 @@ def rapid_tap(point: tuple[int, int], times: int = 10, gap_ms: int = 45) -> bool
     return True
 
 
+def grab_png() -> bytes:
+    """Full-screen PNG from WDA. No Airtest session recover."""
+    ensure_link()
+    response = requests.get(f"{config.WDA_URL}/screenshot", timeout=15)
+    if response.status_code != 200:
+        sid = ensure_session(settle=0.2)
+        response = requests.get(
+            f"{config.WDA_URL}/session/{sid}/screenshot",
+            timeout=15,
+        )
+    response.raise_for_status()
+    payload = response.json().get("value")
+    if not isinstance(payload, str):
+        raise RuntimeError("WDA screenshot returned no image")
+    return base64.b64decode(payload)
+
+
 def screenshot(name: str) -> Path:
     """Capture the current device frame into the ignored log directory."""
     config.LOG.mkdir(parents=True, exist_ok=True)
     path = config.LOG / f"{name}.png"
-    snapshot(filename=str(path))
+    path.write_bytes(grab_png())
     return path
 
 
@@ -469,6 +797,7 @@ def _tap_airplane(sid: str, want: bool, settle: float = 4.0,
                   timeout: float = 45.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
+        allow_tracking(sid)
         el = _element(sid, AIRPLANE_SWITCH, timeout=_ROW_TIMEOUT)
         if el is None:
             continue
@@ -498,6 +827,7 @@ def set_network(online: bool, wait: float = 75.0, restore: bool = True):
     time.sleep(1.5)
     try:
         airplane_ok = _tap_airplane(sid, not online)
+        allow_tracking(sid)
         wifi_ok = airplane_ok and _set_wifi(sid, online)
         ok = airplane_ok and wifi_ok
         net = ""

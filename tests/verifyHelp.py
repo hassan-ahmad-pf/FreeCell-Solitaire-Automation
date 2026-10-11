@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import sys
 
-from airtest.core.api import swipe
-
 import freecell_ui as ui
 
 
@@ -15,8 +13,8 @@ def run() -> None:
     ui.expect(ui.expect_screen("help"), "tapping Help did not open Help")
     ui.expect(not ui.on_menu(timeout=1.0), "tapping Help did not leave the menu")
     shot = ui.shoot("Help")
-    swipe((645, 2100), (645, 600), duration=0.6)
-    swipe((645, 2100), (645, 600), duration=0.6)
+    ui.scroll()
+    ui.scroll()
     bottom = ui.shoot("HelpBottom")
     ui.expect(ui.to_menu(), "could not return to the menu after Help")
     print(f"PASS: Help opened, scrolled, and returned — {shot}, {bottom}")

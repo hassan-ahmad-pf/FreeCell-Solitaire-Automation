@@ -1,0 +1,230 @@
+Case ID,Title,Section Hierarchy,Type,Priority,Steps,Expected Result,Automation
+FL-01,Launch - Force-quit and reopen reaches the main menu,FreeCell Solitaire Obj-C > Launch,Functional,High,"1. If FreeCell is open, swipe it away from the app switcher, then tap the FreeCell icon.
+2. If Terms & Conditions or the tracking prompt appear, dismiss them (Continue, then Allow).
+3. Wait until the menu finishes appearing.","1. The app opens.
+2. No pop-up is left on screen.
+3. Play and the rest of the main menu are showing.",Automated
+FL-02,Launch - Fresh install shows Terms & Conditions,FreeCell Solitaire Obj-C > Launch,Functional,High,"1. Delete FreeCell, install the dev build, and open it.
+2. Tap Continue.","1. A card reads ""To use FreeCell you must agree to our Terms & Conditions and affirm you have reviewed our Privacy Policy"" with a Continue button.
+2. The card goes away. The iOS tracking prompt may appear next.",Automated
+FL-03,Launch - Fresh install shows the tracking prompt,FreeCell Solitaire Obj-C > Launch,Functional,High,"1. After Terms & Conditions, wait for the iOS tracking prompt (Allow / Ask App Not to Track).
+2. Tap Allow. Do not tap Ask App Not to Track — that does not clear the gate.","1. The system tracking alert is on screen.
+2. The prompt goes away and the main menu is reachable.",Automated
+FL-04,Launch - Terms & Conditions link opens the terms page,FreeCell Solitaire Obj-C > Launch,Functional,High,"1. On a fresh install, with the Terms & Conditions card on screen and Wi-Fi on, tap the Terms & Conditions link. Do not tap Continue yet.
+2. If Accept All Cookies appears, tap it and wait for the banner to go.
+3. Close the page.","1. A PeopleFun Terms of Service page opens, not the Privacy Notice.
+2. The Terms of Service heading is fully visible.
+3. The Terms & Conditions card is still there.",Automated
+FL-05,Launch - Privacy Policy link opens the privacy page,FreeCell Solitaire Obj-C > Launch,Functional,High,"1. On the same card, tap Privacy Policy.
+2. Accept cookies if asked, then close the page.","1. A PeopleFun Privacy Notice page opens, not the Terms of Service.
+2. The Terms & Conditions card is still there. Continue is checked in FL-02.",Automated
+MM-01,Main Menu - All eight controls are visible,FreeCell Solitaire Obj-C > Main Menu,Functional,High,1. Open the app and wait until the menu finishes animating.,"1. Play, Daily, Stats, Options, Help, About, More Games, Choose Look, and the FreeCell crown are all on screen.",Automated
+MM-02,Main Menu - Welcome tip after the first game opens Options,FreeCell Solitaire Obj-C > Main Menu,Functional,Medium,"1. On a fresh install, deal a game, then tap the table's Back.
+2. Tap Options.
+3. Tap Back.","1. A Welcome alert says most features can be enabled and disabled in the Options page, with OK and Options.
+2. Options opens.
+3. The main menu is showing and the Welcome alert does not come back.",Automated
+ST-01,Statistics - Opens on the Solo tab,FreeCell Solitaire Obj-C > Statistics,Functional,Medium,"1. From the main menu, tap Stats.",1. Statistics opens with the Solo tab selected and Game Center in the header.,Automated
+ST-02,Statistics - Fresh install reads 0 and none,FreeCell Solitaire Obj-C > Statistics,Functional,High,"1. On a fresh install, before any game, open Stats.","1. Solo reads best score 0, games played 0, games won 0, playtime 0:00, and Standard • Easy reads best score none.",Automated
+ST-03,Statistics - Solo scrolls down to Reset Solo Statistics,FreeCell Solitaire Obj-C > Statistics,Functional,Medium,"1. On the Solo tab, scroll all the way down. Do not tap Reset.","1. Standard and Relaxed blocks for every level pass by, and Reset Solo Statistics is at the bottom.",Automated
+ST-04,Statistics - Back returns to the main menu,FreeCell Solitaire Obj-C > Statistics,Functional,Medium,"1. From Statistics, tap Back.",1. The main menu is showing.,Automated
+ST-05,Statistics - Daily tab shows the Daily totals,FreeCell Solitaire Obj-C > Statistics,Functional,Medium,"1. On Statistics, tap Daily.","1. The Daily tab is selected. It shows best score, games played, games won, and playtime (0 / 0:00 on a fresh install).",Automated
+ST-06,Statistics - Daily scrolls down to Reset Daily Statistics,FreeCell Solitaire Obj-C > Statistics,Functional,Medium,"1. On the Daily tab, scroll all the way down. Do not tap Reset.",1. Reset Daily Statistics is at the bottom.,Automated
+ST-07,Statistics - Solo shows the score of a won game,FreeCell Solitaire Obj-C > Statistics,Functional,High,"1. Win an Easy game (dev build: QA code, then Synthetic Win) and note the Victory score.
+2. Go to the menu and open Stats on the Solo tab.","1. Victory shows a current score.
+2. Best score and Standard • Easy show that same score, and games won is 1 or more.",Automated
+OP-01,Options - Opens from the main menu,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. From the main menu, tap Options.",1. Options opens on the Sounds section. The main menu is gone.,Automated
+OP-02,Options - Back returns to the main menu,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. From Options, tap Back.",1. The main menu is showing.,Automated
+OP-03,"Options - Applause Volume moves to min, max, and middle",FreeCell Solitaire Obj-C > Options,Functional,High,"1. On Options, drag the Applause Volume knob all the way left, all the way right, then to the middle.","1. The knob sits at the left end, the right end, then in the middle — not only at the two ends.",Automated
+OP-04,Options - Applause Volume stays after you leave the screen,FreeCell Solitaire Obj-C > Options,Functional,High,"1. Drag Applause Volume to a new position and remember it.
+2. Go back to the main menu, then open Options again.","1. The knob moves.
+2. The knob is still where you left it.",Automated
+OP-05,"Options - Effects Volume moves to min, max, and middle",FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. Drag the Effects Volume knob all the way left, all the way right, then to the middle.",1. The knob reaches both ends and can sit in the middle.,Automated
+OP-06,Options - Auto Mute Sounds turns off and on,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. Look at Auto Mute Sounds (it ships ON), tap it, then tap it again.",1. It turns off the first time and back on the second. A tap that does nothing fails.,Automated
+OP-07,Options - Maintain Card Spacing turns off and on,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. In the Cards section, tap Maintain Card Spacing (ships ON) twice.","1. It turns off, then back on.",Automated
+OP-08,Options - Card Bouncing turns off and on,FreeCell Solitaire Obj-C > Options,Functional,Medium,1. Tap Card Bouncing (ships ON) twice.,"1. It turns off, then back on.",Automated
+OP-09,"Options - Card Lowering moves to min, max, and middle",FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. In Interface, drag the Card Lowering knob all the way left, all the way right, then to the middle.",1. The knob reaches both ends and can sit in the middle.,Automated
+OP-10,Options - Show Status Bar OFF hides the status bar in a game,FreeCell Solitaire Obj-C > Options,Functional,High,"1. On a game table, note the iOS status bar (time, battery). Open the in-game menu → options and turn Show Status Bar off. Go back to the table.
+2. Turn Show Status Bar back on and return to the table.","1. The status bar is gone and the table moves up.
+2. The status bar is back and the table is where it started.",Automated
+OP-11,Options - Show Card Messages ON explains a stuck card,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. On a table, fill all four free cells, then tap a bottom card that has nowhere to go.","1. ""this card cannot attach anywhere"" flashes on the felt for under a second.",Automated
+OP-12,Options - Show Card Messages OFF hides the stuck-card note,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. Turn Show Card Messages off, go back to the same table, and tap the same stuck card.","1. No ""cannot attach"" note appears. Turn the switch back on afterwards.",Automated
+OP-13,"Options - UI Brightness moves to min, max, and middle",FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. Drag the UI Brightness knob all the way left, all the way right, then to the middle.",1. The knob reaches both ends and can sit in the middle.,Automated
+OP-14,Options - Auto Hint turns on and off,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. Tap Auto Hint (ships OFF), then tap it again.","1. It turns on, then back off.",Automated
+HS-01,Options - Contact Us opens support,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. With Wi-Fi on, open Options and tap Contact Us.",1. You leave Options and the PeopleFun Support page opens.,Online - later
+HS-02,Options - Contact Us still leaves Options without internet,FreeCell Solitaire Obj-C > Options,Functional,Medium,"1. With Airplane Mode on and Wi-Fi off, open Options and tap Contact Us.
+2. Close the support page.","1. You leave Options. A no-connection page instead of PeopleFun Support is expected — the redirect still happened.
+2. Options is showing again.",Automated
+HP-01,Help - Opens on Introduction,FreeCell Solitaire Obj-C > Help,Functional,Medium,"1. From the main menu, tap Help.",1. Help opens with the foundations / cells / tableaux diagram and the Introduction heading.,Automated
+HP-02,Help - Rules scroll down to the FAQ link,FreeCell Solitaire Obj-C > Help,Functional,Medium,1. Scroll Help all the way down.,"1. Rules, Undo button and Menu button pass by, and a frequently asked questions link is at the bottom.",Automated
+HP-03,Help - Back returns to the main menu,FreeCell Solitaire Obj-C > Help,Functional,Medium,"1. From Help, tap Back.",1. The main menu is showing.,Automated
+HP-04,Help - FAQ link opens the FAQ,FreeCell Solitaire Obj-C > Help,Functional,Medium,"1. At the bottom of Help, tap frequently asked questions.
+2. Tap Back.","1. The FAQ opens inside FreeCell.
+2. Help is showing again.",Automated
+AB-01,About - Opens from the About menu item,FreeCell Solitaire Obj-C > About,Functional,Medium,"1. From the main menu, tap ABOUT.","1. About opens with ""FreeCell ▻ Solitaire"" and the copyright line.",Automated
+AB-02,About - Version and links are on the page,FreeCell Solitaire Obj-C > About,Functional,Medium,1. Look over About. Do not tap ad free version or submit feedback here.,"1. A Version line, © PeopleFun, Inc., and the links help, ad free version, frequently asked questions, more games, and submit feedback.",Automated
+AB-03,About - Tapping the version line shows the build,FreeCell Solitaire Obj-C > About,Functional,Medium,1. Tap the Version line.,"1. It changes to the build number and hash, e.g. ""279 build 60706F"".",Automated
+AB-04,About - Frequently asked questions stays in the app,FreeCell Solitaire Obj-C > About,Functional,Medium,1. Tap frequently asked questions.,"1. The FAQ opens inside FreeCell with General, Solo, and Daily tabs. You do not leave for a browser.",Automated
+AB-05,About - FAQ scrolls down to submit feedback,FreeCell Solitaire Obj-C > About,Functional,Medium,"1. On the FAQ's General tab, scroll all the way down.",1. submit feedback is at the bottom. The FAQ header stays put.,Automated
+AB-06,About - Crown logo also opens About,FreeCell Solitaire Obj-C > About,Functional,High,"1. From the main menu, tap the FreeCell crown.","1. About opens, the same screen as the ABOUT item.",Automated
+AB-07,About - Help link opens Help and comes back,FreeCell Solitaire Obj-C > About,Functional,Medium,"1. On About, tap help.
+2. Tap Back.","1. Help opens on Introduction.
+2. About is showing again, not the main menu.",Automated
+AB-08,About - More games link opens More Games and comes back,FreeCell Solitaire Obj-C > About,Functional,Medium,"1. On About, tap more games.
+2. Tap Back.","1. The in-app More Games stage opens. The App Store does not.
+2. About is showing again.",Automated
+AB-09,About - Back returns to the main menu,FreeCell Solitaire Obj-C > About,Functional,Medium,"1. From About, tap Back.",1. The main menu is showing.,Automated
+FQ-01,FAQ - Opens on the General tab,FreeCell Solitaire Obj-C > FAQ,Functional,Medium,1. Open the FAQ from About.,"1. General is selected and the first question is ""How do I play a Solo or Daily game?"".",Automated
+FQ-02,FAQ - Solo tab answers What are Solo games,FreeCell Solitaire Obj-C > FAQ,Functional,Medium,1. Tap Solo.,"1. Solo is selected and the first question is ""What are Solo games?"".",Automated
+FQ-03,FAQ - Daily tab answers What are Daily games,FreeCell Solitaire Obj-C > FAQ,Functional,Medium,1. Tap Daily.,"1. Daily is selected and the first question is ""What are Daily games?"".",Automated
+FQ-04,FAQ - Back returns to About,FreeCell Solitaire Obj-C > FAQ,Functional,Medium,"1. From the FAQ opened on About, tap Back.",1. About is showing.,Automated
+AF-01,Ad-free - Link asks No or Yes before the store,FreeCell Solitaire Obj-C > App Store / Mail,Functional,Medium,"1. On About, tap ad free version.","1. A card asks ""Would you like to take a look at the Ad free version?"" with No and Yes. You are still in FreeCell.",Automated
+AF-02,Ad-free - No leaves you on About,FreeCell Solitaire Obj-C > App Store / Mail,Functional,Medium,"1. On that card, tap No.",1. The card closes. About is showing and the App Store did not open.,Automated
+AF-03,Ad-free - Yes opens the ad-free FreeCell in the App Store,FreeCell Solitaire Obj-C > App Store / Mail,Functional,High,"1. With Wi-Fi on, tap ad free version, then Yes.","1. The App Store opens on the paid, ad-free FreeCell.",Online - later
+AF-04,Ad-free - Status-bar back lands on About,FreeCell Solitaire Obj-C > App Store / Mail,Functional,Medium,"1. From the App Store, tap ◀ FreeCell in the status bar.",1. About is showing. Landing on the main menu means the app restarted instead of resuming.,Online - later
+FB-01,Feedback - Submit feedback asks Cancel or Write Email,FreeCell Solitaire Obj-C > App Store / Mail,Functional,Medium,"1. On About, tap submit feedback.","1. ""We appreciate your feedback"" offers Cancel and Write Email.",Automated
+FB-02,Feedback - Cancel leaves you on About,FreeCell Solitaire Obj-C > App Store / Mail,Functional,Medium,"1. On that alert, tap Cancel.",1. The alert closes and About is showing.,Automated
+FB-03,Feedback - Write Email opens a Mail draft,FreeCell Solitaire Obj-C > App Store / Mail,Functional,High,"1. Tap submit feedback, then Write Email. A Mail account must be set up on the phone.","1. Mail opens with a draft. No Mail Accounts is the phone setup, not the game.",Automated
+FB-04,"Feedback - Subject names the game, version, phone, and iOS",FreeCell Solitaire Obj-C > App Store / Mail,Functional,High,1. Read the draft subject. Compare it with Settings → General → About and the game's About.,"1. The subject names FreeCell, the app version, this phone's model, and this iOS version.",Automated
+FB-05,Feedback - Delete the draft — do not send,FreeCell Solitaire Obj-C > App Store / Mail,Functional,High,1. Delete the draft. Never tap send.,1. The draft is gone. Nothing was sent.,Automated
+FB-06,Feedback - Status-bar back returns to FreeCell,FreeCell Solitaire Obj-C > App Store / Mail,Functional,Medium,"1. From Mail, tap ◀ FreeCell in the status bar.","1. FreeCell is in front. Mail is a separate app, so the main menu is acceptable.",Automated
+MG-01,More Games - Gift icon opens the in-app promo page,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. From the main menu, tap More Games (the gift icon).","1. A curtained stage opens with ""Tap any game to download it!"". The App Store does not open.",Automated
+MG-02,More Games - Swipe reveals Card Games and Spiderette,FreeCell Solitaire Obj-C > More Games,Functional,Medium,1. Swipe the stage up until it stops.,1. Card Games and Spiderette come into view. Back and the instruction line stay put.,Automated
+MG-03,More Games - Back returns to the main menu,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. From More Games, tap Back.",1. The main menu is showing.,Automated
+PI-01,Promo icons - Five game icons on the menu after a game,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. After at least one game, go to the main menu and wait a few seconds.","1. Five icons sit on the left beside ""more fun with us!"": Spider, Solitaire, Sudoku 2, Card Games, and Spiderette.",Automated
+PI-02,Promo icons - Spider opens Spider Solitaire,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. With Wi-Fi on, tap the Spider icon.
+2. Tap ◀ FreeCell in the status bar.","1. The App Store opens on Spider Solitaire.
+2. The main menu is showing. FreeCell did not restart.",Online - later
+PI-03,Promo icons - Solitaire opens Solitaire,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. Tap the Solitaire icon.
+2. Switch back to FreeCell.","1. The App Store opens on Solitaire.
+2. The main menu is showing.",Online - later
+PI-04,Promo icons - Sudoku 2 opens Sudoku,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. Tap the Sudoku 2 icon.
+2. Switch back to FreeCell.","1. The App Store opens on Sudoku.
+2. The main menu is showing.",Online - later
+PI-05,Promo icons - Card Games opens Card Games,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. Tap the Card Games icon.
+2. Switch back to FreeCell.","1. The App Store opens on Card Games.
+2. The main menu is showing.",Online - later
+PI-06,Promo icons - Spiderette opens Spiderette,FreeCell Solitaire Obj-C > More Games,Functional,Medium,"1. Tap the Spiderette icon.
+2. Switch back to FreeCell.","1. The App Store opens on Spiderette.
+2. The main menu is showing.",Online - later
+PL-01,Play - Opens the difficulty picker,FreeCell Solitaire Obj-C > Play,Functional,High,"1. From the main menu, tap Play.",1. The difficulty picker opens. No game starts yet.,Automated
+PL-02,Play - Picker shows all five levels,FreeCell Solitaire Obj-C > Play,Functional,High,1. Open Play.,"1. Easy, Medium, Hard, Expert, and Master are listed, with LAST SCORE at the bottom.",Automated
+PL-03,Play - Easy starts a game,FreeCell Solitaire Obj-C > Play,Functional,High,"1. On the picker, tap Easy. If asked to abandon a paused game, tap Yes.","1. The game table is showing: foundations, free cells, and eight columns.",Automated
+PL-04,Play - Declining abandon stays on the picker,FreeCell Solitaire Obj-C > Play,Functional,Medium,"1. With a paused game, open Play and tap a level.
+2. Tap No.","1. ""Are you sure you want to abandon the currently paused game?"" appears.
+2. The picker stays open and the Resume ribbon is still there.",Automated
+PL-05,Play - Rules toggle switches standard and relaxed,FreeCell Solitaire Obj-C > Play,Functional,Medium,"1. On the picker, tap ""standard rules / tap to change"".
+2. Tap it again.","1. It reads relaxed rules and explains that relaxed rules let piles of any size move but score less.
+2. It reads standard rules again.",Automated
+PL-06,Play - Resume continues the paused game,FreeCell Solitaire Obj-C > Play,Functional,High,"1. Make a move on a table, tap Back, then tap Play.
+2. Tap Resume.","1. The red ribbon under the levels reads Resume.
+2. The same board comes back, with your move still made.",Automated
+PL-07,Play - Relaxed rules deal a relaxed game,FreeCell Solitaire Obj-C > Play,Functional,Medium,"1. Switch the picker to relaxed rules and tap Easy.
+2. Go back and switch the picker to standard rules.","1. The table footer reads ""easy level relaxed rules"".
+2. The picker reads standard rules again.",Automated
+GP-01,Gameplay - Table controls are on screen,FreeCell Solitaire Obj-C > Gameplay,Functional,High,1. Start an Easy game.,"1. Back, new, the move counter, and menu at the top; four foundations, four free cells, and eight columns; tap to undo, tap to lower, and tap for hints at the bottom.",Automated
+GP-02,Gameplay - Tapping a card moves it,FreeCell Solitaire Obj-C > Gameplay,Functional,High,1. Tap the bottom card of a column that has a legal move.,"1. The card moves to a column, a free cell, or a foundation, and the move counter goes up by one.",Automated
+GP-03,Gameplay - Undo puts the board back,FreeCell Solitaire Obj-C > Gameplay,Functional,High,"1. After a move, tap tap to undo.",1. The card is back where it was and the move counter goes back down.,Automated
+GP-04,Gameplay - Tap to lower drops the playfield,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,1. Tap tap to lower once.,1. The whole playfield slides down.,Automated
+GP-05,Gameplay - Tap to raise brings the playfield back,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. With the playfield lowered, tap the same control again.",1. The playfield slides back up to where it started.,Automated
+GP-06,Gameplay - Tap for hints steps through moves,FreeCell Solitaire Obj-C > Gameplay,Functional,High,"1. Tap tap for hints.
+2. Tap it again.","1. The label changes to ""tap for more / move 1 of N"".
+2. It reads move 2 of N.",Automated
+GP-07,Gameplay - In-game menu shows all its actions,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. On the table, tap menu.","1. A drawer shows replay, abandon, options, new, help, FAQ, and the rotation lock.",Automated
+GP-08,Gameplay - Rank Strip OFF hides the A-K strip,FreeCell Solitaire Obj-C > Gameplay,Functional,High,"1. On a table, note the A 2 3 … K strip above the bottom labels. Turn Rank Strip off in Options and go back.",1. The strip is gone.,Automated
+GP-09,Gameplay - Rank Strip ON brings the strip back,FreeCell Solitaire Obj-C > Gameplay,Functional,High,1. Turn Rank Strip back on and go back to the table.,1. The A-K strip is back.,Automated
+GP-10,"Gameplay - Rich Features OFF hides timer, score, multiplier",FreeCell Solitaire Obj-C > Gameplay,Functional,High,1. Turn Rich Features off in Options and go back to the table.,"1. Timer, score, multiplier, and the move counter are gone.",Automated
+GP-11,"Gameplay - Rich Features ON brings timer, score, multiplier back",FreeCell Solitaire Obj-C > Gameplay,Functional,High,1. Turn Rich Features back on and go back to the table.,"1. Timer, score, multiplier, and moves are visible again.",Automated
+GP-12,Gameplay - Timer waits for the first move,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Deal a new game and wait about ten seconds without touching a card.
+2. Move a card.","1. The timer still reads 0:00 and the footer says tap a card to start.
+2. The timer starts counting.",Automated
+GP-13,Gameplay - Rules prompt after the first deal opens Help,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. On a fresh install, deal the first game and wait a few seconds.
+2. Tap Yes, then Back on Help.","1. ""Would you like to review the game rules before to play?"" appears with No and Yes.
+2. Help opened, and Back returns to the same table.",Automated
+GP-14,Gameplay - New deals a different board,FreeCell Solitaire Obj-C > Gameplay,Functional,High,"1. Look at the board, tap new, and confirm if asked.",1. A different deal is on the table.,Automated
+GP-15,"Gameplay - Replay asks first, and No keeps the board",FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Make a move, open the menu, and tap replay.
+2. Tap No.","1. ""Are you sure you want to play this game again?"" warns that the replay breaks the current run and is not recorded.
+2. The board still has your move.",Automated
+GP-16,Gameplay - Replay Yes restores the original deal,FreeCell Solitaire Obj-C > Gameplay,Functional,High,1. Tap replay again and answer Yes.,"1. The page turns and the original deal is back: the move is undone, the counter is 0, and the timer reads 0:00.",Automated
+GP-17,Gameplay - Menu help opens Help and returns to the table,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Open the menu and tap help.
+2. Tap Back.","1. Help opens on Introduction.
+2. The same table is showing.",Automated
+GP-18,Gameplay - Menu FAQ opens on Solo and returns to the table,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Open the menu and tap FAQ.
+2. Tap Back.","1. The FAQ opens with the Solo tab selected.
+2. The same table is showing.",Automated
+GP-19,Gameplay - Menu options opens Options and returns to the table,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Open the menu and tap options.
+2. Tap Back.","1. Options opens.
+2. The same table is showing.",Automated
+GP-20,Gameplay - A stuck card offers help,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. With all free cells full, tap a card that has nowhere to go.
+2. Tap help.","1. A help button replaces the score and timer under the board.
+2. Help opens. Back returns to the table.",Automated
+GP-21,Gameplay - Rotation lock keeps the table in portrait,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Open the menu and tap the round arrow (rotation lock).
+2. Turn the phone to landscape.","1. The first time, an alert says the interface orientation is locked. Tap OK.
+2. The table stays in portrait.",Automated
+GP-22,Gameplay - Unlocked table turns to landscape,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,"1. Tap the rotation lock again, then turn the phone to landscape.
+2. Turn the phone back to portrait.","1. The table turns: foundations in a left column, free cells in a right column.
+2. The portrait table is back.",Automated
+GP-23,Gameplay - Abandon ends the game,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,1. Open the menu and tap abandon. Confirm if asked.,1. The game ends and you leave the table. Play shows no Resume ribbon for it.,Automated
+GP-24,Gameplay - Tapping a buried card highlights its rank,FreeCell Solitaire Obj-C > Gameplay,Functional,Medium,1. Tap a card that is buried under others.,1. Every card of that rank is outlined. Nothing moves.,Automated
+RL-01,Relaunch - Same board after closing the app for a few seconds,FreeCell Solitaire Obj-C > Relaunch,Functional,High,"1. On a table, make one move and remember the board.
+2. Press Home first (the app saves when it goes to the background), swipe FreeCell away, wait about 3 seconds, and open it again.","1. The board has changed from the deal.
+2. The same table comes back. A tap a card to start overlay is fine.",Automated
+RL-02,Relaunch - Same board after closing the app for 35 seconds,FreeCell Solitaire Obj-C > Relaunch,Functional,High,"1. Do the same, but wait about 35 seconds before opening it.",1. The same table comes back.,Automated
+QA-01,QA - Code entry opens from About,FreeCell Solitaire Obj-C > QA,Functional,High,"1. On About, tap the Version line, then tap the FreeCell emblem ten times quickly.",1. A code entry appears. A build without QA (the App Store release) shows nothing — that build cannot run this list.,Automated
+QA-02,QA - The code turns QA on,FreeCell Solitaire Obj-C > QA,Functional,High,1. Enter 943010 and go back to the main menu.,1. A CONFIDENTIAL watermark covers the menu.,Automated
+QA-03,QA - The table badge opens Synthetic Win,FreeCell Solitaire Obj-C > QA,Functional,High,"1. Deal Easy, tap a card to start, and tap the QA badge.",1. The Synthetic Win card opens with score bands and WIN.,Automated
+QA-04,QA - Entering the code again turns QA off,FreeCell Solitaire Obj-C > QA,Functional,Medium,1. Repeat the code entry on About with 943010.,1. The CONFIDENTIAL watermark is gone from the menu.,Automated
+VI-01,Victory - Synthetic Win shows the win screen,FreeCell Solitaire Obj-C > Victory,Functional,High,"1. On the Synthetic Win card, pick 90% - 99% and tap WIN.",1. The Victory screen appears.,Automated
+VI-02,Victory - Win screen shows all of its parts,FreeCell Solitaire Obj-C > Victory,Functional,Medium,1. Look over the Victory screen.,"1. ranking for This Week, current / rank / best columns, leaderboards, achievements, and the help, new, and stats buttons.",Automated
+VI-03,Victory - Footer names the level and rules you played,FreeCell Solitaire Obj-C > Victory,Functional,High,1. Win an Easy standard game and read the footer.,1. It reads easy level • standard rules.,Automated
+VI-04,Victory - Back returns to the main menu,FreeCell Solitaire Obj-C > Victory,Functional,Medium,1. Tap the Victory screen's Back — not new.,1. The main menu is showing.,Automated
+VI-05,Victory - Stats opens Statistics,FreeCell Solitaire Obj-C > Victory,Functional,Medium,1. Win a game and tap stats.,1. Statistics opens.,Automated
+VI-06,Victory - New deals the next game,FreeCell Solitaire Obj-C > Victory,Functional,Medium,1. Win a game and tap new.,1. A new table is dealt.,Automated
+VI-07,Victory - Help opens Help,FreeCell Solitaire Obj-C > Victory,Functional,Medium,1. Win a game and tap help.,1. Help opens.,Automated
+DL-01,Difficulty - Medium starts and can be completed,FreeCell Solitaire Obj-C > Difficulty,Functional,High,"1. Tap Play, then Medium. Win it with Synthetic Win.","1. A Medium table dealt, Victory appeared with a medium level footer, and Back reaches the menu.",Automated
+DL-02,Difficulty - Hard starts and can be completed,FreeCell Solitaire Obj-C > Difficulty,Functional,High,"1. Tap Play, then Hard. Win it with Synthetic Win.","1. A Hard table dealt, Victory appeared, and Back reaches the menu.",Automated
+DL-03,Difficulty - Expert starts and can be completed,FreeCell Solitaire Obj-C > Difficulty,Functional,High,"1. Tap Play, then Expert. Win it with Synthetic Win.","1. An Expert table dealt, Victory appeared, and Back reaches the menu.",Automated
+DL-04,Difficulty - Master starts and can be completed,FreeCell Solitaire Obj-C > Difficulty,Functional,High,"1. Tap Play, then Master. Win it with Synthetic Win.","1. A Master table dealt, Victory appeared, and Back reaches the menu.",Automated
+LS-01,Last Score - Before any win it says no game is completed,FreeCell Solitaire Obj-C > Last Score,Functional,Medium,"1. On a fresh install, tap Play, then LAST SCORE.","1. ""No game has been completed yet — At least one Solo game has to be completed before any data can be shown"".",Automated
+LS-02,Last Score - After a win it opens Last Won Game Score,FreeCell Solitaire Obj-C > Last Score,Functional,Medium,"1. After a win, tap Play, then LAST SCORE.",1. Last Won Game Score opens with current / rank / best for the won game.,Automated
+LS-03,Last Score - Arrows change the ranking period,FreeCell Solitaire Obj-C > Last Score,Functional,Medium,1. Tap the arrow beside the ranking period.,1. The period changes and you stay on Last Won Game Score.,Automated
+LS-04,Last Score - Leaderboards opens Game Center,FreeCell Solitaire Obj-C > Last Score,Functional,Medium,"1. With Wi-Fi on and an Apple ID signed in, tap leaderboards.",1. Game Center opens on Leaderboards. Close it to return.,Online - later
+LS-05,Last Score - Achievements opens Game Center,FreeCell Solitaire Obj-C > Last Score,Functional,Medium,1. Tap achievements.,1. Game Center opens on Achievements. Close it to return.,Online - later
+LS-06,Last Score - Back returns to the picker,FreeCell Solitaire Obj-C > Last Score,Functional,Medium,"1. From Last Score, tap Back.",1. The difficulty picker or the main menu is showing.,Automated
+DY-01,Daily - Opens the calendar from the main menu,FreeCell Solitaire Obj-C > Daily,Functional,High,"1. From the main menu, tap Daily.",1. The Daily screen opens with a level button at the top right.,Automated
+DY-02,Daily - First visit points at the level button,FreeCell Solitaire Obj-C > Daily,Functional,Medium,"1. On a fresh install, open Daily.","1. A tip says ""Tap on the Level Button to select your favorite level"" and the level button is outlined.",Automated
+DY-03,Daily - Second tip explains dates and replays,FreeCell Solitaire Obj-C > Daily,Functional,Medium,"1. Tap the first tip.
+2. Tap it.","1. A second tip says ""Tap on any available date to play a game"", with notes on replays and gold stars.
+2. The calendar is showing with no tip.",Automated
+DY-04,Daily - Calendar shows this month with today marked,FreeCell Solitaire Obj-C > Daily,Functional,Medium,1. Look at the calendar.,"1. It shows the current month. Today is orange, past days are white, and future days are dimmed.",Automated
+DY-05,Daily - Level button lists Standard and Relaxed levels,FreeCell Solitaire Obj-C > Daily,Functional,Medium,1. Tap the level button.,"1. A list shows Standard Easy, Medium, Hard, Expert, Master and Relaxed Easy, Medium, Hard, Expert, Master, with a note on relaxed rules.",Automated
+DY-06,Daily - Choosing a level updates the button,FreeCell Solitaire Obj-C > Daily,Functional,Medium,"1. Choose Standard Hard.
+2. Open the list again and choose Relaxed Easy.
+3. Choose Standard Medium.","1. The button reads Hard.
+2. The button reads Easy with an R badge.
+3. The button reads Medium again.",Automated
+DY-07,Daily - A future date cannot be played,FreeCell Solitaire Obj-C > Daily,Functional,Medium,1. Tap a dimmed future date.,1. Nothing happens. The calendar stays.,Automated
+DY-08,"Daily - Offline, a date asks for internet",FreeCell Solitaire Obj-C > Daily,Functional,High,"1. With Airplane Mode on, tap today.
+2. Tap No.","1. ""Sorry, Daily Games can be initiated only when Internet is available"" offers a Solo game instead, with No and Yes.
+2. The calendar is still showing.",Automated
+DY-09,"Daily - Offline, Yes goes to the main menu",FreeCell Solitaire Obj-C > Daily,Functional,Medium,"1. Tap a past date, then Yes on the same alert.",1. Daily closes onto the main menu. No game is dealt.,Automated
+DY-10,Daily - Back returns to the main menu,FreeCell Solitaire Obj-C > Daily,Functional,Medium,"1. From the calendar, tap back.",1. The main menu is showing.,Automated
+DY-11,Daily - FAQ link opens the FAQ,FreeCell Solitaire Obj-C > Daily,Functional,Medium,"1. Under the calendar, tap FAQ.",1. The FAQ opens inside FreeCell. Back returns to the calendar.,Automated
+DY-12,Daily - Today deals a Daily game,FreeCell Solitaire Obj-C > Daily,Functional,High,"1. With Wi-Fi on, tap today.","1. A Daily table is dealt, with a star in its header and the chosen level in its footer.",Online - later
+DY-13,Daily - Winning today puts a gold star on the calendar,FreeCell Solitaire Obj-C > Daily,Functional,High,1. Win today's Daily game (Synthetic Win) and go back to Daily.,1. Today carries a gold star.,Online - later
+DY-14,Daily - A Daily win counts on the Daily statistics,FreeCell Solitaire Obj-C > Daily,Functional,Medium,1. Open Stats → Daily after that win.,1. Games won is 1 and best score shows the win.,Online - later
+CL-01,Choose Look - Opens on the Surface tab,FreeCell Solitaire Obj-C > Choose Look,Functional,Medium,"1. From the main menu, tap Choose Look.","1. The look picker opens on Surface, with six felts and Simulate Depth.",Automated
+CL-02,Choose Look - Close returns to the main menu,FreeCell Solitaire Obj-C > Choose Look,Functional,Medium,1. Tap the X.,1. The picker closes and the main menu is usable.,Automated
+CL-03,Choose Look - Surface and Cards tabs switch,FreeCell Solitaire Obj-C > Choose Look,Functional,Medium,"1. Tap Cards, then Surface.",1. Cards shows six card backs and Extra Large Card-Symbols. Surface shows the felts again.,Automated
+CL-04,Choose Look - Another surface shows on the game table,FreeCell Solitaire Obj-C > Choose Look,Functional,High,"1. Pick a different felt, close the picker, and start or resume Easy.",1. The table felt matches the felt you picked.,Automated
+CL-05,Choose Look - Another card back shows on the table,FreeCell Solitaire Obj-C > Choose Look,Functional,High,1. Pick a different card back and look at the table's undo and hint piles.,1. The backs match the deck you picked.,Automated
+CL-06,Choose Look - Extra Large Card-Symbols turns on and off,FreeCell Solitaire Obj-C > Choose Look,Functional,Medium,"1. On Cards, tap Extra Large Card-Symbols (ships OFF) twice.","1. It turns on, then back off.",Automated
+CL-07,Choose Look - Simulate Depth turns off and on,FreeCell Solitaire Obj-C > Choose Look,Functional,Medium,"1. On Surface, tap Simulate Depth twice.","1. It changes state, then returns to where it was.",Automated
+RS-01,Reset Statistics - Solo reset asks twice,FreeCell Solitaire Obj-C > Statistics,Destructive,High,"1. On Solo, scroll to Reset Solo Statistics and tap it.
+2. Tap Yes.","1. ""Would you like to reset local scores?"" notes that Game Center scores are not reset (No / Yes).
+2. ""Just to be on the safe side…"" asks once more (No / Yes).",Automated
+RS-02,Reset Statistics - Confirming wipes the Solo scores,FreeCell Solitaire Obj-C > Statistics,Destructive,High,"1. Tap Yes on the second alert, then open Stats.",1. You land on the main menu. Solo reads best score 0 and every level none.,Automated
+RS-03,Reset Statistics - Declining leaves the Solo scores alone,FreeCell Solitaire Obj-C > Statistics,Destructive,Medium,"1. Tap Reset Solo Statistics, then No.",1. Statistics stays open and the scores are unchanged.,Automated
+RS-04,Reset Statistics - Daily reset asks twice,FreeCell Solitaire Obj-C > Statistics,Destructive,Medium,"1. On Daily, scroll to Reset Daily Statistics and tap it, then Yes.",1. The same two alerts as the Solo reset appear.,Automated
+RS-05,Reset Statistics - Confirming wipes the Daily scores,FreeCell Solitaire Obj-C > Statistics,Destructive,Medium,"1. Tap Yes on the second alert, then open Stats → Daily.",1. You land on the main menu. Daily reads 0 everywhere.,Automated
+RS-06,Reset Statistics - Declining leaves the Daily scores alone,FreeCell Solitaire Obj-C > Statistics,Destructive,Medium,"1. Tap Reset Daily Statistics, then No.",1. Statistics stays open on Daily and nothing changed.,Automated
