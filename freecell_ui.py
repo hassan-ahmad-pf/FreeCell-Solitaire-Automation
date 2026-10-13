@@ -383,10 +383,14 @@ def start_deal() -> None:
 
 
 def open_qa_panel() -> bool:
-    """Open the table Synthetic Win card (badge or drawer QA)."""
+    """Open the table Synthetic Win card (badge or drawer QA).
+
+    The badge's "A" box toggles the card, so it is tapped only while the
+    card is closed.
+    """
     if is_on("qa_panel"):
         return True
-    if tap("qa_badge", settle=1.2) and wait_for("qa_panel", timeout=4.0):
+    if tap("qa_badge_a", settle=1.2) and wait_for("qa_panel", timeout=4.0):
         return True
     helpers.wda_tap((1140, 350), settle=1.2)
     helpers.wda_tap((1180, 2280), settle=1.5)
@@ -578,8 +582,10 @@ def qa_enabled() -> bool:
     """True when QA is already on — menu CONFIDENTIAL watermark or table badge.
 
     The About code toggles. Re-entering it while this is True turns QA off.
+    The badge is matched by its "A" box alone: a wider crop takes in the
+    hint deck, which is there with QA off too.
     """
-    return is_on("qa_watermark") or is_on("qa_badge")
+    return is_on("qa_watermark") or is_on("qa_badge_a")
 
 
 def _enter_qa_code_on_about() -> bool:
@@ -635,8 +641,8 @@ def enter_qa_code() -> bool:
     return wait_for("qa_panel")
 
 
-def complete_game() -> bool:
-    """Complete the active table through the Synthetic Win panel."""
+def synthetic_win() -> bool:
+    """Fire Synthetic Win (90% - 99%, WIN) on the active table. True once WIN is tapped."""
     start_deal()
     if not open_qa_panel():
         return False
@@ -644,6 +650,13 @@ def complete_game() -> bool:
         return False
     helpers.wda_tap(QA_SELECT_90_99, settle=1.0)
     helpers.wda_tap(QA_WIN, settle=0.2)
+    return True
+
+
+def complete_game() -> bool:
+    """Complete the active table through the Synthetic Win panel."""
+    if not synthetic_win():
+        return False
     time.sleep(3.0)
     return expect_screen("victory")
 

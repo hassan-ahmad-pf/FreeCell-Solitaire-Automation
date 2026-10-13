@@ -109,11 +109,23 @@ def diff_frac(path_a, path_b, box=None, tol: int = 32) -> float:
 
 # ── accessibility ──────────────────────────────────────────────────
 
+SOURCE_BUILD = 5.0
+
+
 def source() -> dict:
     """The foreground app's accessibility tree as WDA's JSON."""
     sid = helpers.current_session()
-    response = requests.get(f"{config.WDA_URL}/session/{sid}/source",
-                            params={"format": "json"}, timeout=90)
+    for attempt in range(5):
+        try:
+            response = requests.get(f"{config.WDA_URL}/session/{sid}/source",
+                                    params={"format": "json"}, timeout=90)
+            break
+        except (requests.ConnectionError, requests.exceptions.ChunkedEncodingError):
+            if attempt == 4:
+                raise
+            # WDA keeps building a dropped read's tree (~3.5 s on the table);
+            # a read on top of it stacks the work and can take the runner down.
+            time.sleep(SOURCE_BUILD)
     response.raise_for_status()
     return response.json().get("value") or {}
 
@@ -189,6 +201,19 @@ def named(kind: str, name: str, timeout: float = 0.0) -> str | None:
                    timeout=timeout)
 
 
+def visible_rect(kind: str, name: str) -> dict | None:
+    """Rect of the first *kind* element called *name* that is actually drawn.
+
+    Native lists (MAX's debugger) keep off-screen rows in the tree with rects
+    that cannot be tapped; only ``visible`` says a row is on screen.
+    """
+    q = _quote(name)
+    for eid in find_elements(f"type == 'XCUIElementType{kind}' AND name == '{q}'"):
+        if attr(eid, "visible") is True:
+            return rect(eid)
+    return None
+
+
 def tap_point(x: float, y: float, settle: float = 1.0) -> None:
     """Tap a WDA point (the tree's coordinate space)."""
     scale = helpers.pixel_scale()
@@ -227,6 +252,103 @@ def drag_points(start, end, move_ms: int = 600, hold_ms: int = 200) -> None:
     requests.post(f"{config.WDA_URL}/session/{sid}/actions", json=body,
                   timeout=30).raise_for_status()
     time.sleep(0.6)
+
+
+# ── QA ─────────────────────────────────────────────────────────────
+
+# The QA page's interstitial SHOW (pixels) is grey until an interstitial has
+# loaded and black once one has; it updates while the page is open.
+QA_SHOW = (290, 995, 470, 1065)
+
+
+def inter_loaded() -> bool:
+    """On the QA page: an interstitial is loaded and ready to show."""
+    img = ui.screen_rgb()
+    if not ui._locate_in("qa_page_adapters", img):
+        return False
+    x0, y0, x1, y1 = QA_SHOW
+    return int((img[y0:y1, x0:x1].min(axis=2) < 90).sum()) > 500
+
+
+def await_inter(timeout: float = 300.0) -> float:
+    """On the QA page: wait until an interstitial is loaded. Seconds waited."""
+    t0 = time.time()
+    loaded = inter_loaded()
+    while not loaded and time.time() - t0 < timeout:
+        time.sleep(2.0)
+        loaded = inter_loaded()
+    ui.expect(loaded, f"no interstitial loaded within {timeout:.0f}s (the QA page's SHOW "
+                      "stayed grey) — no ad fill, so the ad point cannot be measured")
+    return time.time() - t0
+
+
+def wait_inter_loaded(timeout: float = 300.0) -> float:
+    """From the main menu: wait on the QA page until an interstitial is
+    loaded, then return to the menu. Seconds waited."""
+    ui.expect(ui.tap("qa_watermark", settle=1.5) and ui.seen("qa_page_adapters", 4.0),
+              "the QA page did not open from the menu's CONFIDENTIAL watermark")
+    try:
+        return await_inter(timeout)
+    finally:
+        ui.tap("qa_page_back", settle=1.5)
+        ui.expect(ui.on_menu(6.0), "back from the QA page did not reach the main menu")
+
+
+def enter_from_menu(deal: bool) -> None:
+    """Play, then Resume (or Easy and Yes to abandon when *deal*)."""
+    ui.expect(ui.on_menu(4.0), "game entry did not start from the main menu")
+    if not ui.tap("menu_play", settle=2.0):
+        helpers.wda_tap(ui.MENU_PLAY, settle=2.0)
+    ui.expect(ui.wait_for("difficulty_easy", timeout=6.0), "Play did not open the picker")
+    if not deal and ui.is_on("resume"):
+        ui.expect(ui.tap("resume", settle=1.0), "Resume could not be tapped")
+        return
+    ui.expect(ui.tap("difficulty_easy", settle=1.0), "Easy could not be tapped")
+    if wait_alert("abandon", timeout=3.0):
+        helpers.answer_alert("Yes", settle=1.0)
+
+
+# FreeCell's ads can land ~10 s after their trigger.
+LATE_AD = 12.0
+
+
+def loaded_table(label: str, ready_wait: float = 300.0) -> None:
+    """Onto the table with an interstitial loaded and no cooldown running.
+
+    Spider's Unity ads always fill; FreeCell's do not, so an ad point is
+    measured only once the QA page shows one loaded: menu, QA page until
+    SHOW, then Resume. An ad on the way in uses that one up, so the detour
+    starts again.
+    """
+    for _ in range(3):
+        if ui.at_table(timeout=1.0):
+            ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
+        clear_ad(f"{label} setup", wait=LATE_AD)
+        if not ui.on_menu(3.0):
+            menu()
+        waited = wait_inter_loaded(ready_wait)
+        enter_from_menu(deal=False)
+        if clear_ad(f"{label} resume", wait=LATE_AD):
+            print("  entering the game showed an ad, which used up the loaded one — "
+                  "waiting for the next", flush=True)
+            continue
+        ui.settle_prompts()
+        ui.expect(ui.at_table(timeout=8.0), "Resume did not reach the game table")
+        print(f"  interstitial loaded (QA SHOW after {waited:.0f}s) — on the table for "
+              f"{label}", flush=True)
+        return
+    raise AssertionError(f"could not reach the table with an interstitial loaded for {label}")
+
+
+def ensure_qa() -> None:
+    """QA on, from the main menu, without toggling it off when it already is."""
+    if ui.qa_enabled():
+        return
+    print("  QA is off — unlocking it on About", flush=True)
+    ui.expect(ui.open_dev_panel(), "could not turn QA on (About → version line → "
+                                   "emblem taps → code)")
+    ui.expect(ui.on_menu(4.0) or ui.to_menu(), "could not return to the menu after "
+                                               "turning QA on")
 
 
 # ── apps ───────────────────────────────────────────────────────────
@@ -612,7 +734,8 @@ LANDMARKS = ("menu_play", "back_game", "page_back", "daily_back", "screen_play",
              "difficulty_easy", "look_close", "screen_options", "contact_us",
              "drawer_options", "table_menu", "screen_about", "screen_help",
              "screen_faq", "screen_stats", "screen_more_games", "screen_table",
-             "tableau", "hint_hints", "hint_undo", "screen_choose_look")
+             "tableau", "hint_hints", "hint_undo", "screen_choose_look",
+             "screen_victory", "screen_last_score")
 CLOSE_NAMES = ("Close", "close", "Close Advertisement", "Close ad", "Dismiss",
                "Skip", "skip", "Done", "closeButton", "close button", "X")
 MANUAL_WAIT = 300.0
@@ -656,6 +779,10 @@ def wait_ad(timeout: float = 20.0) -> bool:
 AD_CORNERS = ((0, 0, 400, 600), (890, 0, 1290, 600))
 AD_X_POINTS = ((29, 83),)
 AD_X_AFTER = 20.0
+# Some playable end cards draw no X until their App Store sheet has been
+# opened and closed. A tap shows an "Open Store" pill (top-left, pixels) for
+# about a second only, so it is pressed straight off the next screenshot.
+STORE_PILL = (0, 150, 500, 400)
 
 
 def _tap_close_control() -> str:
@@ -683,6 +810,18 @@ def _tap_ad_x() -> str:
     return ""
 
 
+def _tap_open_store() -> str:
+    if not ui.have("ad_open_store"):
+        return ""
+    x0, y0, x1, y1 = STORE_PILL
+    hit = ui.find_ink("ad_open_store", ui.screen_rgb()[y0:y1, x0:x1])
+    if not hit:
+        return ""
+    point = (x0 + hit[0], y0 + hit[1])
+    helpers.tap(point, settle=2.5)
+    return f"Open Store at {point}"
+
+
 def close_ad(where: str, budget: float = 150.0) -> bool:
     """Close an interstitial chain (video, store sheet, playable) by its
     close controls until FreeCell's own UI is back."""
@@ -707,9 +846,14 @@ def close_ad(where: str, budget: float = 150.0) -> bool:
         now = time.time()
         if now - started >= AD_X_AFTER and now - last_measured >= AD_X_AFTER:
             for x, y in AD_X_POINTS:
-                tap_point(x, y, settle=2.0)
+                tap_point(x, y, settle=0.2)
             last_measured = now
             taps.append("measured X")
+            store = _tap_open_store()
+            if store:
+                taps.append(store)
+            else:
+                time.sleep(1.8)
             continue
         time.sleep(2.0)
     shot = ui.shoot(f"ad_unclosed_{re.sub(r'[^a-z0-9]+', '_', where.lower())}")

@@ -323,7 +323,9 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
     for row in rows:
         kinds[row["status"]] = kinds.get(row["status"], 0) + 1
     scope = (f"{kinds.get('pass', 0) + kinds.get('fail', 0)} run · "
-             f"{kinds.get('dev', 0)} dev build · {kinds.get('later', 0)} later")
+             f"{kinds.get('dev', 0)} dev build · "
+             f"{kinds.get('skip', 0) + kinds.get('block', 0)} skipped · "
+             f"{kinds.get('later', 0)} later")
     logo = _image_uri(HEADER_LOGO, box=(256, 256))
     mark = (f'<img class="mark" src="{logo}" alt="FreeCell Solitaire logo">'
             if logo else '<div class="mark">F</div>')

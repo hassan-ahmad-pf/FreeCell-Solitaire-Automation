@@ -7,15 +7,27 @@ an interstitial; once one closes, a 30 s cooldown suppresses the next.
 TA-01  under 30 s on the table, Options: no ad
 TA-02  over 30 s on the table, Help: ad
 TA-03  Options within 30 s of the Help ad: no ad
+TA-04  over 30 s on the table, Synthetic Win: ad over Victory
+TA-05  New within 30 s of that Victory ad: no ad
+TA-06  a second win after 30 s on the table, its ad closed, over 30 s on
+       Victory, then New: ad
 TA-07  over 30 s on the table, Back: ad, closing onto the main menu
 TA-08  starting a game within 30 s on that menu: no ad
 TA-10  over 30 s on the table, FAQ: ad
 TA-09  Back ad onto the menu, over 30 s on the menu, then deal: ad
 
-TA-04..06 need the dev build's Complete Game and are not here. An ad is
-FreeCell in front with none of its own screens showing. An ad that cannot be
-closed by its controls is closed by hand, as in Spider ("Manual effort
-required at this step"); that case then says "passed manually".
+Spider's Complete Game is the QA badge's Synthetic Win, so the run turns QA
+on first. An ad is FreeCell in front with none of its own screens showing.
+
+Spider's Unity ads fill every time; FreeCell's do not, so a missing ad could
+just be no fill. Each case that expects an ad therefore starts only once an
+interstitial is loaded: back to the menu, the QA page until its SHOW control
+turns black, then Resume onto the table. A missing ad then means the trigger
+did not fire. FreeCell's ads can arrive ~10 s after their trigger, so each
+detour first waits out a late one.
+An ad that cannot be closed by its controls is closed by hand, as in Spider
+("Manual effort required at this step"); that case then says "passed
+manually".
 
 Run:  ./.venv/bin/python -u tests/spider_suite/triggerAdPoints.py
 """
@@ -38,6 +50,7 @@ DWELL = 32.0
 NO_AD = 10.0
 WATCH = 5.0
 AD_WAIT = 20.0
+READY_WAIT = 300.0
 
 DESTINATIONS = {
     "options": ("drawer_options", lambda: ui.expect_screen("options", timeout=0.5)),
@@ -96,18 +109,16 @@ def _back_to_table() -> None:
     ui.expect(ui.at_table(timeout=8.0), "could not get back to the game table")
 
 
-def _enter_from_menu(deal: bool) -> None:
-    """Play, then Resume (or Easy and Yes to abandon when *deal*)."""
-    ui.expect(ui.on_menu(4.0), "game entry did not start from the main menu")
-    if not ui.tap("menu_play", settle=2.0):
-        helpers.wda_tap(ui.MENU_PLAY, settle=2.0)
-    ui.expect(ui.wait_for("difficulty_easy", timeout=6.0), "Play did not open the picker")
-    if not deal and ui.is_on("resume"):
-        ui.expect(ui.tap("resume", settle=1.0), "Resume could not be tapped")
-        return
-    ui.expect(ui.tap("difficulty_easy", settle=1.0), "Easy could not be tapped")
-    if fc.wait_alert("abandon", timeout=3.0):
-        helpers.answer_alert("Yes", settle=1.0)
+def _win_with_ad(label: str) -> None:
+    """Synthetic Win on the table; its ad must come up over Victory."""
+    ui.expect(ui.synthetic_win(), f"Synthetic Win could not be fired for {label}")
+    _ad(label)
+    ui.expect(ui.expect_screen("victory", timeout=8.0),
+              f"the Victory screen is not showing after the {label} ad closed")
+
+
+def _victory_new() -> None:
+    ui.expect(ui.tap("victory_new", settle=1.0), "Victory's New could not be tapped")
 
 
 def _fresh_table() -> None:
@@ -119,14 +130,16 @@ def _fresh_table() -> None:
     if fc.wait_alert("abandon", timeout=2.0):
         helpers.answer_alert("Yes", settle=1.5)
     ui.settle_prompts()
-    if fc.ad_up():
-        print("  the fresh deal showed an inherited ad — closing it", flush=True)
-        fc.close_or_wait("fresh-table setup")
+    if fc.clear_ad("fresh-table setup", wait=fc.LATE_AD):
+        print("  the fresh deal showed an ad — closed it", flush=True)
+        ui.settle_prompts()
     ui.expect(ui.at_table(timeout=8.0), "could not reach a fresh game table")
 
 
 def run() -> None:
     fc.go_online()
+    fc.menu()
+    fc.ensure_qa()
     _fresh_table()
 
     with caselog.case("TA-01") as c:
@@ -148,6 +161,7 @@ def run() -> None:
         c.note(f"Options after {SHORT:.0f}s on the table, no ad")
 
     with caselog.case("TA-02") as c:
+        fc.loaded_table("Help")
         _dwell(DWELL, "on the table before Help")
         _open("help")
         _ad("long table -> Help")
@@ -163,7 +177,55 @@ def run() -> None:
         _back_to_table()
         c.note("Options right after the Help ad, no ad")
 
+    with caselog.case("TA-04") as c:
+        fc.loaded_table("the first win")
+        _dwell(DWELL, "on the table before Synthetic Win")
+        _win_with_ad("long table -> Victory")
+        c.shot(ui.shoot("AdVictory"))
+        _manual_note(c, "long table -> Victory")
+        c.note("ad over Victory, closed; Victory showing")
+
+    with caselog.case("TA-05", soft=True) as c:
+        _victory_new()
+        try:
+            _no_ad("Victory ad closed -> New", lambda: ui.at_table(timeout=0.5))
+        finally:
+            c.shot(ui.shoot("AdVictoryNewCooldown"))
+        ui.settle_prompts()
+        ui.expect(ui.at_table(timeout=8.0), "New within the cooldown did not reach a table")
+        c.note("New within 30s of the Victory ad, no ad")
+    if fc.ad_up():
+        fc.close_or_wait("Victory -> New inside the cooldown")
+    ui.settle_prompts()
+    ui.expect(ui.at_table(timeout=8.0), "could not reach the table after TA-05")
+
+    with caselog.case("TA-06") as c:
+        # New's ad needs the next interstitial to have loaded after the win's
+        # ad, which the table detour cannot check from Victory: one rerun.
+        for attempt in range(2):
+            fc.loaded_table("the second win")
+            _dwell(DWELL, "on the table before the second Synthetic Win")
+            _win_with_ad("second long table -> Victory")
+            _dwell(DWELL, "on Victory before New")
+            _victory_new()
+            if fc.wait_ad(timeout=AD_WAIT):
+                print("  Victory -> New after the cooldown: interstitial up", flush=True)
+                fc.close_or_wait("Victory -> New after the cooldown")
+                break
+            ui.expect(not attempt, f"no interstitial for Victory -> New after the cooldown "
+                                   f"within {AD_WAIT:.0f}s, twice")
+            print("  no ad on New — the next interstitial may not have loaded after the "
+                  "win's ad; once more from a loaded table", flush=True)
+            ui.settle_prompts()
+        _back_to_table()
+        c.shot(ui.shoot("AdVictoryNew"))
+        if {"second long table -> Victory",
+                "Victory -> New after the cooldown"} & fc.MANUAL_CLOSES:
+            c.note("passed manually — the ad was closed by hand")
+        c.note("second Victory ad closed; New after 30s on Victory showed an ad")
+
     with caselog.case("TA-07") as c:
+        fc.loaded_table("Back")
         _dwell(DWELL, "on the table before Back")
         ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
         _ad("long table -> Back")
@@ -174,12 +236,13 @@ def run() -> None:
 
     with caselog.case("TA-08") as c:
         _dwell(SHORT, "on the menu before entering the game")
-        _enter_from_menu(deal=False)
+        fc.enter_from_menu(deal=False)
         _no_ad("short menu -> game", lambda: ui.at_table(timeout=0.5))
         c.shot(ui.shoot("AdShortMenuEntry"))
         c.note("game entered within 30s of the Back ad, no ad")
 
     with caselog.case("TA-10") as c:
+        fc.loaded_table("FAQ")
         _dwell(DWELL, "on the table before FAQ")
         _open("faq")
         _ad("long table -> FAQ")
@@ -189,12 +252,15 @@ def run() -> None:
         c.note("ad shown and closed, back on the table")
 
     with caselog.case("TA-09") as c:
+        fc.loaded_table("Back (TA-09 setup)")
         _dwell(DWELL, "on the table before Back")
         ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
         _ad("long table -> Back (TA-09 setup)")
         ui.expect(ui.on_menu(8.0), "the Back ad did not close onto the main menu")
+        waited = fc.wait_inter_loaded(READY_WAIT)
+        print(f"  interstitial loaded again (QA SHOW after {waited:.0f}s)", flush=True)
         _dwell(DWELL, "on the menu before dealing")
-        _enter_from_menu(deal=True)
+        fc.enter_from_menu(deal=True)
         _ad("long menu -> deal")
         ui.settle_prompts()
         ui.expect(ui.at_table(timeout=8.0), "the deal did not reach the table after its ad")
@@ -203,6 +269,7 @@ def run() -> None:
         c.note("ad shown on entering the game")
 
     ui.expect(ui.to_menu(), "could not return to the main menu after the ad checks")
+    caselog.raise_if_failed()
     print("PASS: every interstitial trigger and cooldown point behaved as in Spider")
 
 

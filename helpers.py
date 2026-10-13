@@ -267,12 +267,19 @@ def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
             ],
         }]
     }
-    response = requests.post(
-        f"{config.WDA_URL}/session/{current_session()}/actions",
-        data=json.dumps(actions),
-        headers={"Content-Type": "application/json"},
-        timeout=15,
-    )
+    global _SESSION_ID
+    for attempt in range(2):
+        response = requests.post(
+            f"{config.WDA_URL}/session/{current_session()}/actions",
+            data=json.dumps(actions),
+            headers={"Content-Type": "application/json"},
+            timeout=15,
+        )
+        # An app switch (an ad opening the App Store) can end the session
+        # between the session check and the tap.
+        if response.status_code != 404 or attempt:
+            break
+        _SESSION_ID = None
     response.raise_for_status()
     if settle:
         time.sleep(settle)
@@ -617,13 +624,20 @@ def rapid_tap(point: tuple[int, int], times: int = 10, gap_ms: int = 45) -> bool
 def grab_png() -> bytes:
     """Full-screen PNG from WDA. No Airtest session recover."""
     ensure_link()
-    response = requests.get(f"{config.WDA_URL}/screenshot", timeout=15)
-    if response.status_code != 200:
-        sid = ensure_session(settle=0.2)
-        response = requests.get(
-            f"{config.WDA_URL}/session/{sid}/screenshot",
-            timeout=15,
-        )
+    for attempt in range(3):
+        try:
+            response = requests.get(f"{config.WDA_URL}/screenshot", timeout=15)
+            if response.status_code != 200:
+                sid = ensure_session(settle=0.2)
+                response = requests.get(
+                    f"{config.WDA_URL}/session/{sid}/screenshot",
+                    timeout=15,
+                )
+            break
+        except (requests.ConnectionError, requests.exceptions.ChunkedEncodingError):
+            if attempt == 2:
+                raise
+            time.sleep(0.5)
     response.raise_for_status()
     payload = response.json().get("value")
     if not isinstance(payload, str):

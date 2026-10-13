@@ -414,6 +414,107 @@ def step_shot() -> None:
     save(sys.argv[2] if len(sys.argv) > 2 else "now")
 
 
+def step_qa_on() -> None:
+    """Dev build: About → version → emblem burst → code, saving each screen."""
+    print("menu", ui.to_menu())
+    save("dev_menu_before")
+    print("  watermark before", ui.is_on("qa_watermark"))
+    print("about", ui.tap("menu_about", settle=2.5) and ui.expect_screen("about", 6))
+    save("dev_about")
+    print("version", ui.tap("about_version", settle=1.0))
+    save("dev_about_version")
+    point = ui.find("about_emblem")
+    print("emblem", point)
+    print("burst", helpers.rapid_tap(point, times=config.QA_TAPS))
+    time.sleep(1.0)
+    save("dev_about_burst")
+    _texts(30)
+    print("code", helpers.type_keys(config.QA_CODE))
+    time.sleep(1.5)
+    save("dev_about_code")
+    _texts(30)
+    ui.back()
+    print("menu", ui.on_menu(6))
+    time.sleep(1.0)
+    save("dev_menu_after")
+    print("  watermark after", ui.is_on("qa_watermark"))
+
+
+KEYPAD = {"1": (219, 1965), "2": (642, 1965), "3": (1066, 1965),
+          "4": (219, 2134), "5": (642, 2134), "6": (1066, 2134),
+          "7": (219, 2304), "8": (642, 2304), "9": (1066, 2304),
+          "0": (642, 2473)}
+
+
+def step_qa_keypad() -> None:
+    """About → version → burst, then press the code on the keypad one digit at a time."""
+    print("menu", ui.to_menu())
+    print("about", ui.tap("menu_about", settle=2.5) and ui.expect_screen("about", 6))
+    print("version", ui.tap("about_version", settle=1.0))
+    point = ui.find("about_emblem")
+    print("burst", helpers.rapid_tap(point, times=config.QA_TAPS))
+    time.sleep(1.0)
+    for digit in config.QA_CODE:
+        helpers.wda_tap(KEYPAD[digit], settle=0.4)
+    time.sleep(0.6)
+    save("dev_keypad_code")
+    _texts(30)
+    time.sleep(2.0)
+    save("dev_keypad_code_2")
+
+
+def step_qa_table() -> None:
+    """Dev build: Easy, first move prompt cleared, the QA badge and its panel."""
+    print("menu", ui.to_menu())
+    print("easy", ui.start_game("easy"))
+    ui.start_deal()
+    time.sleep(1.0)
+    save("dev_table")
+    print("  badge", ui.is_on("qa_badge"))
+    print("panel", ui.open_qa_panel())
+    save("dev_qa_panel")
+    _texts(40)
+
+
+def step_qa_drawer() -> None:
+    """Dev build: the table drawer, which carries a QA entry."""
+    print("drawer", ui.open_table_drawer())
+    save("dev_drawer")
+    _texts(40)
+
+
+def step_win() -> None:
+    """Dev build: on the Synthetic Win panel pick 90-99 and WIN; capture Victory."""
+    if not ui.is_on("qa_panel"):
+        print("panel", ui.open_qa_panel())
+    helpers.wda_tap(ui.QA_SELECT_90_99, settle=1.0)
+    save("dev_qa_selected")
+    helpers.wda_tap(ui.QA_WIN, settle=0.2)
+    for n in range(4):
+        time.sleep(1.5)
+        save(f"dev_victory_{n}")
+    print("  victory", ui.expect_screen("victory", 4))
+    _texts(40)
+
+
+def step_last_score() -> None:
+    """Play → LAST SCORE."""
+    print("menu", ui.to_menu())
+    print("play", ui.tap("menu_play", settle=2.0))
+    save("dev_picker")
+    helpers.wda_tap(ui.LAST_SCORE, settle=3.0)
+    save("dev_last_score")
+    _texts(40)
+
+
+def step_tap() -> None:
+    """Tap pixel (argv[2], argv[3]) and save argv[4]."""
+    x, y = int(sys.argv[2]), int(sys.argv[3])
+    helpers.wda_tap((x, y), settle=float(sys.argv[5]) if len(sys.argv) > 5 else 2.0)
+    save(sys.argv[4] if len(sys.argv) > 4 else f"tap_{x}_{y}")
+    print("  app", helpers.active_app(), "alert", repr(helpers.alert_text()))
+
+
 STEPS = {
     "menu-about": step_menu_about,
     "options": step_options,
@@ -443,6 +544,13 @@ STEPS = {
     "close-ad": step_close_ad,
     "kill": step_kill,
     "shot": step_shot,
+    "qa-on": step_qa_on,
+    "qa-keypad": step_qa_keypad,
+    "qa-table": step_qa_table,
+    "qa-drawer": step_qa_drawer,
+    "win": step_win,
+    "last-score": step_last_score,
+    "tap": step_tap,
 }
 
 

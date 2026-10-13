@@ -1,0 +1,1690 @@
+{
+  "schema": 1,
+  "suite": "Spider regression suite on FreeCell",
+  "build_kind": "dev",
+  "started": "2026-10-14T00:45:58+05:00",
+  "device": {
+    "model": "iPhone16,2",
+    "ios": "27.0.1",
+    "udid": "00008130-00010D283A31001C",
+    "screen": "1290x2796"
+  },
+  "app": {
+    "name": "FreeCell",
+    "version": "7.42.1",
+    "build": "266"
+  },
+  "tests": [
+    {
+      "name": "installFromTestFlight",
+      "module": null,
+      "status": "skip",
+      "seconds": 0.0,
+      "error": "the dev build was installed by hand, not from TestFlight"
+    },
+    {
+      "name": "verifyFirstLaunch",
+      "module": "verifyFirstLaunch",
+      "status": "pass",
+      "seconds": 83.9,
+      "error": ""
+    },
+    {
+      "name": "verifyMainMenu",
+      "module": "verifyMainMenu",
+      "status": "pass",
+      "seconds": 15.0,
+      "error": ""
+    },
+    {
+      "name": "verifyStatsPage",
+      "module": "verifyStatsPage",
+      "status": "pass",
+      "seconds": 35.1,
+      "error": ""
+    },
+    {
+      "name": "verifyOptions",
+      "module": "verifyOptions",
+      "status": "pass",
+      "seconds": 153.0,
+      "error": ""
+    },
+    {
+      "name": "verifyHelpShift",
+      "module": "verifyHelpShift",
+      "status": "pass",
+      "seconds": 31.4,
+      "error": ""
+    },
+    {
+      "name": "verifyHelpPage",
+      "module": "verifyHelpPage",
+      "status": "pass",
+      "seconds": 46.8,
+      "error": ""
+    },
+    {
+      "name": "verifySpiderLogo",
+      "module": "verifyFreeCellLogo",
+      "status": "pass",
+      "seconds": 96.6,
+      "error": ""
+    },
+    {
+      "name": "verifyMoreGamesBtn",
+      "module": "verifyMoreGamesBtn",
+      "status": "pass",
+      "seconds": 30.6,
+      "error": ""
+    },
+    {
+      "name": "verifyPlay",
+      "module": "verifyPlay",
+      "status": "pass",
+      "seconds": 46.1,
+      "error": ""
+    },
+    {
+      "name": "verifyAbandonNo",
+      "module": "verifyAbandonNo",
+      "status": "pass",
+      "seconds": 39.4,
+      "error": ""
+    },
+    {
+      "name": "verifyRelaunch",
+      "module": "verifyRelaunch",
+      "status": "pass",
+      "seconds": 212.1,
+      "error": ""
+    },
+    {
+      "name": "openDebugTools",
+      "module": "openDebugTools",
+      "status": "pass",
+      "seconds": 135.1,
+      "error": ""
+    },
+    {
+      "name": "verifyGamePlay",
+      "module": "verifyGamePlay",
+      "status": "pass",
+      "seconds": 235.4,
+      "error": ""
+    },
+    {
+      "name": "verifyVictory",
+      "module": "verifyVictory",
+      "status": "pass",
+      "seconds": 58.0,
+      "error": ""
+    },
+    {
+      "name": "verifyDifficultyLevels",
+      "module": "verifyDifficultyLevels",
+      "status": "pass",
+      "seconds": 168.6,
+      "error": ""
+    },
+    {
+      "name": "verifyMoreGamesIcons",
+      "module": "verifyMoreGamesIcons",
+      "status": "pass",
+      "seconds": 89.2,
+      "error": ""
+    },
+    {
+      "name": "verifyResetCancelled",
+      "module": "verifyResetCancelled",
+      "status": "pass",
+      "seconds": 54.4,
+      "error": ""
+    },
+    {
+      "name": "resetStats",
+      "module": "resetStats",
+      "status": "pass",
+      "seconds": 75.2,
+      "error": ""
+    },
+    {
+      "name": "verifyHelpShiftOnline",
+      "module": "verifyHelpShiftOnline",
+      "status": "pass",
+      "seconds": 34.5,
+      "error": ""
+    },
+    {
+      "name": "verifyChooseLook",
+      "module": "verifyChooseLook",
+      "status": "pass",
+      "seconds": 169.5,
+      "error": ""
+    },
+    {
+      "name": "verifyAds",
+      "module": "verifyAds",
+      "status": "pass",
+      "seconds": 240.4,
+      "error": ""
+    },
+    {
+      "name": "triggerAdPoints",
+      "module": "triggerAdPoints",
+      "status": "fail",
+      "seconds": 1654.0,
+      "error": "failed cases: TA-05"
+    },
+    {
+      "name": "visitLastScore",
+      "module": "visitLastScore",
+      "status": "pass",
+      "seconds": 108.6,
+      "error": ""
+    },
+    {
+      "name": "verifyAdFreeVersion",
+      "module": "verifyAdFreeVersion",
+      "status": "pass",
+      "seconds": 121.4,
+      "error": ""
+    },
+    {
+      "name": "submitFeedback",
+      "module": "submitFeedback",
+      "status": "pass",
+      "seconds": 62.3,
+      "error": ""
+    }
+  ],
+  "cases": [
+    {
+      "id": "FL-01",
+      "title": "Launch - Force-quit and reopen reaches the main menu",
+      "section": "Launch",
+      "test": "verifyFirstLaunch",
+      "status": "pass",
+      "detail": "reopened onto the main menu, no pop-up left",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/FirstLaunch.png"
+      ],
+      "notes": [
+        "reopened onto the main menu, no pop-up left"
+      ],
+      "seconds": 10.4
+    },
+    {
+      "id": "FL-02",
+      "title": "Launch - Fresh install shows Terms & Conditions",
+      "section": "Launch",
+      "test": "verifyFirstLaunch",
+      "status": "pass",
+      "detail": "Continue cleared the Terms card",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/FirstLaunchTerms.png"
+      ],
+      "notes": [
+        "Continue cleared the Terms card"
+      ],
+      "seconds": 4.7
+    },
+    {
+      "id": "FL-03",
+      "title": "Launch - Fresh install shows the tracking prompt",
+      "section": "Launch",
+      "test": "verifyFirstLaunch",
+      "status": "pass",
+      "detail": "tracking prompt shown and Allowed",
+      "shots": [],
+      "notes": [
+        "tracking prompt shown and Allowed"
+      ],
+      "seconds": 3.3
+    },
+    {
+      "id": "FL-04",
+      "title": "Launch - Terms & Conditions link opens the terms page",
+      "section": "Launch",
+      "test": "verifyFirstLaunch",
+      "status": "pass",
+      "detail": "Terms & Conditions page opened and closed back to the card",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/first_launch_terms_page.png"
+      ],
+      "notes": [
+        "Terms & Conditions page opened and closed back to the card"
+      ],
+      "seconds": 10.5
+    },
+    {
+      "id": "FL-05",
+      "title": "Launch - Privacy Policy link opens the privacy page",
+      "section": "Launch",
+      "test": "verifyFirstLaunch",
+      "status": "pass",
+      "detail": "Privacy Policy page opened and closed back to the card",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/first_launch_privacy_page.png"
+      ],
+      "notes": [
+        "Privacy Policy page opened and closed back to the card"
+      ],
+      "seconds": 10.0
+    },
+    {
+      "id": "FL-06",
+      "title": "Launch - Latest odd TestFlight build installs",
+      "section": "Launch",
+      "test": "installFromTestFlight",
+      "status": "skip",
+      "detail": "the dev build was installed by hand, not from TestFlight",
+      "shots": [],
+      "notes": [],
+      "seconds": 0.0
+    },
+    {
+      "id": "MM-01",
+      "title": "Main Menu - All eight controls are visible",
+      "section": "Main Menu",
+      "test": "verifyMainMenu",
+      "status": "pass",
+      "detail": "all 9 controls visible",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/MainMenu.png"
+      ],
+      "notes": [
+        "all 9 controls visible"
+      ],
+      "seconds": 6.8
+    },
+    {
+      "id": "ST-01",
+      "title": "Statistics - Opens from the main menu",
+      "section": "Statistics",
+      "test": "verifyStatsPage",
+      "status": "pass",
+      "detail": "Statistics opened",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/Stats.png"
+      ],
+      "notes": [
+        "Statistics opened"
+      ],
+      "seconds": 8.7
+    },
+    {
+      "id": "ST-03",
+      "title": "Statistics - Page scrolls down to Reset Statistics",
+      "section": "Statistics",
+      "test": "verifyStatsPage",
+      "status": "pass",
+      "detail": "Reset Solo Statistics reached at the bottom",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/StatsBottom.png"
+      ],
+      "notes": [
+        "Reset Solo Statistics reached at the bottom"
+      ],
+      "seconds": 11.4
+    },
+    {
+      "id": "ST-04",
+      "title": "Statistics - Back returns to the main menu",
+      "section": "Statistics",
+      "test": "verifyStatsPage",
+      "status": "pass",
+      "detail": "back on the main menu",
+      "shots": [],
+      "notes": [
+        "back on the main menu"
+      ],
+      "seconds": 6.4
+    },
+    {
+      "id": "OP-01",
+      "title": "Options - Opens from the main menu",
+      "section": "Options",
+      "test": "verifyOptions",
+      "status": "pass",
+      "detail": "Options opened",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/Options.png"
+      ],
+      "notes": [
+        "Options opened"
+      ],
+      "seconds": 9.0
+    },
+    {
+      "id": "OP-03",
+      "title": "Options - Applause Volume moves to min, max, and middle",
+      "section": "Options",
+      "test": "verifyOptions",
+      "status": "pass",
+      "detail": "min 0%, max 99%, middle 52%",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/OptionsApplause.png"
+      ],
+      "notes": [
+        "min 0%, max 99%, middle 52%"
+      ],
+      "seconds": 29.5
+    },
+    {
+      "id": "OP-04",
+      "title": "Options - Applause Volume stays after you leave the screen",
+      "section": "Options",
+      "test": "verifyOptions",
+      "status": "pass",
+      "detail": "32% kept after leaving Options",
+      "shots": [],
+      "notes": [
+        "32% kept after leaving Options"
+      ],
+      "seconds": 22.8
+    },
+    {
+      "id": "OP-05",
+      "title": "Options - Auto Mute Sounds turns off and on",
+      "section": "Options",
+      "test": "verifyOptions",
+      "status": "pass",
+      "detail": "on \u2192 off \u2192 on",
+      "shots": [],
+      "notes": [
+        "on \u2192 off \u2192 on"
+      ],
+      "seconds": 6.7
+    },
+    {
+      "id": "OP-06",
+      "title": "Options - Card Lowering moves to min, max, and middle",
+      "section": "Options",
+      "test": "verifyOptions",
+      "status": "pass",
+      "detail": "min 0%, max 100%, middle 52%",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/OptionsCardLowering.png"
+      ],
+      "notes": [
+        "min 0%, max 100%, middle 52%"
+      ],
+      "seconds": 19.6
+    },
+    {
+      "id": "OP-07",
+      "title": "Options - Use Hearts turns on and off",
+      "section": "Options",
+      "test": "verifyOptions",
+      "status": "later",
+      "detail": "FreeCell difference \u2014 FreeCell's Options have no Use Hearts",
+      "shots": [],
+      "notes": [],
+      "seconds": 0.0
+    },
+    {
+      "id": "HP-01",
+      "title": "Help - Opens on Introduction",
+      "section": "Help",
+      "test": "verifyHelpPage",
+      "status": "pass",
+      "detail": "Help opened",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/Help.png"
+      ],
+      "notes": [
+        "Help opened"
+      ],
+      "seconds": 9.1
+    },
+    {
+      "id": "HP-02",
+      "title": "Help - Rules scroll down to the FAQ link",
+      "section": "Help",
+      "test": "verifyHelpPage",
+      "status": "pass",
+      "detail": "scrolled down to the FAQ link",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/HelpBottom.png"
+      ],
+      "notes": [
+        "scrolled down to the FAQ link"
+      ],
+      "seconds": 23.1
+    },
+    {
+      "id": "HP-03",
+      "title": "Help - Back returns to the main menu",
+      "section": "Help",
+      "test": "verifyHelpPage",
+      "status": "pass",
+      "detail": "back on the main menu",
+      "shots": [],
+      "notes": [
+        "back on the main menu"
+      ],
+      "seconds": 6.2
+    },
+    {
+      "id": "AB-01",
+      "title": "About - Opens from the About menu item",
+      "section": "About",
+      "test": "verifySpiderLogo",
+      "status": "pass",
+      "detail": "About opened from the menu item",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/About.png"
+      ],
+      "notes": [
+        "About opened from the menu item"
+      ],
+      "seconds": 5.7
+    },
+    {
+      "id": "AB-03",
+      "title": "About - Version and links are on the page",
+      "section": "About",
+      "test": "verifySpiderLogo",
+      "status": "pass",
+      "detail": "version line and all five links present",
+      "shots": [],
+      "notes": [
+        "version line and all five links present"
+      ],
+      "seconds": 4.0
+    },
+    {
+      "id": "AB-04",
+      "title": "About - Frequently asked questions stays in the app",
+      "section": "About",
+      "test": "verifySpiderLogo",
+      "status": "pass",
+      "detail": "FAQ opened inside FreeCell",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AboutFaq.png"
+      ],
+      "notes": [
+        "FAQ opened inside FreeCell"
+      ],
+      "seconds": 5.7
+    },
+    {
+      "id": "AB-05",
+      "title": "About - FAQ scrolls down to submit feedback",
+      "section": "About",
+      "test": "verifySpiderLogo",
+      "status": "pass",
+      "detail": "scrolled to submit feedback (30% of the text changed), still on FAQ",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AboutFaqBottom.png"
+      ],
+      "notes": [
+        "scrolled to submit feedback (30% of the text changed), still on FAQ"
+      ],
+      "seconds": 48.6
+    },
+    {
+      "id": "AB-06",
+      "title": "About - FreeCell logo also opens About",
+      "section": "About",
+      "test": "verifySpiderLogo",
+      "status": "pass",
+      "detail": "the crown logo opened About",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AboutFromLogo.png"
+      ],
+      "notes": [
+        "the crown logo opened About"
+      ],
+      "seconds": 5.8
+    },
+    {
+      "id": "MG-01",
+      "title": "More Games - Gift icon opens the in-app promo page",
+      "section": "More Games",
+      "test": "verifyMoreGamesBtn",
+      "status": "pass",
+      "detail": "in-app promo page opened",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/MoreGames.png"
+      ],
+      "notes": [
+        "in-app promo page opened"
+      ],
+      "seconds": 5.0
+    },
+    {
+      "id": "MG-02",
+      "title": "More Games - Swipe reveals Card Games and Spiderette",
+      "section": "More Games",
+      "test": "verifyMoreGamesBtn",
+      "status": "pass",
+      "detail": "one swipe moved 21% of the list \u2014 Card Games and Spiderette in view",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/MoreGamesScrolled.png"
+      ],
+      "notes": [
+        "one swipe moved 21% of the list \u2014 Card Games and Spiderette in view"
+      ],
+      "seconds": 10.5
+    },
+    {
+      "id": "MG-03",
+      "title": "More Games - Back returns to the main menu",
+      "section": "More Games",
+      "test": "verifyMoreGamesBtn",
+      "status": "pass",
+      "detail": "back on the main menu",
+      "shots": [],
+      "notes": [
+        "back on the main menu"
+      ],
+      "seconds": 6.8
+    },
+    {
+      "id": "PL-01",
+      "title": "Play - Opens the difficulty picker",
+      "section": "Play",
+      "test": "verifyPlay",
+      "status": "pass",
+      "detail": "difficulty picker opened",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/PlayPicker.png"
+      ],
+      "notes": [
+        "difficulty picker opened"
+      ],
+      "seconds": 7.5
+    },
+    {
+      "id": "PL-02",
+      "title": "Play - Picker shows all five levels",
+      "section": "Play",
+      "test": "verifyPlay",
+      "status": "pass",
+      "detail": "Easy, Medium, Hard, Expert, Master listed",
+      "shots": [],
+      "notes": [
+        "Easy, Medium, Hard, Expert, Master listed"
+      ],
+      "seconds": 3.4
+    },
+    {
+      "id": "PL-03",
+      "title": "Play - Easy starts a game",
+      "section": "Play",
+      "test": "verifyPlay",
+      "status": "pass",
+      "detail": "Easy dealt a table",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/PlayEasy.png"
+      ],
+      "notes": [
+        "Easy dealt a table"
+      ],
+      "seconds": 15.0
+    },
+    {
+      "id": "PL-04",
+      "title": "Play - Declining abandon stays on the picker",
+      "section": "Play",
+      "test": "verifyAbandonNo",
+      "status": "pass",
+      "detail": "No kept the picker and the paused game",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AbandonPrompt.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AbandonNo.png"
+      ],
+      "notes": [
+        "No kept the picker and the paused game"
+      ],
+      "seconds": 11.2
+    },
+    {
+      "id": "QA-02",
+      "title": "QA - Dev Panel is hidden until you unlock it",
+      "section": "QA / Dev Panel",
+      "test": "openDebugTools",
+      "status": "pass",
+      "detail": "no watermark on the menu, no 'reset alerts' on About",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/debug_tools_before.png"
+      ],
+      "notes": [
+        "no watermark on the menu, no 'reset alerts' on About"
+      ],
+      "seconds": 9.7
+    },
+    {
+      "id": "QA-03",
+      "title": "QA - Ten emblem taps and the code turn QA on",
+      "section": "QA / Dev Panel",
+      "test": "openDebugTools",
+      "status": "pass",
+      "detail": "CONFIDENTIAL on the menu; 'reset alerts' bottom-right on About (10 taps + code)",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/debug_tools_menu.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/debug_tools.png"
+      ],
+      "notes": [
+        "CONFIDENTIAL on the menu; 'reset alerts' bottom-right on About (10 taps + code)"
+      ],
+      "seconds": 41.1
+    },
+    {
+      "id": "QA-04",
+      "title": "QA - The code again turns QA off",
+      "section": "QA / Dev Panel",
+      "test": "openDebugTools",
+      "status": "pass",
+      "detail": "the code again: watermark and 'reset alerts' gone",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/debug_tools_off.png"
+      ],
+      "notes": [
+        "the code again: watermark and 'reset alerts' gone"
+      ],
+      "seconds": 49.7
+    },
+    {
+      "id": "GP-01",
+      "title": "Gameplay - Table controls are on screen",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "back, menu, undo, lower and hints all on screen",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayTable.png"
+      ],
+      "notes": [
+        "back, menu, undo, lower and hints all on screen"
+      ],
+      "seconds": 4.7
+    },
+    {
+      "id": "GP-02",
+      "title": "Gameplay - Dealing from the stock changes the board",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "later",
+      "detail": "FreeCell difference \u2014 FreeCell has no stock pile to deal from",
+      "shots": [],
+      "notes": [],
+      "seconds": 0.0
+    },
+    {
+      "id": "GP-03",
+      "title": "Gameplay - Undo puts the board back",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "moved club-8, undo restored every card",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayMoved.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayUndone.png"
+      ],
+      "notes": [
+        "moved club-8, undo restored every card"
+      ],
+      "seconds": 34.5
+    },
+    {
+      "id": "GP-04",
+      "title": "Gameplay - Tap to lower drops the playfield",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "top 198 -> 252 pt",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayLowered.png"
+      ],
+      "notes": [
+        "top 198 -> 252 pt"
+      ],
+      "seconds": 22.5
+    },
+    {
+      "id": "GP-05",
+      "title": "Gameplay - Tap to raise brings the playfield back",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "top 252 -> 198 pt",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayRaised.png"
+      ],
+      "notes": [
+        "top 252 -> 198 pt"
+      ],
+      "seconds": 12.3
+    },
+    {
+      "id": "GP-06",
+      "title": "Gameplay - Tap for hints highlights a move",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "hint shown \u2014 tap for more, 0.0% of the playfield highlighted",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayHint.png"
+      ],
+      "notes": [
+        "hint shown \u2014 tap for more, 0.0% of the playfield highlighted"
+      ],
+      "seconds": 4.9
+    },
+    {
+      "id": "GP-07",
+      "title": "Gameplay - In-game menu shows all six actions",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "replay, abandon, options, new, help, FAQ",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayDrawer.png"
+      ],
+      "notes": [
+        "replay, abandon, options, new, help, FAQ"
+      ],
+      "seconds": 15.2
+    },
+    {
+      "id": "GP-08",
+      "title": "Gameplay - Use Hearts ON turns Easy cards into hearts",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "later",
+      "detail": "FreeCell difference \u2014 FreeCell has no Use Hearts",
+      "shots": [],
+      "notes": [],
+      "seconds": 0.0
+    },
+    {
+      "id": "GP-09",
+      "title": "Gameplay - Use Hearts OFF turns the cards back to spades",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "later",
+      "detail": "FreeCell difference \u2014 FreeCell has no Use Hearts",
+      "shots": [],
+      "notes": [],
+      "seconds": 0.0
+    },
+    {
+      "id": "GP-10",
+      "title": "Gameplay - Rich Features OFF hides timer, score, multiplier",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "timer, score, multiplier and moves hidden",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RichFeaturesOptionOff.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RichFeaturesOff.png"
+      ],
+      "notes": [
+        "timer, score, multiplier and moves hidden"
+      ],
+      "seconds": 35.4
+    },
+    {
+      "id": "GP-11",
+      "title": "Gameplay - Rich Features ON brings timer, score, multiplier back",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "timer, score, multiplier and moves back",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RichFeaturesBackOn.png"
+      ],
+      "notes": [
+        "timer, score, multiplier and moves back"
+      ],
+      "seconds": 32.2
+    },
+    {
+      "id": "GP-14",
+      "title": "Gameplay - New deals a different board",
+      "section": "Gameplay",
+      "test": "verifyGamePlay",
+      "status": "pass",
+      "detail": "a different deal (40 of 52 cards elsewhere)",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/GamePlayNew.png"
+      ],
+      "notes": [
+        "a different deal (40 of 52 cards elsewhere)"
+      ],
+      "seconds": 31.7
+    },
+    {
+      "id": "VI-01",
+      "title": "Victory - Complete Game from the table shows the win screen",
+      "section": "Victory",
+      "test": "verifyVictory",
+      "status": "pass",
+      "detail": "Easy won through Synthetic Win; Victory showing",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/VictoryTable.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/VictoryScreen.png"
+      ],
+      "notes": [
+        "Easy won through Synthetic Win; Victory showing"
+      ],
+      "seconds": 29.8
+    },
+    {
+      "id": "VI-02",
+      "title": "Victory - Win screen shows all of its parts",
+      "section": "Victory",
+      "test": "verifyVictory",
+      "status": "pass",
+      "detail": "all 7 parts drawn",
+      "shots": [],
+      "notes": [
+        "all 7 parts drawn"
+      ],
+      "seconds": 4.5
+    },
+    {
+      "id": "VI-03",
+      "title": "Victory - Footer names the level you just played",
+      "section": "Victory",
+      "test": "verifyVictory",
+      "status": "pass",
+      "detail": "footer: easy level",
+      "shots": [],
+      "notes": [
+        "footer: easy level"
+      ],
+      "seconds": 0.6
+    },
+    {
+      "id": "VI-04",
+      "title": "Victory - Back returns to the main menu",
+      "section": "Victory",
+      "test": "verifyVictory",
+      "status": "pass",
+      "detail": "back to the main menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/VictoryBack.png"
+      ],
+      "notes": [
+        "back to the main menu"
+      ],
+      "seconds": 14.2
+    },
+    {
+      "id": "DL-01",
+      "title": "Difficulty - Medium starts and can be completed",
+      "section": "Difficulty",
+      "test": "verifyDifficultyLevels",
+      "status": "pass",
+      "detail": "Medium dealt, won through Synthetic Win, back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/difficulty_medium.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/victory_medium.png"
+      ],
+      "notes": [
+        "Medium dealt, won through Synthetic Win, back on the menu"
+      ],
+      "seconds": 41.0
+    },
+    {
+      "id": "DL-02",
+      "title": "Difficulty - Hard starts and can be completed",
+      "section": "Difficulty",
+      "test": "verifyDifficultyLevels",
+      "status": "pass",
+      "detail": "Hard dealt, won through Synthetic Win, back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/difficulty_hard.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/victory_hard.png"
+      ],
+      "notes": [
+        "Hard dealt, won through Synthetic Win, back on the menu"
+      ],
+      "seconds": 38.1
+    },
+    {
+      "id": "DL-03",
+      "title": "Difficulty - Expert starts and can be completed",
+      "section": "Difficulty",
+      "test": "verifyDifficultyLevels",
+      "status": "pass",
+      "detail": "Expert dealt, won through Synthetic Win, back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/difficulty_expert.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/victory_expert.png"
+      ],
+      "notes": [
+        "Expert dealt, won through Synthetic Win, back on the menu"
+      ],
+      "seconds": 41.0
+    },
+    {
+      "id": "DL-04",
+      "title": "Difficulty - Master starts and can be completed",
+      "section": "Difficulty",
+      "test": "verifyDifficultyLevels",
+      "status": "pass",
+      "detail": "Master dealt, won through Synthetic Win, back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/difficulty_master.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/victory_master.png"
+      ],
+      "notes": [
+        "Master dealt, won through Synthetic Win, back on the menu"
+      ],
+      "seconds": 40.0
+    },
+    {
+      "id": "PI-01",
+      "title": "Promo icons - Five game icons on the menu after a win",
+      "section": "More Games",
+      "test": "verifyMoreGamesIcons",
+      "status": "pass",
+      "detail": "Spider, Solitaire, Sudoku 2, Card Games, Spiderette on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/more_games_icons.png"
+      ],
+      "notes": [
+        "Spider, Solitaire, Sudoku 2, Card Games, Spiderette on the menu"
+      ],
+      "seconds": 1.8
+    },
+    {
+      "id": "PI-02",
+      "title": "Promo icons - Solitaire opens Solitaire: Classic Cards",
+      "section": "More Games",
+      "test": "verifyMoreGamesIcons",
+      "status": "pass",
+      "detail": "App Store: Solitaire: Classic Cards; back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/promo_store_solitaire.png"
+      ],
+      "notes": [
+        "App Store: Solitaire: Classic Cards; back on the menu"
+      ],
+      "seconds": 14.8
+    },
+    {
+      "id": "PI-03",
+      "title": "Promo icons - Sudoku 2 opens Sudoku",
+      "section": "More Games",
+      "test": "verifyMoreGamesIcons",
+      "status": "pass",
+      "detail": "App Store: Sudoku - Classic Brain Game; back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/promo_store_sudoku_2.png"
+      ],
+      "notes": [
+        "App Store: Sudoku - Classic Brain Game; back on the menu"
+      ],
+      "seconds": 14.7
+    },
+    {
+      "id": "PI-04",
+      "title": "Promo icons - Card Games opens Card Games",
+      "section": "More Games",
+      "test": "verifyMoreGamesIcons",
+      "status": "pass",
+      "detail": "App Store: Card Games; back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/promo_store_card_games.png"
+      ],
+      "notes": [
+        "App Store: Card Games; back on the menu"
+      ],
+      "seconds": 14.0
+    },
+    {
+      "id": "PI-05",
+      "title": "Promo icons - Spider opens Spider Solitaire",
+      "section": "More Games",
+      "test": "verifyMoreGamesIcons",
+      "status": "pass",
+      "detail": "App Store: Spider Solitaire; back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/promo_store_spider.png"
+      ],
+      "notes": [
+        "App Store: Spider Solitaire; back on the menu"
+      ],
+      "seconds": 14.7
+    },
+    {
+      "id": "PI-06",
+      "title": "Promo icons - Spiderette opens Spiderette",
+      "section": "More Games",
+      "test": "verifyMoreGamesIcons",
+      "status": "pass",
+      "detail": "App Store: Solitaire Spiderette; back on the menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/promo_store_spiderette.png"
+      ],
+      "notes": [
+        "App Store: Solitaire Spiderette; back on the menu"
+      ],
+      "seconds": 14.8
+    },
+    {
+      "id": "RS-01",
+      "title": "Reset Statistics - Link asks you to confirm",
+      "section": "Statistics",
+      "test": "resetStats",
+      "status": "pass",
+      "detail": "Would you like to reset local scores?",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetStats.png"
+      ],
+      "notes": [
+        "Would you like to reset local scores?"
+      ],
+      "seconds": 4.3
+    },
+    {
+      "id": "RS-02",
+      "title": "Reset Statistics - Confirming wipes local scores",
+      "section": "Statistics",
+      "test": "resetStats",
+      "status": "pass",
+      "detail": "both confirmations accepted; Solo reads none / 0",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetStatsAfter.png"
+      ],
+      "notes": [
+        "both confirmations accepted; Solo reads none / 0"
+      ],
+      "seconds": 28.1
+    },
+    {
+      "id": "RS-03",
+      "title": "Reset Statistics - Declining leaves scores alone",
+      "section": "Statistics",
+      "test": "verifyResetCancelled",
+      "status": "pass",
+      "detail": "No kept Statistics open; page diff 0.00%",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/StatsResetCancelledBefore.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/StatsResetCancelledAfter.png"
+      ],
+      "notes": [
+        "No kept Statistics open; page diff 0.00%"
+      ],
+      "seconds": 10.4
+    },
+    {
+      "id": "CL-01",
+      "title": "Choose Look - Opens on the Surface tab",
+      "section": "Choose Look",
+      "test": "verifyChooseLook",
+      "status": "pass",
+      "detail": "opened on Surface",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ChooseLookSurface.png"
+      ],
+      "notes": [
+        "opened on Surface"
+      ],
+      "seconds": 21.5
+    },
+    {
+      "id": "CL-03",
+      "title": "Choose Look - Surface and Cards tabs switch",
+      "section": "Choose Look",
+      "test": "verifyChooseLook",
+      "status": "pass",
+      "detail": "Cards and Surface switched",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ChooseLookCards.png"
+      ],
+      "notes": [
+        "Cards and Surface switched"
+      ],
+      "seconds": 8.9
+    },
+    {
+      "id": "CL-04",
+      "title": "Choose Look - Sixth surface shows on the game table",
+      "section": "Choose Look",
+      "test": "verifyChooseLook",
+      "status": "pass",
+      "detail": "felt matches Surface 6 (0.020)",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ChooseLookTable.png"
+      ],
+      "notes": [
+        "felt matches Surface 6 (0.020)"
+      ],
+      "seconds": 48.9
+    },
+    {
+      "id": "CL-05",
+      "title": "Choose Look - Fifth card back shows on the table",
+      "section": "Choose Look",
+      "test": "verifyChooseLook",
+      "status": "pass",
+      "detail": "backs match Cards 5 (0.000)",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ChooseLookTable.png"
+      ],
+      "notes": [
+        "backs match Cards 5 (0.000)"
+      ],
+      "seconds": 0.0
+    },
+    {
+      "id": "AD-01",
+      "title": "Ads - Dev Panel opens (unlock if needed)",
+      "section": "Ads",
+      "test": "verifyAds",
+      "status": "pass",
+      "detail": "QA page open, offers Max: Adapters",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ad_dev_panel.png"
+      ],
+      "notes": [
+        "QA page open, offers Max: Adapters"
+      ],
+      "seconds": 6.9
+    },
+    {
+      "id": "AD-02",
+      "title": "Ads - Max Debugger opens",
+      "section": "Ads",
+      "test": "verifyAds",
+      "status": "pass",
+      "detail": "MAX Mediation Debugger open, FreeCell in front",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ad_max_debugger.png"
+      ],
+      "notes": [
+        "MAX Mediation Debugger open, FreeCell in front"
+      ],
+      "seconds": 7.0
+    },
+    {
+      "id": "AD-03",
+      "title": "Ads - Ads section shows the Live Network row",
+      "section": "Ads",
+      "test": "verifyAds",
+      "status": "pass",
+      "detail": "Ads section: 'Select Live Network' on screen",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ad_ads_section.png"
+      ],
+      "notes": [
+        "Ads section: 'Select Live Network' on screen"
+      ],
+      "seconds": 5.9
+    },
+    {
+      "id": "AD-04",
+      "title": "Ads - AppLovin is the live network",
+      "section": "Ads",
+      "test": "verifyAds",
+      "status": "pass",
+      "detail": "AppLovin ticked on Select Live Network",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ad_applovin.png"
+      ],
+      "notes": [
+        "AppLovin ticked on Select Live Network"
+      ],
+      "seconds": 9.1
+    },
+    {
+      "id": "AD-06",
+      "title": "Ads - Leave-game ad: close the store X, then the ad X",
+      "section": "Ads",
+      "test": "verifyAds",
+      "status": "pass",
+      "detail": "leave-game interstitial played inside FreeCell and closed",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ad_interstitial.png"
+      ],
+      "notes": [
+        "leave-game interstitial played inside FreeCell and closed"
+      ],
+      "seconds": 153.7
+    },
+    {
+      "id": "AD-07",
+      "title": "Ads - After the ad you are back on the table",
+      "section": "Ads",
+      "test": "verifyAds",
+      "status": "pass",
+      "detail": "back on the game table",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ad_back_on_table.png"
+      ],
+      "notes": [
+        "back on the game table"
+      ],
+      "seconds": 26.7
+    },
+    {
+      "id": "TA-01",
+      "title": "Ads - Under 30s on the table, Options has no ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "Options after 8s on the table, no ad",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdShortOptions.png"
+      ],
+      "notes": [
+        "Options after 8s on the table, no ad"
+      ],
+      "seconds": 31.0
+    },
+    {
+      "id": "TA-02",
+      "title": "Ads - Over 30s on the table, Help shows an ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "ad shown and closed",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdAfterHelp.png"
+      ],
+      "notes": [
+        "ad shown and closed"
+      ],
+      "seconds": 169.1
+    },
+    {
+      "id": "TA-03",
+      "title": "Ads - Options within 30s of the Help ad has no ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "Options right after the Help ad, no ad",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdCooldownOptions.png"
+      ],
+      "notes": [
+        "Options right after the Help ad, no ad"
+      ],
+      "seconds": 25.2
+    },
+    {
+      "id": "TA-04",
+      "title": "Ads - Over 30s on the table, Complete Game shows a Victory ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "ad over Victory, closed; Victory showing",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdVictory.png"
+      ],
+      "notes": [
+        "ad over Victory, closed; Victory showing"
+      ],
+      "seconds": 164.2
+    },
+    {
+      "id": "TA-05",
+      "title": "Ads - New within 30s of the Victory ad has no ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "fail",
+      "detail": "an interstitial appeared during Victory ad closed -> New",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdVictoryNewCooldown.png"
+      ],
+      "notes": [],
+      "seconds": 17.1
+    },
+    {
+      "id": "TA-06",
+      "title": "Ads - New after 30s on Victory shows an ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "second Victory ad closed; New after 30s on Victory showed an ad",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdVictoryNew.png"
+      ],
+      "notes": [
+        "second Victory ad closed; New after 30s on Victory showed an ad"
+      ],
+      "seconds": 287.9
+    },
+    {
+      "id": "TA-07",
+      "title": "Ads - Over 30s on the table, Back shows an ad then the menu",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "ad shown, closed onto the main menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdBackMenu.png"
+      ],
+      "notes": [
+        "ad shown, closed onto the main menu"
+      ],
+      "seconds": 169.4
+    },
+    {
+      "id": "TA-08",
+      "title": "Ads - Starting a game within 30s on the menu has no ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "game entered within 30s of the Back ad, no ad",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdShortMenuEntry.png"
+      ],
+      "notes": [
+        "game entered within 30s of the Back ad, no ad"
+      ],
+      "seconds": 29.7
+    },
+    {
+      "id": "TA-09",
+      "title": "Ads - Starting a game after 30s on the menu shows an ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "ad shown on entering the game",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdLongMenuEntry.png"
+      ],
+      "notes": [
+        "ad shown on entering the game"
+      ],
+      "seconds": 319.3
+    },
+    {
+      "id": "TA-10",
+      "title": "Ads - Over 30s on the table, FAQ shows an ad",
+      "section": "Ads",
+      "test": "triggerAdPoints",
+      "status": "pass",
+      "detail": "ad shown and closed, back on the table",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdAfterFaq.png"
+      ],
+      "notes": [
+        "ad shown and closed, back on the table"
+      ],
+      "seconds": 163.7
+    },
+    {
+      "id": "LS-01",
+      "title": "Last Score - LAST SCORE opens Last Won Game Score",
+      "section": "Last Score",
+      "test": "visitLastScore",
+      "status": "pass",
+      "detail": "header: Last Won Game Score",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/last_score.png"
+      ],
+      "notes": [
+        "header: Last Won Game Score"
+      ],
+      "seconds": 14.4
+    },
+    {
+      "id": "LS-02",
+      "title": "Last Score - Arrow cycles week, month, overall, day",
+      "section": "Last Score",
+      "test": "visitLastScore",
+      "status": "pass",
+      "detail": "4 taps: every tap changed the period, the 4th is back at the start",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/last_score_tap1.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/last_score_tap2.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/last_score_tap3.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/last_score_tap4.png"
+      ],
+      "notes": [
+        "4 taps: every tap changed the period, the 4th is back at the start"
+      ],
+      "seconds": 17.8
+    },
+    {
+      "id": "LS-03",
+      "title": "Last Score - Leaderboards opens Game Center",
+      "section": "Last Score",
+      "test": "visitLastScore",
+      "status": "pass",
+      "detail": "Game Center \u2192 Leaderboards, back and dismissed onto Last Score",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/game_center_leaderboards_board.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/game_center_leaderboards.png"
+      ],
+      "notes": [
+        "Game Center \u2192 Leaderboards, back and dismissed onto Last Score"
+      ],
+      "seconds": 31.1
+    },
+    {
+      "id": "LS-04",
+      "title": "Last Score - Achievements opens Game Center",
+      "section": "Last Score",
+      "test": "visitLastScore",
+      "status": "pass",
+      "detail": "Game Center \u2192 Achievements, back and dismissed onto Last Score",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/game_center_achievements.png"
+      ],
+      "notes": [
+        "Game Center \u2192 Achievements, back and dismissed onto Last Score"
+      ],
+      "seconds": 18.5
+    },
+    {
+      "id": "LS-05",
+      "title": "Last Score - Back returns to the main menu",
+      "section": "Last Score",
+      "test": "visitLastScore",
+      "status": "pass",
+      "detail": "back on the main menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/last_score_back.png"
+      ],
+      "notes": [
+        "back on the main menu"
+      ],
+      "seconds": 10.7
+    },
+    {
+      "id": "AF-01",
+      "title": "Ad-free - No leaves you on About",
+      "section": "App Store / Mail",
+      "test": "verifyAdFreeVersion",
+      "status": "pass",
+      "detail": "No kept FreeCell on About",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdFreeVersionNo.png"
+      ],
+      "notes": [
+        "No kept FreeCell on About"
+      ],
+      "seconds": 4.9
+    },
+    {
+      "id": "AF-02",
+      "title": "Ad-free - Link asks No or Yes before the store",
+      "section": "App Store / Mail",
+      "test": "verifyAdFreeVersion",
+      "status": "pass",
+      "detail": "asks No / Yes, FreeCell still in front",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdFreeVersionAsk.png"
+      ],
+      "notes": [
+        "asks No / Yes, FreeCell still in front"
+      ],
+      "seconds": 5.2
+    },
+    {
+      "id": "AF-03",
+      "title": "Ad-free - Yes opens FreeCell Solitaire +",
+      "section": "App Store / Mail",
+      "test": "verifyAdFreeVersion",
+      "status": "pass",
+      "detail": "App Store page 'FreeCell Solitaire +'",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdFreeVersion.png"
+      ],
+      "notes": [
+        "App Store page 'FreeCell Solitaire +'"
+      ],
+      "seconds": 17.5
+    },
+    {
+      "id": "AF-04",
+      "title": "Ad-free - Status-bar back resumes FreeCell",
+      "section": "App Store / Mail",
+      "test": "verifyAdFreeVersion",
+      "status": "pass",
+      "detail": "FreeCell kept running behind the store; the crumb resumed it on the main menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/AdFreeVersionBack.png"
+      ],
+      "notes": [
+        "FreeCell kept running behind the store; the crumb resumed it on the main menu"
+      ],
+      "seconds": 13.4
+    },
+    {
+      "id": "FB-02",
+      "title": "Feedback - Submit feedback asks Cancel or Write Email",
+      "section": "App Store / Mail",
+      "test": "submitFeedback",
+      "status": "pass",
+      "detail": "asks Cancel / Write Email",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/SubmitFeedbackAsk.png"
+      ],
+      "notes": [
+        "asks Cancel / Write Email"
+      ],
+      "seconds": 5.6
+    },
+    {
+      "id": "FB-03",
+      "title": "Feedback - Write Email opens a Mail draft",
+      "section": "App Store / Mail",
+      "test": "submitFeedback",
+      "status": "pass",
+      "detail": "Mail draft to cardgames@peoplefun.com",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/SubmitFeedback.png"
+      ],
+      "notes": [
+        "Mail draft to cardgames@peoplefun.com"
+      ],
+      "seconds": 7.5
+    },
+    {
+      "id": "FB-04",
+      "title": "Feedback - Subject names the game, version, phone, and iOS",
+      "section": "App Store / Mail",
+      "test": "submitFeedback",
+      "status": "pass",
+      "detail": "FreeCell 7.42 feedback (iPhone16,2, iOS 27.0.1, al / al) us",
+      "shots": [],
+      "notes": [
+        "FreeCell 7.42 feedback (iPhone16,2, iOS 27.0.1, al / al) us"
+      ],
+      "seconds": 0.0
+    },
+    {
+      "id": "FB-05",
+      "title": "Feedback - Delete the draft \u2014 do not send",
+      "section": "App Store / Mail",
+      "test": "submitFeedback",
+      "status": "pass",
+      "detail": "draft deleted, nothing sent",
+      "shots": [],
+      "notes": [
+        "draft deleted, nothing sent"
+      ],
+      "seconds": 8.2
+    },
+    {
+      "id": "FB-06",
+      "title": "Feedback - Status-bar back returns to FreeCell",
+      "section": "App Store / Mail",
+      "test": "submitFeedback",
+      "status": "pass",
+      "detail": "back in FreeCell on the main menu",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/SubmitFeedbackBack.png"
+      ],
+      "notes": [
+        "back in FreeCell on the main menu"
+      ],
+      "seconds": 13.2
+    },
+    {
+      "id": "HS-01",
+      "title": "Options - Contact Us opens support",
+      "section": "Options",
+      "test": "verifyHelpShiftOnline",
+      "status": "pass",
+      "detail": "opened PeopleFun Support",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/HelpShiftOnline.png"
+      ],
+      "notes": [
+        "opened PeopleFun Support"
+      ],
+      "seconds": 0.7
+    },
+    {
+      "id": "HS-02",
+      "title": "Options - Contact Us still leaves Options without internet",
+      "section": "Options",
+      "test": "verifyHelpShift",
+      "status": "pass",
+      "detail": "left Options for the no-network support page",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/HelpShift.png"
+      ],
+      "notes": [
+        "left Options for the no-network support page"
+      ],
+      "seconds": 7.0
+    },
+    {
+      "id": "RL-01",
+      "title": "Relaunch - Same board after closing the app for a few seconds",
+      "section": "Relaunch",
+      "test": "verifyRelaunch",
+      "status": "pass",
+      "detail": "resumed the paused game, moved club-7; same board after 3.5s closed \u2014 the table came straight back",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RelaunchShortReopened.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RelaunchShort.png"
+      ],
+      "notes": [
+        "resumed the paused game, moved club-7; same board after 3.5s closed \u2014 the table came straight back"
+      ],
+      "seconds": 79.3
+    },
+    {
+      "id": "RL-02",
+      "title": "Relaunch - Same board after closing the app for 35 seconds",
+      "section": "Relaunch",
+      "test": "verifyRelaunch",
+      "status": "pass",
+      "detail": "carried on with the game on the table, moved spade-6; same board after 35.0s closed \u2014 the table came straight back",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RelaunchLongReopened.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/RelaunchLong.png"
+      ],
+      "notes": [
+        "carried on with the game on the table, moved spade-6; same board after 35.0s closed \u2014 the table came straight back"
+      ],
+      "seconds": 83.1
+    }
+  ],
+  "finished": "2026-10-14T02:47:53+05:00",
+  "duration_seconds": 3996.6
+}

@@ -65,7 +65,6 @@ CROPS = {
     "opt_rank_strip": ("rank_options", (190, 2258, 560, 2338)),
     "about_emblem": ("qa_about_build_info", (500, 450, 800, 800)),
     "about_version": ("qa_about_build_info", (350, 1150, 950, 1400)),
-    "qa_watermark": ("qa_diag_menu", (16, 168, 318, 468)),
     "qa_badge": ("qa_table_started", (1120, 2150, 1290, 2450)),
     "qa_panel": ("qa_panel_table", (400, 850, 1250, 2000)),
     "qa_90_99": ("qa_after_percent", (850, 1600, 1250, 1850)),

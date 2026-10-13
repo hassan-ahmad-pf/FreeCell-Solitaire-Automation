@@ -9,6 +9,7 @@ tests/spider_suite/catalog.py says where every Spider test stands:
          its cases
   dev    needs the dev build — SKIP on the prod build; --dev runs the ones
          that have a FreeCell port
+  skip   cannot run on this install (FL-06: not installed from TestFlight)
   later  a Spider-only feature FreeCell does not have — listed, not run
 
 As in Spider, a bare run is the main suite (Spider's TESTS); the standalone
@@ -78,6 +79,12 @@ REQUIRED = [
     "look_cards_tab", "stats_best_zero", "stats_easy_none", "tc_continue",
     "tc_terms_link", "tc_terms_page", "tc_privacy_link", "tc_privacy_page",
     "att_prompt", "att_allow", "ad_close", "faq_header", "mg_header", "promo_close", "hint_deck",
+    # dev build: QA, Synthetic Win, Victory, Last Score, Game Center, the QA page
+    "about_emblem", "about_reset_alerts", "qa_watermark", "qa_badge_a", "qa_panel", "qa_90_99", "qa_win",
+    "screen_victory", "victory_ranking", "victory_leaderboards", "victory_achieve",
+    "victory_help", "victory_new", "victory_stats", "victory_level_easy",
+    "screen_last_score", "last_score_next", "gc_back", "gc_leaderboards", "gc_achievements",
+    "qa_page_adapters", "qa_page_back",
 ]
 
 
@@ -122,8 +129,8 @@ def _plan(picked: list[str], dev: bool, offline: bool) -> list[tuple]:
             continue
         if offline and (kind != "run" or not _offline_ids(ids)):
             continue
-        runs = bool(module) and (kind == "run" or dev)
-        reason = why if kind == "dev" else ""
+        runs = bool(module) and (kind == "run" or (kind == "dev" and dev))
+        reason = why if kind in ("dev", "skip") else ""
         if kind == "dev" and dev and not module:
             reason = "no FreeCell port yet"
         out.append((spider, module, runs, ids, reason))
@@ -198,18 +205,20 @@ def main() -> int:
     print(f"wda:    {config.WDA_URL}", flush=True)
     print(f"build:  FreeCell {build[0]} ({build[1]}) — {'dev' if dev else 'prod'} run"
           f"{', offline cases only' if offline else ''}", flush=True)
-    n_run = n_dev = n_later = 0
-    for _s, _m, runs, ids, _w in plan:
+    n_run = n_dev = n_skip = n_later = 0
+    for spider, _m, runs, ids, _w in plan:
         n_later += sum(c in catalog.LATER for c in ids)
         mine = [c for c in ids if c not in catalog.LATER]
         if runs:
             n_run += len(_offline_ids(ids) if offline else mine)
+        elif catalog.entry(spider)[2] == "skip":
+            n_skip += len(mine)
         else:
             n_dev += len(mine)
     label = ("offline cases only" if offline else "main suite" if not picked
              else "named tests")
-    print(f"cases:  {label} — {n_run} run, {n_dev} dev build (skipped), {n_later} later",
-          flush=True)
+    print(f"cases:  {label} — {n_run} run, {n_dev} dev build (skipped), {n_skip} skipped, "
+          f"{n_later} later", flush=True)
     for i, (spider, _module, runs, ids, reason) in enumerate(plan, 1):
         print(f"  {i:2}/{total}  {spider:24} {'' if runs else 'SKIP — ' + reason}", flush=True)
 
@@ -234,6 +243,7 @@ def main() -> int:
                 fc.go_online()
             if not runs:
                 print(f"\n>>> [{i}/{total}] SKIP   {spider} — {reason}", flush=True)
+                status = "skip" if catalog.entry(spider)[2] == "skip" else "dev"
                 for cid in ids:
                     if cid in catalog.LATER:
                         print(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}",
@@ -241,7 +251,7 @@ def main() -> int:
                         cases.append(_case_row(cid, spider, "later", catalog.LATER[cid]))
                     else:
                         print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {reason}", flush=True)
-                        cases.append(_case_row(cid, spider, "dev", reason))
+                        cases.append(_case_row(cid, spider, status, reason))
                 tests.append({"name": spider, "module": module, "status": "skip",
                               "seconds": 0.0, "error": reason})
                 print(f"<<< [{i}/{total}] SKIP   {spider}", flush=True)
