@@ -139,6 +139,8 @@ ADAPTED = OrderedDict([
     ("PI-05", "FreeCell's strip has the Spider icon in place of FreeCell; it opens "
               "Spider Solitaire"),
     ("TA-04", "Complete Game is Synthetic Win; its card closes itself on the win"),
+    ("TA-05", "FreeCell shows an ad on Victory → New even within 30 s of the Victory "
+              "ad — its intended behaviour, where Spider shows none"),
     ("TA-06", "Complete Game is Synthetic Win; its card closes itself on the win"),
     ("AD-01", "FreeCell's Dev Panel is its QA page, opened from the menu's "
               "CONFIDENTIAL watermark; it offers Max: Adapters"),
@@ -158,6 +160,7 @@ TITLE_OVERRIDES = {
     "DL-03": "Difficulty - Expert starts and can be completed",
     "DL-04": "Difficulty - Master starts and can be completed",
     "PI-05": "Promo icons - Spider opens Spider Solitaire",
+    "TA-05": "Ads - New within 30s of the Victory ad also shows an ad",
 }
 
 

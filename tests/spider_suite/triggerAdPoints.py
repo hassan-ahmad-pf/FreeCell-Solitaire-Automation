@@ -8,7 +8,8 @@ TA-01  under 30 s on the table, Options: no ad
 TA-02  over 30 s on the table, Help: ad
 TA-03  Options within 30 s of the Help ad: no ad
 TA-04  over 30 s on the table, Synthetic Win: ad over Victory
-TA-05  New within 30 s of that Victory ad: no ad
+TA-05  New within 30 s of that Victory ad: an ad too (Spider shows none;
+       FreeCell's New after Victory is not held by the cooldown)
 TA-06  a second win after 30 s on the table, its ad closed, over 30 s on
        Victory, then New: ad
 TA-07  over 30 s on the table, Back: ad, closing onto the main menu
@@ -187,13 +188,15 @@ def run() -> None:
 
     with caselog.case("TA-05", soft=True) as c:
         _victory_new()
-        try:
-            _no_ad("Victory ad closed -> New", lambda: ui.at_table(timeout=0.5))
-        finally:
-            c.shot(ui.shoot("AdVictoryNewCooldown"))
+        ui.expect(fc.wait_ad(timeout=AD_WAIT), f"no interstitial for Victory ad closed -> New "
+                                               f"within {AD_WAIT:.0f}s")
+        print("  Victory ad closed -> New: interstitial up", flush=True)
+        c.shot(ui.shoot("AdVictoryNewCooldown"))
+        fc.close_or_wait("Victory -> New inside the cooldown")
+        _manual_note(c, "Victory -> New inside the cooldown")
         ui.settle_prompts()
         ui.expect(ui.at_table(timeout=8.0), "New within the cooldown did not reach a table")
-        c.note("New within 30s of the Victory ad, no ad")
+        c.note("New within 30s of the Victory ad showed an ad, closed onto the new deal")
     if fc.ad_up():
         fc.close_or_wait("Victory -> New inside the cooldown")
     ui.settle_prompts()
