@@ -3,7 +3,9 @@
 
 Spider's tests/run_all.py on the FreeCell build: Spider's test order, case
 IDs and titles (game name swapped), one line per case, and Spider's report.
-tests/spider_suite/catalog.py says where every Spider test stands:
+FreeCell's Daily cases (DY-01..14, from FreeCell's own TestRail list) run
+in two FreeCell-only tests slotted into that order.
+tests/spider_suite/catalog.py says where every test stands:
 
   run    a FreeCell port (tests/spider_suite/<module>.py) runs and records
          its cases
@@ -85,6 +87,11 @@ REQUIRED = [
     "victory_help", "victory_new", "victory_stats", "victory_level_easy",
     "screen_last_score", "last_score_next", "gc_back", "gc_leaderboards", "gc_achievements",
     "qa_page_adapters", "qa_page_back",
+    # Daily (FreeCell's own DY cases)
+    "daily_back", "daily_tip1", "daily_tip2", "daily_weekdays", "daily_faq_link",
+    "daily_gold_star", "daily_levels", "daily_relaxed_note", "daily_level_easy",
+    "daily_level_medium", "daily_level_hard", "daily_level_easy_r", "daily_table_star",
+    "daily_table_medium", "daily_popup_days", "faq_daily_heading",
 ]
 
 
@@ -187,6 +194,7 @@ def _report() -> None:
 def main() -> int:
     args = sys.argv[1:]
     dev = "--dev" in args
+    os.environ["SPIDER_SUITE_BUILD"] = "dev" if dev else "prod"
     offline = "--offline" in args
     picked = [a for a in args if not a.startswith("-")]
     plan = _plan(picked, dev, offline)

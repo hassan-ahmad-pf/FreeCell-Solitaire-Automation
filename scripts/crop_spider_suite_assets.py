@@ -61,6 +61,22 @@ CROPS = {
     "qa_page_back": ("dev_qa_page", (18, 200, 215, 268)),
     "about_reset_alerts": ("dev_about_qa", (1100, 2515, 1232, 2615)),
     "ad_open_store": ("dev_ad_open_store", (60, 222, 315, 276)),
+    # Daily (FreeCell's own DY cases)
+    "daily_tip1": ("daily_tip1", (232, 683, 1066, 833)),
+    "daily_tip2": ("daily_tip2", (205, 465, 1080, 607)),
+    "daily_weekdays": ("daily_won", (82, 1180, 1203, 1245)),
+    "daily_faq_link": ("daily_won", (585, 2148, 705, 2207)),
+    "daily_gold_star": ("daily_won", (755, 1548, 843, 1631)),
+    "daily_levels": ("daily_levels", (645, 402, 1252, 1867)),
+    "daily_relaxed_note": ("daily_levels", (50, 1745, 550, 2080)),
+    "daily_level_easy": ("daily_level_easy", (960, 280, 1150, 352)),
+    "daily_level_medium": ("daily_level_medium", (864, 267, 1149, 330)),
+    "daily_level_hard": ("daily_level_hard", (971, 280, 1150, 340)),
+    "daily_level_easy_r": ("daily_level_easy_r", (899, 270, 1148, 352)),
+    "daily_table_star": ("daily_table_past", (605, 306, 686, 383)),
+    "daily_table_medium": ("daily_table_today", (315, 1781, 975, 1828)),
+    "daily_popup_days": ("daily_score_popup", (375, 590, 460, 760)),
+    "faq_daily_heading": ("daily_faq", (265, 636, 1025, 722)),
 }
 
 

@@ -43,6 +43,12 @@ def main(run) -> None:
         sys.exit(1)
 
 
+def dev_build() -> bool:
+    """True on the dev build: run_all.py --dev, or SPIDER_SUITE_BUILD=dev
+    for a port run on its own (the default, as the QA ports need it)."""
+    return os.environ.get("SPIDER_SUITE_BUILD", "dev") == "dev"
+
+
 # ── network ────────────────────────────────────────────────────────
 
 def is_online() -> bool:
