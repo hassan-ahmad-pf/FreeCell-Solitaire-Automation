@@ -176,7 +176,8 @@ def _write(payload: dict, kept: tuple[list, list, str]) -> None:
     out["tests"] = sorted(kept[0] + payload["tests"], key=lambda t: order.get(t["name"], 99))
     out["cases"] = sorted(kept[1] + payload["cases"], key=lambda c: ids.index(c["id"]))
     if kept[0]:
-        out["started"] = min(filter(None, (kept[2], payload["started"])))
+        starts = [t.get("started") or kept[2] for t in out["tests"]]
+        out["started"] = min(filter(None, starts + [payload["started"]]))
         out["duration_seconds"] = round(sum(t.get("seconds", 0) for t in out["tests"]), 1)
     config.LOG.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
@@ -265,7 +266,7 @@ def main() -> int:
                         print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {reason}", flush=True)
                         cases.append(_case_row(cid, spider, status, reason))
                 tests.append({"name": spider, "module": module, "status": "skip",
-                              "seconds": 0.0, "error": reason})
+                              "started": _iso(), "seconds": 0.0, "error": reason})
                 print(f"<<< [{i}/{total}] SKIP   {spider}", flush=True)
                 continue
 
@@ -312,7 +313,7 @@ def main() -> int:
                 bad = bad or rec["status"] == "fail"
             ok = not error and not bad
             tests.append({"name": spider, "module": module, "status": "pass" if ok else "fail",
-                          "seconds": round(dt, 1), "error": error})
+                          "started": _iso(t0), "seconds": round(dt, 1), "error": error})
             print(f"<<< [{i}/{total}] {'PASS' if ok else 'FAIL'}  {spider}  ({dt:.1f}s)",
                   flush=True)
             payload["finished"] = _iso()

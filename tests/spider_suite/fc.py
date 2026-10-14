@@ -740,19 +740,22 @@ def slider_set(human: str, target: float, tol: float = 0.04, tries: int = 8) -> 
 
     FreeCell's sliders do not read back the position they were dragged to
     (50% reads 33%), so each drag is corrected from the value it produced.
+    A slider that ignores a few adjusts throws the bisection off, so a miss
+    starts it over once.
     """
     got = slider_value(human)
     if got is not None and abs(got - target) <= tol:
         return got
-    lo, hi, pos = 0.0, 1.0, target
-    for _ in range(tries):
-        got = slider_adjust(human, pos)
-        if got is None:
-            return slider_drag(human, target)
-        if abs(got - target) <= tol:
-            return got
-        lo, hi = (pos, hi) if got < target else (lo, pos)
-        pos = (lo + hi) / 2
+    for _round in range(2):
+        lo, hi, pos = 0.0, 1.0, target
+        for _ in range(tries):
+            got = slider_adjust(human, pos)
+            if got is None:
+                return slider_drag(human, target)
+            if abs(got - target) <= tol:
+                return got
+            lo, hi = (pos, hi) if got < target else (lo, pos)
+            pos = (lo + hi) / 2
     return got
 
 
