@@ -131,7 +131,14 @@
       "name": "verifyDaily",
       "module": "verifyDaily",
       "status": "pass",
-      "seconds": 186.3,
+      "seconds": 238.1,
+      "error": ""
+    },
+    {
+      "name": "resetDailyStats",
+      "module": "resetDailyStats",
+      "status": "pass",
+      "seconds": 195.2,
       "error": ""
     },
     {
@@ -160,13 +167,6 @@
       "module": "verifyHelpShiftOnline",
       "status": "pass",
       "seconds": 34.5,
-      "error": ""
-    },
-    {
-      "name": "verifyDailyOnline",
-      "module": "verifyDailyOnline",
-      "status": "pass",
-      "seconds": 190.5,
       "error": ""
     },
     {
@@ -1712,7 +1712,7 @@
       "notes": [
         "Daily opened the calendar"
       ],
-      "seconds": 5.6
+      "seconds": 4.9
     },
     {
       "id": "DY-02",
@@ -1737,51 +1737,21 @@
       "seconds": 0.0
     },
     {
-      "id": "DY-04",
-      "title": "Daily - Calendar shows this month with today marked",
-      "section": "Daily",
-      "test": "verifyDaily",
-      "status": "pass",
-      "detail": "October 2026: the 15th orange, 1\u201314 bright, 16\u201331 dimmed",
-      "shots": [
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyMonth.png"
-      ],
-      "notes": [
-        "October 2026: the 15th orange, 1\u201314 bright, 16\u201331 dimmed"
-      ],
-      "seconds": 1.0
-    },
-    {
       "id": "DY-05",
       "title": "Daily - Level button lists Standard and Relaxed levels",
       "section": "Daily",
       "test": "verifyDaily",
       "status": "pass",
-      "detail": "Standard Easy\u2013Master and Relaxed Easy\u2013Master listed, with the relaxed-rules note",
+      "detail": "the level button (Standard Medium) opened Standard and Relaxed Easy\u2013Master; a tap beside the list closed it with the level unchanged",
       "shots": [
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyLevels.png"
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyCalendarLevel.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyLevels.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyLevelsClosed.png"
       ],
       "notes": [
-        "Standard Easy\u2013Master and Relaxed Easy\u2013Master listed, with the relaxed-rules note"
+        "the level button (Standard Medium) opened Standard and Relaxed Easy\u2013Master; a tap beside the list closed it with the level unchanged"
       ],
-      "seconds": 4.7
-    },
-    {
-      "id": "DY-06",
-      "title": "Daily - Choosing a level updates the button",
-      "section": "Daily",
-      "test": "verifyDaily",
-      "status": "pass",
-      "detail": "Standard Hard read 'Hard', Relaxed Easy 'Easy' with the R badge, Standard Medium 'Medium'",
-      "shots": [
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyLevelHard.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyLevelRelaxedEasy.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyLevelMedium.png"
-      ],
-      "notes": [
-        "Standard Hard read 'Hard', Relaxed Easy 'Easy' with the R badge, Standard Medium 'Medium'"
-      ],
-      "seconds": 25.5
+      "seconds": 8.9
     },
     {
       "id": "DY-07",
@@ -1796,43 +1766,7 @@
       "notes": [
         "tapping the 16th did nothing"
       ],
-      "seconds": 5.7
-    },
-    {
-      "id": "DY-08",
-      "title": "Daily - Offline, a date asks for internet",
-      "section": "Daily",
-      "test": "verifyDaily",
-      "status": "pass",
-      "detail": "offline on the dev build, today (Standard Easy) dealt a Daily game; Synthetic Win completed it (45,061) and today shows the gold star (today was already won on this level earlier)",
-      "shots": [
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyOfflineTodayTable.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyOfflineTodayVictory.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyOfflineTodayStar.png"
-      ],
-      "notes": [
-        "offline on the dev build, today (Standard Easy) dealt a Daily game; Synthetic Win completed it (45,061) and today shows the gold star (today was already won on this level earlier)"
-      ],
-      "seconds": 43.1
-    },
-    {
-      "id": "DY-09",
-      "title": "Daily - Offline, Yes goes to the main menu",
-      "section": "Daily",
-      "test": "verifyDaily",
-      "status": "pass",
-      "detail": "offline on the dev build, the 12th dealt a Daily game, Synthetic Win completed it (48,357) and it shows a star; score popup: 12th 48,357; 13th 45,326; 14th 47,620; 15th 47,739 x2 = 95,478 \u2014 monthly score 236,781",
-      "shots": [
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyOfflinePastDateTable.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyOfflinePastDateVictory.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyOfflinePastStar.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyScorePopup.png"
-      ],
-      "notes": [
-        "offline on the dev build, the 12th dealt a Daily game, Synthetic Win completed it (48,357) and it shows a star",
-        "score popup: 12th 48,357; 13th 45,326; 14th 47,620; 15th 47,739 x2 = 95,478 \u2014 monthly score 236,781"
-      ],
-      "seconds": 39.2
+      "seconds": 5.8
     },
     {
       "id": "DY-10",
@@ -1866,53 +1800,133 @@
       "id": "DY-12",
       "title": "Daily - Today deals a Daily game",
       "section": "Daily",
-      "test": "verifyDailyOnline",
+      "test": "verifyDaily",
       "status": "pass",
-      "detail": "online, today dealt a Daily table: gold star in the header, 'medium level standard rules'",
+      "detail": "today (Standard Medium) dealt a Daily table: 'medium level standard rules'; heart-2 tapped up to its foundation: timer 0:00 \u2192 0:14, score 0 \u2192 1,580",
       "shots": [
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayTable.png"
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayTable.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayCardUp.png"
       ],
       "notes": [
-        "online, today dealt a Daily table: gold star in the header, 'medium level standard rules'"
+        "today (Standard Medium) dealt a Daily table: 'medium level standard rules'; heart-2 tapped up to its foundation: timer 0:00 \u2192 0:14, score 0 \u2192 1,580"
       ],
-      "seconds": 15.8
+      "seconds": 27.5
     },
     {
       "id": "DY-13",
       "title": "Daily - Winning today puts a gold star on the calendar",
       "section": "Daily",
-      "test": "verifyDailyOnline",
+      "test": "verifyDaily",
       "status": "pass",
-      "detail": "Synthetic Win completed today's game (75,125); today shows the gold star (today was already won on Standard Medium earlier); score popup: 15th 78,191 x2 = 156,382 \u2014 monthly score 156,382",
+      "detail": "Synthetic Win (74,397); back on the calendar today has the gold star (today was already won on this level earlier)",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayVictory.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayGoldStar.png",
-        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayScorePopup.png"
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayStar.png"
       ],
       "notes": [
-        "Synthetic Win completed today's game (75,125); today shows the gold star (today was already won on Standard Medium earlier)",
-        "score popup: 15th 78,191 x2 = 156,382 \u2014 monthly score 156,382"
+        "Synthetic Win (74,397); back on the calendar today has the gold star (today was already won on this level earlier)"
       ],
-      "seconds": 81.0
+      "seconds": 24.0
     },
     {
       "id": "DY-14",
       "title": "Daily - A Daily win counts on the Daily statistics",
       "section": "Daily",
-      "test": "verifyDailyOnline",
+      "test": "verifyDaily",
       "status": "pass",
-      "detail": "Daily: games won 6 \u2192 7, best score 78,191; Standard Medium: games won 1 \u2192 2, best score 78,191; Standard Easy (verifyDaily's offline wins 45,326): games won 5, best score 47,739",
+      "detail": "Daily: games won 0 \u2192 2, best score 76,731; Standard Medium: games won 0 \u2192 2, best score 76,731",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyStatsAfter.png"
       ],
       "notes": [
-        "Daily: games won 6 \u2192 7, best score 78,191",
-        "Standard Medium: games won 1 \u2192 2, best score 78,191",
-        "Standard Easy (verifyDaily's offline wins 45,326): games won 5, best score 47,739"
+        "Daily: games won 0 \u2192 2, best score 76,731",
+        "Standard Medium: games won 0 \u2192 2, best score 76,731"
       ],
-      "seconds": 28.4
+      "seconds": 22.6
+    },
+    {
+      "id": "RS-04",
+      "title": "Reset Statistics - Daily reset asks twice",
+      "section": "Statistics",
+      "test": "resetDailyStats",
+      "status": "pass",
+      "detail": "'Would you like to reset local scores?', Yes, then 'Just to be on the safe side\u2026'",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetDailySafeSide.png"
+      ],
+      "notes": [
+        "'Would you like to reset local scores?', Yes, then 'Just to be on the safe side\u2026'"
+      ],
+      "seconds": 31.5
+    },
+    {
+      "id": "RS-05",
+      "title": "Reset Statistics - Confirming wipes the Daily scores",
+      "section": "Statistics",
+      "test": "resetDailyStats",
+      "status": "pass",
+      "detail": "both Yes: the main menu; Daily reads best score 0, games played 0, games won 0 and every level none; Solo unchanged (best score 46,528, games played 2, games won 2)",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyStatsAfterReset.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/SoloStatsAfterDailyReset.png"
+      ],
+      "notes": [
+        "both Yes: the main menu; Daily reads best score 0, games played 0, games won 0 and every level none; Solo unchanged (best score 46,528, games played 2, games won 2)"
+      ],
+      "seconds": 50.5
+    },
+    {
+      "id": "RS-06",
+      "title": "Reset Statistics - Declining leaves the Daily scores alone",
+      "section": "Statistics",
+      "test": "resetDailyStats",
+      "status": "pass",
+      "detail": "No kept Statistics on Daily; the scores are unchanged (best score 76,731, games played 2, games won 2)",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetDailyAsk.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetDailyNo.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyStatsAfterNo.png"
+      ],
+      "notes": [
+        "No kept Statistics on Daily; the scores are unchanged (best score 76,731, games played 2, games won 2)"
+      ],
+      "seconds": 60.9
+    },
+    {
+      "id": "DY-15",
+      "title": "Daily - A past date can be played and won",
+      "section": "Daily",
+      "test": "verifyDaily",
+      "status": "pass",
+      "detail": "the 13th dealt a Daily table: 'medium level standard rules'; spade-2 tapped up to its foundation: timer 0:00 \u2192 0:25, score 0 \u2192 1,570; Synthetic Win (76,731); the 13th has a star",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastTable.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastCardUp.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastVictory.png",
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastStar.png"
+      ],
+      "notes": [
+        "the 13th dealt a Daily table: 'medium level standard rules'; spade-2 tapped up to its foundation: timer 0:00 \u2192 0:25, score 0 \u2192 1,570",
+        "Synthetic Win (76,731); the 13th has a star"
+      ],
+      "seconds": 63.6
+    },
+    {
+      "id": "DY-16",
+      "title": "Daily - Monthly score popup lists the games played",
+      "section": "Daily",
+      "test": "verifyDaily",
+      "status": "pass",
+      "detail": "score popup: 13th 76,731; 14th 78,661; 15th 78,191 x2 = 156,382 \u2014 monthly score 311,774",
+      "shots": [
+        "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyScorePopup.png"
+      ],
+      "notes": [
+        "score popup: 13th 76,731; 14th 78,661; 15th 78,191 x2 = 156,382 \u2014 monthly score 311,774"
+      ],
+      "seconds": 8.7
     }
   ],
-  "finished": "2026-10-15T01:19:39+05:00",
-  "duration_seconds": 4373.4
+  "finished": "2026-10-15T01:59:41+05:00",
+  "duration_seconds": 4429.9
 }

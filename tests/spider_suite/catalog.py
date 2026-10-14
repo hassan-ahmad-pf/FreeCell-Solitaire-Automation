@@ -5,10 +5,11 @@ testrail/cases.py, identical to the Spider repo), with the game name swapped.
 RUN_ORDER is Spider's tests/run_all.py TESTS (the main suite), then Spider's
 six standalone tests (STANDALONE) in the order of Spider's report catalog.
 
-FreeCell's Daily mode has no Spider counterpart, so its cases (DY-01..14)
-come from FreeCell's own TestRail list (docs/testrail/cases.py) as written
-there, and run in two FreeCell-only tests: verifyDaily in the offline part
-of the main suite, verifyDailyOnline once the phone is back online.
+FreeCell's Daily mode has no Spider counterpart, so its cases come from
+FreeCell's own TestRail list (docs/testrail/cases.py) as written there,
+plus EXTRA_CASES for the two steps that list has no case for. They run in
+two FreeCell-only tests in the offline part of the main suite: verifyDaily
+(the Daily flow) and resetDailyStats right after it.
 
 Each Spider test is one of:
   run  — a FreeCell port in tests/spider_suite/<module>.py
@@ -31,9 +32,28 @@ SPIDER_CASES = os.path.join(ROOT, "reference", "spider", "docs", "testrail", "ca
 FREECELL_CASES = os.path.join(ROOT, "docs", "testrail", "cases.py")
 
 # FreeCell's own cases with no Spider counterpart.
-FREECELL_ONLY = tuple(f"DY-{n:02d}" for n in range(1, 15))
+FREECELL_ONLY = ("DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
+                 "DY-12", "DY-13", "DY-14", "RS-04", "RS-05", "RS-06")
+
+# Daily steps FreeCell's TestRail list has no case for.
+EXTRA_CASES = [
+    {"id": "DY-15", "title": "Daily - A past date can be played and won",
+     "section": "FreeCell Solitaire Obj-C > Daily", "type": "Functional",
+     "priority": "Medium",
+     "steps": [("Tap an unplayed past date, tap a card that can go up to its "
+                "foundation, then win (Synthetic Win) and go back to Daily.",
+                "A Daily table is dealt with a plain star; the timer starts and "
+                "the score counts; the date carries a star.")]},
+    {"id": "DY-16", "title": "Daily - Monthly score popup lists the games played",
+     "section": "FreeCell Solitaire Obj-C > Daily", "type": "Functional",
+     "priority": "Medium",
+     "steps": [("Tap the monthly score on the calendar.",
+                "A popup lists each played date's score, today's counted twice, "
+                "and they add up to the monthly score. A tap closes it.")]},
+]
 
 DEV_REASON = "needs the dev build"
+DAILY_DEV = "needs the dev build (Daily games are won with Synthetic Win)"
 
 # (Spider test, FreeCell module or None, kind, case ids, skip reason)
 RUN_ORDER = [
@@ -64,16 +84,15 @@ RUN_ORDER = [
      ["DL-01", "DL-02", "DL-03", "DL-04"],
      "needs the dev build (each level is completed with Synthetic Win)"),
     ("verifyDaily", "verifyDaily", "run",
-     ["DY-01", "DY-02", "DY-03", "DY-04", "DY-05", "DY-06",
-      "DY-07", "DY-08", "DY-09", "DY-10", "DY-11"], ""),
+     ["DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-11", "DY-12", "DY-13",
+      "DY-15", "DY-16", "DY-10", "DY-14"], ""),
+    ("resetDailyStats", "resetDailyStats", "run", ["RS-06", "RS-04", "RS-05"], ""),
     ("verifyMoreGamesIcons", "verifyMoreGamesIcons", "dev",
      ["PI-01", "PI-02", "PI-03", "PI-04", "PI-05", "PI-06"],
      "needs the dev build (the promo strip is drawn only after a won game)"),
     ("verifyResetCancelled", "verifyResetCancelled", "run", ["RS-03"], ""),
     ("resetStats", "resetStats", "run", ["RS-01", "RS-02"], ""),
     ("verifyHelpShiftOnline", "verifyHelpShiftOnline", "run", ["HS-01"], ""),
-    ("verifyDailyOnline", "verifyDailyOnline", "dev", ["DY-12", "DY-13", "DY-14"],
-     "needs the dev build (today's Daily game is won with Synthetic Win)"),
     ("verifyChooseLook", "verifyChooseLook", "run",
      ["CL-01", "CL-03", "CL-04", "CL-05"], ""),
     ("verifyAds", "verifyAds", "dev",
@@ -94,7 +113,7 @@ RUN_ORDER = [
 ]
 
 # Cases inside a run test that cannot run on the prod build.
-DEV_CASES = OrderedDict()
+DEV_CASES = OrderedDict((cid, DAILY_DEV) for cid in ("DY-12", "DY-13", "DY-15", "DY-16", "DY-14"))
 
 # Spider's run_all.py leaves these out of TESTS and runs each only when it is
 # named ("run_all.py verifyAds"); see the note above Spider's TESTS.
@@ -163,12 +182,12 @@ ADAPTED = OrderedDict([
               "onto the table, as Spider does when its ad closes off the table"),
     ("LS-03", "FreeCell's link opens the board of the level last won (Easy • Scores); "
               "Game Center's back arrow then shows Leaderboards"),
-    ("DY-08", "the dev build plays Daily offline: today (Standard Easy) is dealt and "
-              "completed with Synthetic Win and gets the gold star; the prod build asks "
-              "for internet, as written"),
-    ("DY-09", "the dev build plays Daily offline: a past date is dealt, completed and "
-              "starred, and the monthly score popup lists both games' scores; the prod "
-              "build asks for internet, as written"),
+    ("DY-05", "the list is closed with a tap beside it; the level is left as it was"),
+    ("DY-12", "plays the level the button shows, offline (the dev build deals Daily "
+              "games without Wi-Fi); a card is first tapped up to its foundation — "
+              "FreeCell scores only cards put up — so the timer starts and the score counts"),
+    ("DY-14", "checked after today's and a past date's wins: games won goes up by both "
+              "and the best score takes the higher"),
 ])
 
 # FreeCell wording where swapping the game name is not enough.
@@ -202,7 +221,7 @@ CASES = [
          section=_freecell(case["section"]))
     for case in _load_cases(SPIDER_CASES, "spider_cases")
 ] + [case for case in _load_cases(FREECELL_CASES, "freecell_cases")
-     if case["id"] in FREECELL_ONLY]
+     if case["id"] in FREECELL_ONLY] + EXTRA_CASES
 TITLES = {case["id"]: case["title"] for case in CASES}
 SECTIONS = {case["id"]: case["section"].split(" > ")[-1] for case in CASES}
 
@@ -268,5 +287,6 @@ def validate() -> dict:
 
 
 if __name__ == "__main__":
-    print(f"{len(CASES)} cases ({len(CASES) - len(FREECELL_ONLY)} Spider, "
-          f"{len(FREECELL_ONLY)} FreeCell Daily): {validate()}")
+    own = len(FREECELL_ONLY) + len(EXTRA_CASES)
+    print(f"{len(CASES)} cases ({len(CASES) - own} Spider, {own} FreeCell Daily): "
+          f"{validate()}")

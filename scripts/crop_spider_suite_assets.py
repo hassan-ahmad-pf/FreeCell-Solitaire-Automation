@@ -69,14 +69,10 @@ CROPS = {
     "daily_gold_star": ("daily_won", (755, 1548, 843, 1631)),
     "daily_levels": ("daily_levels", (645, 402, 1252, 1867)),
     "daily_relaxed_note": ("daily_levels", (50, 1745, 550, 2080)),
-    "daily_level_easy": ("daily_level_easy", (960, 280, 1150, 352)),
-    "daily_level_medium": ("daily_level_medium", (864, 267, 1149, 330)),
-    "daily_level_hard": ("daily_level_hard", (971, 280, 1150, 340)),
-    "daily_level_easy_r": ("daily_level_easy_r", (899, 270, 1148, 352)),
     "daily_table_star": ("daily_table_past", (605, 306, 686, 383)),
-    "daily_table_medium": ("daily_table_today", (315, 1781, 975, 1828)),
     "daily_popup_days": ("daily_score_popup", (375, 590, 460, 760)),
     "faq_daily_heading": ("daily_faq", (265, 636, 1025, 722)),
+    "reset_daily_stats": ("daily_stats_bottom", (315, 2648, 978, 2716)),
 }
 
 

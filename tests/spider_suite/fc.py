@@ -602,6 +602,56 @@ def play_one_move(tag: str = "") -> tuple[Board, Board, str]:
     raise AssertionError("no bottom card had a legal move — every tap left the board alone")
 
 
+def _next_up(b: Board) -> list[str]:
+    """Each suit's next card for its foundation (its Ace while it is empty)."""
+    top: dict[str, int] = {}
+    for card, (area, _index, _depth) in b.cards.items():
+        suit, rank = card.rsplit("-", 1)
+        top[suit] = max(top.get(suit, 0), int(rank) if area == "F" else 0)
+    return [f"{suit}-{rank + 1}" for suit, rank in top.items() if rank < 13]
+
+
+def _covering(b: Board, card: str) -> list[str]:
+    """The cards lying on *card* in its column, the bottom one first."""
+    area, index, depth = b.cards[card]
+    return list(reversed(b.column(index)[depth + 1:])) if area == "T" else []
+
+
+def _up(b: Board) -> int:
+    return sum(1 for area, _i, _d in b.cards.values() if area == "F")
+
+
+def play_to_foundation(max_cover: int = 4) -> tuple[Board, Board, str]:
+    """Put one card up on its foundation, the only move FreeCell scores.
+
+    Picks the next card a suit needs with the fewest cards on it and taps
+    those away first (each goes to a legal column or free cell by itself).
+    Returns (before, after, the card tapped last).
+    """
+    start = settled_board()
+    ui.expect(start is not None and len(start) == 52, "could not read the 52 cards off the table")
+    b = start
+    for target in sorted((c for c in _next_up(b) if c in b.cards),
+                         key=lambda c: len(_covering(b, c))):
+        cover = _covering(b, target)
+        if len(cover) > max_cover:
+            continue
+        for card in cover + [target]:
+            tap_card(b, card, settle=1.6)
+            ui.answer_prompt("tip")
+            after = settled_board()
+            if after is None:
+                break
+            if _up(after) > _up(start):
+                return start, after, card
+            stuck = after.cards.get(card) == b.cards.get(card)
+            b = after
+            if stuck:
+                break
+    raise AssertionError("no card could be put up on a foundation within "
+                         f"{max_cover} taps (board: {b.text()})")
+
+
 # ── Options controls ───────────────────────────────────────────────
 
 SLIDERS = {

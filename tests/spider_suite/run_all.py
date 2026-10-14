@@ -3,8 +3,8 @@
 
 Spider's tests/run_all.py on the FreeCell build: Spider's test order, case
 IDs and titles (game name swapped), one line per case, and Spider's report.
-FreeCell's Daily cases (DY-01..14, from FreeCell's own TestRail list) run
-in two FreeCell-only tests slotted into that order.
+FreeCell's Daily cases (from FreeCell's own TestRail list) run in two
+FreeCell-only tests slotted into that order: verifyDaily and resetDailyStats.
 tests/spider_suite/catalog.py says where every test stands:
 
   run    a FreeCell port (tests/spider_suite/<module>.py) runs and records
@@ -89,9 +89,8 @@ REQUIRED = [
     "qa_page_adapters", "qa_page_back",
     # Daily (FreeCell's own DY cases)
     "daily_back", "daily_tip1", "daily_tip2", "daily_weekdays", "daily_faq_link",
-    "daily_gold_star", "daily_levels", "daily_relaxed_note", "daily_level_easy",
-    "daily_level_medium", "daily_level_hard", "daily_level_easy_r", "daily_table_star",
-    "daily_table_medium", "daily_popup_days", "faq_daily_heading",
+    "daily_gold_star", "daily_levels", "daily_relaxed_note", "daily_table_star",
+    "daily_popup_days", "faq_daily_heading", "reset_daily_stats",
 ]
 
 
@@ -155,14 +154,19 @@ def _case_row(cid: str, test: str, status: str, detail: str = "", rec: dict | No
 
 
 def _previous(names: set[str], scope: set[str]) -> tuple[list, list, str]:
-    """Tests, cases and start time of an earlier run that this invocation does not redo."""
+    """Tests, cases and start time of an earlier run that this invocation does
+    not redo; ones the catalog no longer lists are dropped."""
     try:
         old = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return [], [], ""
-    tests = [t for t in old.get("tests", []) if t.get("name") not in names]
-    return (tests, [c for c in old.get("cases", []) if c.get("id") not in scope],
-            old.get("started", "") if tests else "")
+    listed = {spider for spider, *_rest in catalog.RUN_ORDER}
+    known = set(catalog.TITLES)
+    tests = [t for t in old.get("tests", [])
+             if t.get("name") not in names and t.get("name") in listed]
+    cases = [c for c in old.get("cases", [])
+             if c.get("id") not in scope and c.get("id") in known]
+    return tests, cases, old.get("started", "") if tests else ""
 
 
 def _write(payload: dict, kept: tuple[list, list, str]) -> None:
