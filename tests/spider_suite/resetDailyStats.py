@@ -27,32 +27,13 @@ import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
 
 
-def _tap_reset() -> str:
-    """From the menu: Statistics → Daily → Reset Daily Statistics; the first alert."""
-    daily.open_daily_stats()
-    ui.expect(ui.scroll_to_bottom("reset_daily_stats", max_swipes=20),
-              "could not reach Reset Daily Statistics at the bottom of the Daily tab")
-    ui.expect(daily.daily_tab_on(ui.screen_rgb()), "Statistics left the Daily tab while scrolling")
-    ui.expect(ui.tap("reset_daily_stats", settle=1.5), "Reset Daily Statistics could not be tapped")
-    text = fc.wait_alert("reset local scores", timeout=6.0)
-    ui.expect(text, "Reset Daily Statistics did not ask to confirm "
-                    f"(alert on screen: {helpers.alert_text()!r})")
-    return text
-
-
-def _summary(sections: list[dict]) -> str:
-    t = sections[daily.TOTALS]
-    return (f"best score {daily.fmt(t['best'])}, games played {daily.fmt(t['played'])}, "
-            f"games won {daily.fmt(t['won'])}")
-
-
 def run() -> None:
     fc.menu()
     before, _shot = daily.read_stats("DailyStatsBeforeReset")
     solo, _shot = daily.read_stats("SoloStatsBeforeDailyReset", tab="solo")
 
     with caselog.case("RS-06") as c:
-        _tap_reset()
+        daily.tap_reset()
         c.shot(ui.shoot("ResetDailyAsk"))
         ui.expect(helpers.answer_alert("No", settle=1.5), "could not press No")
         ui.expect(not helpers.alert_text(), "an alert is still up after No")
@@ -63,12 +44,13 @@ def run() -> None:
         after, shot = daily.read_stats("DailyStatsAfterNo")
         c.shot(shot)
         ui.expect(after[:len(before)] == before[:len(after)],
-                  f"declining changed the Daily scores ({_summary(before)} → "
-                  f"{_summary(after)}, see {shot})")
-        c.note(f"No kept Statistics on Daily; the scores are unchanged ({_summary(after)})")
+                  f"declining changed the Daily scores ({daily.stats_summary(before)} → "
+                  f"{daily.stats_summary(after)}, see {shot})")
+        c.note("No kept Statistics on Daily; the scores are unchanged "
+               f"({daily.stats_summary(after)})")
 
     with caselog.case("RS-04") as c:
-        text = _tap_reset()
+        text = daily.tap_reset()
         buttons = helpers.alert_buttons()
         ui.expect({"No", "Yes"} <= set(buttons), f"the alert offers {buttons}, not No and Yes")
         ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press Yes")
@@ -82,18 +64,15 @@ def run() -> None:
         ui.expect(ui.on_menu(10.0), "the main menu did not come back after both Yes")
         after, shot = daily.read_stats("DailyStatsAfterReset")
         c.shot(shot)
-        totals, levels = after[daily.TOTALS], after[daily.TOTALS + 1:]
-        ui.expect(all(totals[k] in (None, 0) for k in ("best", "played", "won")),
-                  f"the Daily totals did not go to 0 ({_summary(after)}, see {shot})")
-        ui.expect(all(s["best"] is None and not s["won"] for s in levels),
-                  f"a Daily level still shows a score after the reset (see {shot})")
+        ui.expect(daily.stats_empty(after), f"Daily did not go to 0 / none after the reset "
+                                            f"({daily.stats_summary(after)}, see {shot})")
         solo_after, solo_shot = daily.read_stats("SoloStatsAfterDailyReset", tab="solo")
         c.shot(solo_shot)
         ui.expect(solo_after[daily.TOTALS] == solo[daily.TOTALS],
-                  f"the Daily reset changed the Solo scores ({_summary(solo)} → "
-                  f"{_summary(solo_after)}, see {solo_shot})")
-        c.note(f"both Yes: the main menu; Daily reads {_summary(after)} and every level none; "
-               f"Solo unchanged ({_summary(solo_after)})")
+                  f"the Daily reset changed the Solo scores ({daily.stats_summary(solo)} → "
+                  f"{daily.stats_summary(solo_after)}, see {solo_shot})")
+        c.note(f"both Yes: the main menu; Daily reads {daily.stats_summary(after)} and every "
+               f"level none; Solo unchanged ({daily.stats_summary(solo_after)})")
     print("PASS: Reset Daily Statistics declined, then confirmed twice; Daily wiped, "
           "Solo untouched")
 

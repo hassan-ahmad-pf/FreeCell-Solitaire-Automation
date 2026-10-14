@@ -352,7 +352,8 @@ def _stat_line(shot: str, cy: float) -> int | None:
 
 def stats_sections(shot: str) -> list[dict]:
     """A Statistics tab in *shot*, one dict per section (TOTALS first, then
-    each level on screen) with "best", "played" and "won"; None where blank."""
+    each level on screen) with "best", "played" and "won"; None where blank.
+    A level cut off by the bottom of the screen lacks the lines below it."""
     sections: list[dict] = []
     for cy, text in ocr.rows(ocr.read(shot, box=STATS_BOX)):
         low = text.lower()
@@ -361,7 +362,7 @@ def stats_sections(shot: str) -> list[dict]:
                 and "none" not in low):
             value = _stat_line(shot, cy)
         if low.startswith("best score"):
-            sections.append({"best": value, "played": None, "won": None})
+            sections.append({"best": value})
         elif sections and low.startswith("games played"):
             sections[-1]["played"] = value
         elif sections and low.startswith("games won"):
@@ -384,6 +385,42 @@ def read_stats(name: str, tab: str = "daily") -> tuple[list[dict], str]:
     sections = stats_sections(shot)
     ui.expect(sections, f"could not read the {tab.title()} statistics (see {shot})")
     return sections, shot
+
+
+def stats_empty(sections: list[dict]) -> bool:
+    """Statistics as a fresh install shows them: totals 0, every level none."""
+    totals, levels = sections[TOTALS], sections[TOTALS + 1:]
+    return (all(totals.get(k) in (None, 0) for k in ("best", "played", "won"))
+            and all(s["best"] is None and not s.get("won") for s in levels))
+
+
+def stats_summary(sections: list[dict]) -> str:
+    t = sections[TOTALS]
+    return (f"best score {fmt(t['best'])}, games played {fmt(t.get('played'))}, "
+            f"games won {fmt(t.get('won'))}")
+
+
+def tap_reset() -> str:
+    """From the menu: Statistics → Daily → Reset Daily Statistics; the first alert."""
+    open_daily_stats()
+    ui.expect(ui.scroll_to_bottom("reset_daily_stats", max_swipes=20),
+              "could not reach Reset Daily Statistics at the bottom of the Daily tab")
+    ui.expect(daily_tab_on(ui.screen_rgb()), "Statistics left the Daily tab while scrolling")
+    ui.expect(ui.tap("reset_daily_stats", settle=1.5), "Reset Daily Statistics could not be tapped")
+    text = fc.wait_alert("reset local scores", timeout=6.0)
+    ui.expect(text, "Reset Daily Statistics did not ask to confirm "
+                    f"(alert on screen: {helpers.alert_text()!r})")
+    return text
+
+
+def reset_stats() -> None:
+    """Reset Daily Statistics from the menu, Yes to both alerts; back on the menu."""
+    tap_reset()
+    ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press Yes")
+    ui.expect(fc.wait_alert("safe side", timeout=6.0),
+              "the second 'safe side' confirmation did not appear")
+    ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press the second Yes")
+    ui.expect(ui.on_menu(10.0), "the main menu did not come back after both Yes")
 
 
 def fmt(value) -> str:

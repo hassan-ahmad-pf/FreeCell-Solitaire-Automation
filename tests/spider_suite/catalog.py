@@ -186,8 +186,9 @@ ADAPTED = OrderedDict([
     ("DY-12", "plays the level the button shows, offline (the dev build deals Daily "
               "games without Wi-Fi); a card is first tapped up to its foundation — "
               "FreeCell scores only cards put up — so the timer starts and the score counts"),
-    ("DY-14", "checked after today's and a past date's wins: games won goes up by both "
-              "and the best score takes the higher"),
+    ("DY-14", "Daily statistics are brought to 0 / none before Daily opens (Reset Daily "
+              "Statistics if needed); after today's and a past date's wins they read played "
+              "2, won 2 and the higher score, in the totals and the level played"),
 ])
 
 # FreeCell wording where swapping the game name is not enough.

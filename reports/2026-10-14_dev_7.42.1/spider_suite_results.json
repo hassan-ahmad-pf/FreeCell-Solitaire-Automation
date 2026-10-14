@@ -131,7 +131,7 @@
       "name": "verifyDaily",
       "module": "verifyDaily",
       "status": "pass",
-      "seconds": 238.1,
+      "seconds": 299.0,
       "error": ""
     },
     {
@@ -1751,7 +1751,7 @@
       "notes": [
         "the level button (Standard Medium) opened Standard and Relaxed Easy\u2013Master; a tap beside the list closed it with the level unchanged"
       ],
-      "seconds": 8.9
+      "seconds": 9.1
     },
     {
       "id": "DY-07",
@@ -1766,7 +1766,7 @@
       "notes": [
         "tapping the 16th did nothing"
       ],
-      "seconds": 5.8
+      "seconds": 5.7
     },
     {
       "id": "DY-10",
@@ -1794,7 +1794,7 @@
       "notes": [
         "the FAQ opened on 'What are Daily games?'; back returned to the calendar"
       ],
-      "seconds": 11.0
+      "seconds": 10.8
     },
     {
       "id": "DY-12",
@@ -1802,15 +1802,15 @@
       "section": "Daily",
       "test": "verifyDaily",
       "status": "pass",
-      "detail": "today (Standard Medium) dealt a Daily table: 'medium level standard rules'; heart-2 tapped up to its foundation: timer 0:00 \u2192 0:14, score 0 \u2192 1,580",
+      "detail": "today (Standard Medium) dealt a Daily table: 'medium level standard rules'; heart-2 tapped up to its foundation: timer 0:00 \u2192 0:24, score 0 \u2192 1,570",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayTable.png",
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayCardUp.png"
       ],
       "notes": [
-        "today (Standard Medium) dealt a Daily table: 'medium level standard rules'; heart-2 tapped up to its foundation: timer 0:00 \u2192 0:14, score 0 \u2192 1,580"
+        "today (Standard Medium) dealt a Daily table: 'medium level standard rules'; heart-2 tapped up to its foundation: timer 0:00 \u2192 0:24, score 0 \u2192 1,570"
       ],
-      "seconds": 27.5
+      "seconds": 38.6
     },
     {
       "id": "DY-13",
@@ -1818,15 +1818,15 @@
       "section": "Daily",
       "test": "verifyDaily",
       "status": "pass",
-      "detail": "Synthetic Win (74,397); back on the calendar today has the gold star (today was already won on this level earlier)",
+      "detail": "Synthetic Win (77,303); back on the calendar today has the gold star (today was already won on this level earlier)",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayVictory.png",
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyTodayStar.png"
       ],
       "notes": [
-        "Synthetic Win (74,397); back on the calendar today has the gold star (today was already won on this level earlier)"
+        "Synthetic Win (77,303); back on the calendar today has the gold star (today was already won on this level earlier)"
       ],
-      "seconds": 24.0
+      "seconds": 23.8
     },
     {
       "id": "DY-14",
@@ -1834,15 +1834,17 @@
       "section": "Daily",
       "test": "verifyDaily",
       "status": "pass",
-      "detail": "Daily: games won 0 \u2192 2, best score 76,731; Standard Medium: games won 0 \u2192 2, best score 76,731",
+      "detail": "Daily statistics were reset to 0 / none before the run (they read best score 77,814, games played 2, games won 2); Daily: best score 77,775, games played 2, games won 2; Standard Medium: best score 77,775, games played 2, games won 2; the other levels on screen read none",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyStatsAfter.png"
       ],
       "notes": [
-        "Daily: games won 0 \u2192 2, best score 76,731",
-        "Standard Medium: games won 0 \u2192 2, best score 76,731"
+        "Daily statistics were reset to 0 / none before the run (they read best score 77,814, games played 2, games won 2)",
+        "Daily: best score 77,775, games played 2, games won 2",
+        "Standard Medium: best score 77,775, games played 2, games won 2",
+        "the other levels on screen read none"
       ],
-      "seconds": 22.6
+      "seconds": 22.9
     },
     {
       "id": "RS-04",
@@ -1857,7 +1859,7 @@
       "notes": [
         "'Would you like to reset local scores?', Yes, then 'Just to be on the safe side\u2026'"
       ],
-      "seconds": 31.5
+      "seconds": 31.6
     },
     {
       "id": "RS-05",
@@ -1873,7 +1875,7 @@
       "notes": [
         "both Yes: the main menu; Daily reads best score 0, games played 0, games won 0 and every level none; Solo unchanged (best score 46,528, games played 2, games won 2)"
       ],
-      "seconds": 50.5
+      "seconds": 50.8
     },
     {
       "id": "RS-06",
@@ -1881,16 +1883,16 @@
       "section": "Statistics",
       "test": "resetDailyStats",
       "status": "pass",
-      "detail": "No kept Statistics on Daily; the scores are unchanged (best score 76,731, games played 2, games won 2)",
+      "detail": "No kept Statistics on Daily; the scores are unchanged (best score 77,775, games played 2, games won 2)",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetDailyAsk.png",
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/ResetDailyNo.png",
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyStatsAfterNo.png"
       ],
       "notes": [
-        "No kept Statistics on Daily; the scores are unchanged (best score 76,731, games played 2, games won 2)"
+        "No kept Statistics on Daily; the scores are unchanged (best score 77,775, games played 2, games won 2)"
       ],
-      "seconds": 60.9
+      "seconds": 60.3
     },
     {
       "id": "DY-15",
@@ -1898,7 +1900,7 @@
       "section": "Daily",
       "test": "verifyDaily",
       "status": "pass",
-      "detail": "the 13th dealt a Daily table: 'medium level standard rules'; spade-2 tapped up to its foundation: timer 0:00 \u2192 0:25, score 0 \u2192 1,570; Synthetic Win (76,731); the 13th has a star",
+      "detail": "the 11th dealt a Daily table: 'medium level standard rules'; spade-2 tapped up to its foundation: timer 0:00 \u2192 0:13, score 0 \u2192 1,580; Synthetic Win (77,775); the 11th has a star",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastTable.png",
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastCardUp.png",
@@ -1906,10 +1908,10 @@
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyPastStar.png"
       ],
       "notes": [
-        "the 13th dealt a Daily table: 'medium level standard rules'; spade-2 tapped up to its foundation: timer 0:00 \u2192 0:25, score 0 \u2192 1,570",
-        "Synthetic Win (76,731); the 13th has a star"
+        "the 11th dealt a Daily table: 'medium level standard rules'; spade-2 tapped up to its foundation: timer 0:00 \u2192 0:13, score 0 \u2192 1,580",
+        "Synthetic Win (77,775); the 11th has a star"
       ],
-      "seconds": 63.6
+      "seconds": 53.5
     },
     {
       "id": "DY-16",
@@ -1917,16 +1919,16 @@
       "section": "Daily",
       "test": "verifyDaily",
       "status": "pass",
-      "detail": "score popup: 13th 76,731; 14th 78,661; 15th 78,191 x2 = 156,382 \u2014 monthly score 311,774",
+      "detail": "score popup: 11th 77,775; 12th 77,814; 13th 76,731; 14th 78,661; 15th 78,191 x2 = 156,382 \u2014 monthly score 467,363",
       "shots": [
         "/Users/hassan/Automation-FA/FreeCell-Solitaire-Automation/log/DailyScorePopup.png"
       ],
       "notes": [
-        "score popup: 13th 76,731; 14th 78,661; 15th 78,191 x2 = 156,382 \u2014 monthly score 311,774"
+        "score popup: 11th 77,775; 12th 77,814; 13th 76,731; 14th 78,661; 15th 78,191 x2 = 156,382 \u2014 monthly score 467,363"
       ],
       "seconds": 8.7
     }
   ],
-  "finished": "2026-10-15T01:59:41+05:00",
-  "duration_seconds": 4429.9
+  "finished": "2026-10-15T02:29:10+05:00",
+  "duration_seconds": 4490.8
 }

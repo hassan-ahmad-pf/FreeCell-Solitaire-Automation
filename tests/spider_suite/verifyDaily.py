@@ -10,7 +10,9 @@ DY-05  the level button opens the level list; a tap beside it closes the
        list and the level stays
 DY-07  a later date does nothing
 DY-11  the FAQ link opens the FAQ on its Daily page; back returns
-dev build — Daily plays offline there, and the wins come from Synthetic Win:
+dev build — Daily plays offline there, and the wins come from Synthetic Win.
+Before Daily opens, Statistics → Daily must read 0 / none; if earlier games
+show, Reset Daily Statistics clears them first.
 DY-12  today deals a Daily table for the level shown; a card tapped up to
        its foundation starts the timer and the score counts
 DY-13  Synthetic Win, back to the calendar: today has the gold star
@@ -18,12 +20,14 @@ DY-15  an unplayed past date the same way; it gets a star
 DY-16  the monthly score popup lists both games' Victory scores (today's
        x2) and they add up to the monthly score
 DY-10  back returns to the main menu
-DY-14  Statistics → Daily counts both wins and their best score
+DY-14  Statistics → Daily shows exactly those games: played and won 2, best
+       score the higher Victory score, in the totals and the level played
 
 The tips show on the first Daily visit after a fresh install only (QA's
 reset alerts does not bring them back), so a rerun skips DY-02 and DY-03.
-A rerun also finds today already won: a replay that scores lower is not
-counted, so the popup then shows at least the new score.
+Reset Daily Statistics leaves the calendar alone, so a rerun also finds
+today already won: a replay that scores lower is not counted, and the
+popup then shows at least the new score.
 
 Run:  SPIDER_SUITE_BUILD=dev ./.venv/bin/python -u tests/spider_suite/verifyDaily.py
 """
@@ -233,26 +237,50 @@ def _play(level: tuple[str, str]) -> list[tuple[int, int, bool]]:
     return played
 
 
-def _stats(before: list[dict], played: list[tuple[int, int, bool]],
-           level: tuple[str, str]) -> None:
+def _clean_stats() -> str:
+    """Daily statistics at 0 / none before Daily opens, so DY-14 can ask for
+    exactly this run's games; earlier games are reset away first."""
+    before, shot = daily.read_stats("DailyStatsBefore")
+    if daily.stats_empty(before):
+        return "Daily statistics read 0 / none before the run"
+    was = daily.stats_summary(before)
+    daily.reset_stats()
+    cleared, shot = daily.read_stats("DailyStatsCleared")
+    ui.expect(daily.stats_empty(cleared), "Reset Daily Statistics did not bring Daily to 0 / none "
+                                          f"before the run ({daily.stats_summary(cleared)}, "
+                                          f"see {shot})")
+    return f"Daily statistics were reset to 0 / none before the run (they read {was})"
+
+
+def _stats(start: str, played: list[tuple[int, int, bool]], level: tuple[str, str]) -> None:
+    """From 0 / none, the totals and the level played show exactly this
+    run's games; every other level on screen stays none."""
+    words = {"best": "best score", "played": "games played", "won": "games won"}
     with caselog.case("DY-14") as c:
+        c.note(start)
         after, shot = daily.read_stats("DailyStatsAfter")
         c.shot(shot)
-        wins, scores = len(played), [score for _d, score, _r in played]
+        wins = len(played)
+        want = {"best": max(score for _d, score, _r in played), "played": wins, "won": wins}
         index = daily.stats_section(*level)
-        checks = [(daily.TOTALS, "Daily")]
-        if index < min(len(before), len(after)):
-            checks.append((index, " ".join(level).title()))
-        for key, name in checks:
-            was, now_won = before[key]["won"] or 0, after[key]["won"]
-            ui.expect(now_won == was + wins, f"{name} games won reads {daily.fmt(now_won)}, "
-                                             f"expected {was + wins} after {wins} wins "
-                                             f"(see {shot})")
-            best = max([before[key]["best"] or 0] + scores)
-            ui.expect(after[key]["best"] == best,
-                      f"{name} best score reads {daily.fmt(after[key]['best'])}, expected "
-                      f"{best:,} (see {shot})")
-            c.note(f"{name}: games won {was} → {now_won}, best score {best:,}")
+        name = " ".join(level).title()
+        ui.expect(set(words) <= set(after[daily.TOTALS]),
+                  f"could not find the Daily totals' lines (see {shot})")
+        for key, label in ((daily.TOTALS, "Daily"), (index, name)):
+            if key >= len(after):
+                c.note(f"{label} is below the screen; the totals cover it")
+                continue
+            for field, value in after[key].items():
+                ui.expect(value == want[field], f"{label} {words[field]} reads {daily.fmt(value)},"
+                                                f" expected {want[field]:,} after {wins} wins "
+                                                f"(see {shot})")
+            c.note(f"{label}: " + ", ".join(f"{words[f]} {daily.fmt(v)}"
+                                             for f, v in after[key].items()))
+        others = [s for key, s in enumerate(after) if key not in (daily.TOTALS, index)]
+        ui.expect(all(s["best"] is None and not s.get("won") for s in others),
+                  f"a level not played this run shows a score (see {shot})")
+        if others:
+            c.note("the other levels on screen read none")
 
 
 def run() -> None:
@@ -260,7 +288,7 @@ def run() -> None:
     fc.menu()
     if dev:
         fc.ensure_qa()
-        before, _shot = daily.read_stats("DailyStatsBefore")
+        start = _clean_stats()
     with caselog.case("DY-01") as c:
         ui.expect(ui.tap("menu_daily", settle=0.4), "Daily control not found on the menu")
         ui.expect(_opened(), "tapping Daily did not open the calendar")
@@ -275,7 +303,7 @@ def run() -> None:
         daily.leave_calendar()
         c.note("back returned to the main menu")
     if dev:
-        _stats(before, played, level)
+        _stats(start, played, level)
     print("PASS: Daily opened, tips and level list checked"
           + (f", {len(played)} Daily games played, scored and counted" if dev else ""))
 
