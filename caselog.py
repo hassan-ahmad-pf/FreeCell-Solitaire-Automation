@@ -70,13 +70,19 @@ def _record(cid: str, status: str, detail: str = "", rec: _Case | None = None,
         "test": _TEST, "seconds": round(elapsed, 1),
     })
     mark = {"pass": "PASS", "fail": "FAIL", "skip": "SKIP", "block": "BLOCKED"}[status]
-    title = f" {_TITLES[cid]}" if cid in _TITLES else ""
-    print(f"    [{mark}] {cid}{title}" + (f" — {detail}" if detail else ""), flush=True)
+    took = f" ({elapsed:.1f}s)" if status in ("pass", "fail") else ""
+    print(f"    [{mark}] {cid}{_title(cid)}{took}" + (f" — {detail}" if detail else ""),
+          flush=True)
+
+
+def _title(cid: str) -> str:
+    return f" {_TITLES[cid]}" if cid in _TITLES else ""
 
 
 @contextmanager
 def case(cid: str, soft: bool = False):
     rec = _Case(cid)
+    print(f"    [RUN ] {cid}{_title(cid)}", flush=True)
     start = time.time()
     try:
         yield rec

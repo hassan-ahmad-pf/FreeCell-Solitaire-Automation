@@ -35,6 +35,9 @@ Run:  ./.venv/bin/python -u tests/spider_suite/run_all.py                # main 
       ./.venv/bin/python -u tests/spider_suite/run_all.py verifyPlay verifyGamePlay
       ./.venv/bin/python -u tests/spider_suite/run_all.py --offline     # Airplane Mode cases only
       ./.venv/bin/python -u tests/spider_suite/run_all.py --dev
+      ./.venv/bin/python -u tests/spider_suite/run_all.py --dev --all   # main suite + standalone
+
+For a live, coloured console (presentations): ./scripts/regression.sh
 
 Results: log/spider_suite_results.json after every test, then
 scripts/gen_spider_format_report.py writes log/freecell_spider_regression.html.
@@ -126,13 +129,13 @@ def _offline_ids(ids: list[str]) -> list[str]:
     return [c for c in ids if c not in catalog.ONLINE_CASES and c not in catalog.LATER]
 
 
-def _plan(picked: list[str], dev: bool, offline: bool) -> list[tuple]:
+def _plan(picked: list[str], dev: bool, offline: bool, everything: bool = False) -> list[tuple]:
     """(spider name, module, runs?, ids, reason) in Spider's order."""
     out = []
     for spider, module, kind, ids, why in catalog.RUN_ORDER:
         if picked and spider not in picked and module not in picked:
             continue
-        if not picked and not offline and spider in catalog.STANDALONE:
+        if not picked and not offline and not everything and spider in catalog.STANDALONE:
             continue
         if offline and (kind != "run" or not _offline_ids(ids)):
             continue
@@ -203,7 +206,8 @@ def main() -> int:
     os.environ["SPIDER_SUITE_BUILD"] = "dev" if dev else "prod"
     offline = "--offline" in args
     picked = [a for a in args if not a.startswith("-")]
-    plan = _plan(picked, dev, offline)
+    everything = "--all" in args
+    plan = _plan(picked, dev, offline, everything)
     total = len(plan)
     started = time.time()
 
@@ -229,7 +233,9 @@ def main() -> int:
             n_skip += len(mine)
         else:
             n_dev += len(mine)
-    label = ("offline cases only" if offline else "main suite" if not picked
+    label = ("offline cases only" if offline
+             else "full regression (main suite and standalone tests)" if everything and not picked
+             else "main suite" if not picked
              else "named tests")
     print(f"cases:  {label} — {n_run} run, {n_dev} dev build (skipped), {n_skip} skipped, "
           f"{n_later} later", flush=True)

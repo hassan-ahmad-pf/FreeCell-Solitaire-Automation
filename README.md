@@ -19,6 +19,33 @@ comes from a free Apple ID and lasts 7 days, so `wda.sh` re-signs WDA into
 `log/wda-build` by itself when under a day is left (Xcode must be signed in
 to that Apple ID); `./scripts/wda.sh renew` forces it.
 
+## One command (live console)
+
+With the phone plugged in, unlocked and online, paste into Terminal:
+
+```bash
+cd /Users/hassan/Automation-FA/FreeCell-Solitaire-Automation && ./scripts/regression.sh
+```
+
+`scripts/regression.sh` starts WDA (re-signing it if due), keeps the Mac
+awake and runs the Spider suite on the dev build, standalone tests
+included (about 80 minutes). The console shows the plan with each test's
+time on the last run, every case as it starts and its PASS / FAIL / SKIP
+with its time and note, and a status bar with the elapsed time, the current
+case, pass and fail counts and the time left. It ends with a RESULT line,
+opens the HTML report and keeps a plain log in `log/regression_<time>.log`.
+
+| Option | Runs |
+| --- | --- |
+| `--main` | main suite only, no standalone tests (about 35 minutes) |
+| `verifyGamePlay verifyDaily` | only the named tests |
+| `--prod` | the App Store build (leaves out the dev-build cases) |
+| `--no-open` | does not open the report at the end |
+
+Ctrl-C stops the run; the runner still turns the network back on. The
+first-launch and Daily tips cases need FreeCell deleted and reinstalled
+without opening it; on an install that has been opened they show SKIP.
+
 ## Setup
 
 ```bash

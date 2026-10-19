@@ -10,6 +10,13 @@ description: >-
 When the user asks to run regression on the FreeCell build, execute the suite.
 Do not ask whether this is a first launch or a subsequent launch.
 
+If the user wants to start it themselves (a demo, or "give me a command"),
+give them `cd /Users/hassan/Automation-FA/FreeCell-Solitaire-Automation &&
+./scripts/regression.sh` (options: `--main`, `--prod`, `--no-open`, test
+names). It starts WDA, runs `tests/spider_suite/run_all.py --dev --all`
+under `caffeinate` and shows each case live through
+`scripts/present_regression.py`; see the README's "One command".
+
 ## WDA first
 
 If `http://127.0.0.1:8100/status` is down, start the in-repo signed build.
