@@ -37,14 +37,6 @@ HEADER_STAR_MATCH = 0.80  # Daily ~1.0, Solo's "new" ~0.49
 STAR_MATCH = 0.80
 GOLD_SHARE = 0.5
 
-# Table: "• medium level standard rules •" under the board; the HUD below
-# it shows the score, then the timer and multiplier ("0:00 X158"). The HUD
-# drops 132 px once the "tap to undo / lower / hints" captions go.
-TABLE_FOOTER = (200, 1760, 1090, 1860)
-HUD_BAND = (380, 2080, 900, 2480)
-TIMER = re.compile(r"(\d+):(\d{2})")
-SCORE_ONLY = re.compile(r"[\d,.\u201a ]+")
-
 # Score popup: rows 1..31 under the month name, "15: ★ 47,739x2 = 95,478"
 # for a played date and a dash otherwise. The monthly score box and the
 # calendar show dimmed through it; their text is taller or dimmer than a row's.
@@ -184,28 +176,6 @@ def on_daily_table(timeout: float = 10.0) -> tuple[bool, bool]:
         if time.time() > deadline:
             return False, False
         time.sleep(0.5)
-
-
-def table_footer(shot: str) -> str:
-    return " ".join(line.text for line in ocr.read(shot, box=TABLE_FOOTER))
-
-
-def hud(shot: str) -> tuple[int | None, int | None]:
-    """(timer in seconds, score) under the board. A lone "0" score is too
-    small for Vision, so None stands for 0 before anything is scored."""
-    timer = score = None
-    for _y, text in ocr.rows(ocr.read(shot, box=HUD_BAND)):
-        match = TIMER.search(text)
-        if match:
-            timer = int(match.group(1)) * 60 + int(match.group(2))
-        elif score is None and SCORE_ONLY.fullmatch(text.strip()):
-            found = ocr.numbers(text)
-            score = found[0] if found else None
-    return timer, score
-
-
-def mmss(seconds: int | None) -> str:
-    return "?" if seconds is None else f"{seconds // 60}:{seconds % 60:02d}"
 
 
 def synthetic_win(started: bool = False) -> bool:

@@ -5,6 +5,7 @@ Spider's tests/run_all.py on the FreeCell build: Spider's test order, case
 IDs and titles (game name swapped), one line per case, and Spider's report.
 FreeCell's Daily cases (from FreeCell's own TestRail list) run in two
 FreeCell-only tests slotted into that order: verifyDaily and resetDailyStats.
+FreeCell's timer and score cases (GP-12, GP-25) run in verifyGamePlay.
 tests/spider_suite/catalog.py says where every test stands:
 
   run    a FreeCell port (tests/spider_suite/<module>.py) runs and records

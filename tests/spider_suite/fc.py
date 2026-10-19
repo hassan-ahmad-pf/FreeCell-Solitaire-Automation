@@ -27,6 +27,7 @@ import catalog
 import config
 import freecell_ui as ui
 import helpers
+import ocr
 
 APP_STORE = "com.apple.AppStore"
 MAIL = "com.apple.mobilemail"
@@ -650,6 +651,38 @@ def play_to_foundation(max_cover: int = 4) -> tuple[Board, Board, str]:
                 break
     raise AssertionError("no card could be put up on a foundation within "
                          f"{max_cover} taps (board: {b.text()})")
+
+
+# Under the board, Solo and Daily alike: the level line, then "tap a card to
+# start" until the first move. Lower down the score, then "0:00 X98" (timer
+# and multiplier); they sit lower once the tap-to captions go.
+TABLE_FOOTER = (200, 1760, 1090, 1920)
+HUD_BAND = (380, 2080, 900, 2480)
+TIMER = re.compile(r"(\d+):(\d{2})")
+SCORE_ONLY = re.compile(r"[\d,.\u201a ]+")
+
+
+def table_footer(shot: str) -> list[str]:
+    """The footer's lines, top first."""
+    return [text for _y, text in ocr.rows(ocr.read(shot, box=TABLE_FOOTER))]
+
+
+def hud(shot: str) -> tuple[int | None, int | None]:
+    """(timer in seconds, score) under the board. A lone "0" score is too
+    small for Vision, so None stands for 0 before anything is scored."""
+    timer = score = None
+    for _y, text in ocr.rows(ocr.read(shot, box=HUD_BAND)):
+        match = TIMER.search(text)
+        if match:
+            timer = int(match.group(1)) * 60 + int(match.group(2))
+        elif score is None and SCORE_ONLY.fullmatch(text.strip()):
+            found = ocr.numbers(text)
+            score = found[0] if found else None
+    return timer, score
+
+
+def mmss(seconds: int | None) -> str:
+    return "?" if seconds is None else f"{seconds // 60}:{seconds % 60:02d}"
 
 
 # ── Options controls ───────────────────────────────────────────────

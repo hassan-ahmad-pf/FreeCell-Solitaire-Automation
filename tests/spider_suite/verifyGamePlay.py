@@ -2,6 +2,9 @@
 """Spider's verifyGamePlay on FreeCell: the table plays.
 
 GP-01  Back, menu, tap to undo, tap to lower and tap for hints are on screen
+GP-12  untouched for 10 s the deal's timer stays 0:00 under "tap a card to
+       start"; a card tapped up to its foundation starts it
+GP-25  that card going up makes the score count
 GP-03  a card move is undone exactly (FreeCell has no stock deal)
 GP-04  tap to lower drops the playfield
 GP-05  tap to raise brings it back
@@ -20,6 +23,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.dirname(os.path.dirname(HERE))]
@@ -43,6 +47,9 @@ DRAWER = ("drawer_replay", "drawer_abandon", "drawer_options", "drawer_new",
 RICH = "opt_rich_features"
 RICH_TITLE = "Rich Features"
 NEW_DEAL = 10
+IDLE = 10.0
+TIMER_RUN = 2.0
+TAP_TO_START = "tap a card to start"
 
 
 def _top_y() -> float:
@@ -78,6 +85,32 @@ def run() -> None:
         ui.expect(not missing, f"the table is missing {missing}")
         c.note("back, menu, undo, lower and hints all on screen")
     ui.await_rules_prompt()
+
+    with caselog.case("GP-12") as c:
+        time.sleep(IDLE)
+        idle = c.shot(ui.shoot("GamePlayIdle"))
+        timer0, score0 = fc.hud(idle)
+        footer = fc.table_footer(idle)
+        ui.expect(timer0 == 0, f"the timer reads {fc.mmss(timer0)} after {IDLE:.0f}s on a new "
+                               f"deal without a move (see {idle})")
+        ui.expect(any(TAP_TO_START in line.lower() for line in footer),
+                  f"the footer reads {footer}, not '{TAP_TO_START}' (see {idle})")
+        _before, _after, card = fc.play_to_foundation()
+        time.sleep(TIMER_RUN)
+        moved = c.shot(ui.shoot("GamePlayCardUp"))
+        timer1, score1 = fc.hud(moved)
+        ui.expect(timer1 is not None and timer1 > 0,
+                  f"the timer did not start: 0:00 before {card} went up, {fc.mmss(timer1)} "
+                  f"after (see {moved})")
+        c.note(f"{IDLE:.0f}s untouched: 0:00 under '{TAP_TO_START}'; {card} tapped up to its "
+               f"foundation: timer 0:00 → {fc.mmss(timer1)}")
+    with caselog.case("GP-25") as c:
+        c.shot(moved)
+        ui.expect(score1 is not None and score1 > (score0 or 0),
+                  f"the score did not count {card} going up to its foundation: "
+                  f"{score0 or 0:,} before, {'unreadable' if score1 is None else f'{score1:,}'} "
+                  f"after (see {moved})")
+        c.note(f"{card} went up to its foundation: score {score0 or 0:,} → {score1:,}")
 
     with caselog.case("GP-03") as c:
         before, after, card = fc.play_one_move()
@@ -175,8 +208,8 @@ def run() -> None:
         c.note(f"a different deal ({moved} of 52 cards elsewhere)")
 
     ui.expect(ui.to_menu(), "could not return to the menu after the table")
-    print("PASS: the table plays — controls, undo, lower / raise, hints, drawer, "
-          "Rich Features both ways, and New")
+    print("PASS: the table plays — controls, timer and score, undo, lower / raise, hints, "
+          "drawer, Rich Features both ways, and New")
 
 
 if __name__ == "__main__":

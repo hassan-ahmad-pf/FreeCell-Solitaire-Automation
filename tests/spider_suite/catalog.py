@@ -7,9 +7,11 @@ six standalone tests (STANDALONE) in the order of Spider's report catalog.
 
 FreeCell's Daily mode has no Spider counterpart, so its cases come from
 FreeCell's own TestRail list (docs/testrail/cases.py) as written there,
-plus EXTRA_CASES for the two steps that list has no case for. They run in
-two FreeCell-only tests in the offline part of the main suite: verifyDaily
-(the Daily flow) and resetDailyStats right after it.
+plus EXTRA_CASES for the steps that list has no case for. They run in two
+FreeCell-only tests in the offline part of the main suite: verifyDaily (the
+Daily flow) and resetDailyStats right after it. FreeCell's own timer case
+(GP-12) and the score case beside it (GP-25) run in verifyGamePlay. Each
+sits in its section after the cases with lower IDs.
 
 Each Spider test is one of:
   run  — a FreeCell port in tests/spider_suite/<module>.py
@@ -32,11 +34,16 @@ SPIDER_CASES = os.path.join(ROOT, "reference", "spider", "docs", "testrail", "ca
 FREECELL_CASES = os.path.join(ROOT, "docs", "testrail", "cases.py")
 
 # FreeCell's own cases with no Spider counterpart.
-FREECELL_ONLY = ("DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
+FREECELL_ONLY = ("GP-12", "DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
                  "DY-12", "DY-13", "DY-14", "RS-04", "RS-05", "RS-06")
 
-# Daily steps FreeCell's TestRail list has no case for.
+# Steps FreeCell's TestRail list has no case for.
 EXTRA_CASES = [
+    {"id": "GP-25", "title": "Gameplay - Score counts when a card goes up to its foundation",
+     "section": "FreeCell Solitaire Obj-C > Gameplay", "type": "Functional",
+     "priority": "Medium",
+     "steps": [("On a new deal, tap a card that can go up to its foundation.",
+                "The card goes up and the score under the board rises from 0.")]},
     {"id": "DY-15", "title": "Daily - A past date can be played and won",
      "section": "FreeCell Solitaire Obj-C > Daily", "type": "Functional",
      "priority": "Medium",
@@ -76,7 +83,7 @@ RUN_ORDER = [
     ("openDebugTools", "openDebugTools", "dev", ["QA-02", "QA-03", "QA-04"],
      "needs the dev build (the prod build has no QA entry point)"),
     ("verifyGamePlay", "verifyGamePlay", "run",
-     ["GP-01", "GP-02", "GP-03", "GP-04", "GP-05", "GP-06",
+     ["GP-01", "GP-12", "GP-25", "GP-02", "GP-03", "GP-04", "GP-05", "GP-06",
       "GP-07", "GP-08", "GP-09", "GP-10", "GP-11", "GP-14"], ""),
     ("verifyVictory", "verifyVictory", "dev", ["VI-01", "VI-02", "VI-03", "VI-04"],
      "needs the dev build (Complete Game / Synthetic Win)"),
@@ -216,15 +223,30 @@ def _freecell(text: str) -> str:
     return re.sub(r"\bSpider\b", "FreeCell", text)
 
 
-CASES = [
+def _section(case: dict) -> str:
+    return case["section"].split(" > ")[-1]
+
+
+def _slot_in(cases: list[dict], own: list[dict]) -> list[dict]:
+    """*own* added to *cases*, each after the last case of its section with a
+    lower ID (at the end when its section is new)."""
+    out = list(cases)
+    for case in own:
+        before = [i for i, other in enumerate(out)
+                  if _section(other) == _section(case) and other["id"] < case["id"]]
+        out.insert(before[-1] + 1 if before else len(out), case)
+    return out
+
+
+CASES = _slot_in([
     dict(case,
          title=TITLE_OVERRIDES.get(case["id"]) or _freecell(case["title"]),
          section=_freecell(case["section"]))
     for case in _load_cases(SPIDER_CASES, "spider_cases")
-] + [case for case in _load_cases(FREECELL_CASES, "freecell_cases")
-     if case["id"] in FREECELL_ONLY] + EXTRA_CASES
+], [case for case in _load_cases(FREECELL_CASES, "freecell_cases")
+    if case["id"] in FREECELL_ONLY] + EXTRA_CASES)
 TITLES = {case["id"]: case["title"] for case in CASES}
-SECTIONS = {case["id"]: case["section"].split(" > ")[-1] for case in CASES}
+SECTIONS = {case["id"]: _section(case) for case in CASES}
 
 
 def owner(cid: str) -> str:
@@ -289,5 +311,5 @@ def validate() -> dict:
 
 if __name__ == "__main__":
     own = len(FREECELL_ONLY) + len(EXTRA_CASES)
-    print(f"{len(CASES)} cases ({len(CASES) - own} Spider, {own} FreeCell Daily): "
+    print(f"{len(CASES)} cases ({len(CASES) - own} Spider, {own} FreeCell's own): "
           f"{validate()}")

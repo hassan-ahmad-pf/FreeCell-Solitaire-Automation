@@ -146,22 +146,22 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> str:
     ui.expect(is_gold == gold, f"the {day}th's table has a {'gold' if is_gold else 'plain'} "
                                f"header star, expected {'gold' if gold else 'plain'}")
     fresh = c.shot(ui.shoot(f"Daily{name}Table"))
-    footer = daily.table_footer(fresh)
+    footer = (fc.table_footer(fresh) or [""])[0]
     ui.expect(level[1] in footer.lower(), f"the table reads {footer!r}, not the "
                                           f"{level[1]} level on the button (see {fresh})")
-    timer0, score0 = daily.hud(fresh)
+    timer0, score0 = fc.hud(fresh)
     _before, _after, card = fc.play_to_foundation()
     time.sleep(TIMER_RUN)
     moved = c.shot(ui.shoot(f"Daily{name}CardUp"))
-    timer1, score1 = daily.hud(moved)
+    timer1, score1 = fc.hud(moved)
     ui.expect(timer1 is not None and timer1 > (timer0 or 0),
-              f"the timer did not start: {daily.mmss(timer0)} before the move, "
-              f"{daily.mmss(timer1)} after (see {moved})")
+              f"the timer did not start: {fc.mmss(timer0)} before the move, "
+              f"{fc.mmss(timer1)} after (see {moved})")
     ui.expect(score1 is not None and score1 > (score0 or 0),
               f"the score did not count {card} going up: {daily.fmt(score0 or 0)} before, "
               f"{daily.fmt(score1)} after (see {moved})")
     return (f"'{footer.strip(' •')}'; {card} tapped up to its foundation: timer "
-            f"{daily.mmss(timer0)} → {daily.mmss(timer1)}, score {score0 or 0:,} → {score1:,}")
+            f"{fc.mmss(timer0)} → {fc.mmss(timer1)}, score {score0 or 0:,} → {score1:,}")
 
 
 def _win(day: int, name: str, c) -> int:
