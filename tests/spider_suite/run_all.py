@@ -44,8 +44,9 @@ scripts/gen_spider_format_report.py writes log/freecell_spider_regression.html.
 
 When a test fails, the report is written, each failed test runs once more
 (the network set as on the first run), and the report is written again.
-A failed case that passes on the rerun is a pass with a note saying so;
---no-rerun turns this off.
+A failed case that passes on the rerun is a plain pass in the report; the
+results JSON keeps its first failure (first_failure). --no-rerun turns
+this off.
 """
 from __future__ import annotations
 
@@ -275,11 +276,7 @@ def _rerun(plan: list[tuple], tests: list[dict], cases: list[dict], dev: bool,
                 continue
             old = first[cid]
             if new and new["status"] == "pass":
-                new = dict(new, rerun="pass",
-                           detail="; ".join(filter(None, [
-                               new["detail"], "passed on the rerun — the first run failed: "
-                               + old["detail"]])))
-                cases[cases.index(old)] = new
+                cases[cases.index(old)] = dict(new, rerun="pass", first_failure=old["detail"])
                 print(f"    [RERUN PASS] {cid} {old['title']} — first run: {old['detail']}",
                       flush=True)
             else:

@@ -37,10 +37,11 @@ opens the HTML report and keeps a plain log in `log/regression_<time>.log`.
 
 If any case fails, the runner writes the report, runs each failed test once
 more (with the network as the first run had it) and writes the report again.
-A failed case that passes on the rerun becomes a pass whose note says it
-passed on the rerun and why the first run failed; one that fails again, or
-cannot rerun (a fresh-install case), keeps its failure. A case that passed
-the first time keeps that pass. This is the runner's default, so
+A failed case that passes on the rerun is a plain pass in the report; its
+first failure stays only in `log/spider_suite_results.json`
+(`first_failure`) and the console log. One that fails again, or cannot
+rerun (a fresh-install case), keeps its failure. A case that passed the
+first time keeps that pass. This is the runner's default, so
 `tests/spider_suite/run_all.py` does it too.
 
 | Option | Runs |
