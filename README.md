@@ -14,7 +14,10 @@ FreeCell-specific assertions.
 ## Current status
 
 The signed WDA for this phone lives in [`wda/`](wda/README.md). `scripts/wda.sh`
-finds it automatically — do not point `WDA_PRODUCTS` at `/tmp`.
+finds it automatically — do not point `WDA_PRODUCTS` at `/tmp`. Its profile
+comes from a free Apple ID and lasts 7 days, so `wda.sh` re-signs WDA into
+`log/wda-build` by itself when under a day is left (Xcode must be signed in
+to that Apple ID); `./scripts/wda.sh renew` forces it.
 
 ## Setup
 

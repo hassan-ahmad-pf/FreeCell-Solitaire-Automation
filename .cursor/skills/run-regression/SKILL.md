@@ -25,9 +25,14 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 ./scripts/wda.sh "$DEVICE_UDID"
 ```
 
-`scripts/wda.sh` finds `wda/` by itself. If it says **Developer App
-Certificate is not trusted**, the phone is still in Airplane Mode — turn
-Wi-Fi on, then run `wda.sh` again. The suite restores Wi-Fi in a `finally`
+`scripts/wda.sh` finds `wda/` by itself, and re-signs WDA into
+`log/wda-build` when its 7-day profile (free Apple ID) has under a day left
+or the phone refuses it — no manual rebuild. If it says **Developer App
+Certificate is not trusted**, the phone is offline or, after a re-sign,
+wants the runner trusted again — ask the user to turn Wi-Fi on and tap
+Verify App / Trust under Settings → General → VPN & Device Management,
+then run `wda.sh` again. If it says the phone is not connected, ask the
+user to plug it in and unlock it. The suite restores Wi-Fi in a `finally`
 so a finished run does not leave the phone offline, closing FreeCell first.
 Never turn Wi-Fi on with FreeCell on screen (an ad loads and fires later
 in the offline run); to stop a run early without its online restore, use
