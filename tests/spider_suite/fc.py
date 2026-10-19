@@ -87,7 +87,8 @@ def menu() -> None:
             pass
         if helpers.in_app() and ad_up():
             close_ad("leftover")
-    ui.expect(ui.launch_to_menu(), "could not reach the main menu")
+    if not ui.launch_to_menu():
+        raise AssertionError(f"could not reach the main menu (see {ui.shoot('NoMenu')})")
 
 
 def wait_alert(phrase: str, timeout: float = 6.0) -> str:
@@ -679,6 +680,22 @@ def hud(shot: str) -> tuple[int | None, int | None]:
             found = ocr.numbers(text)
             score = found[0] if found else None
     return timer, score
+
+
+def hud_after_move(name: str, tries: int = 6, wait: float = 1.2) -> tuple[str, int | None, int | None]:
+    """(shot, timer, score) once both read. A card going up floats a large
+    "X156" multiplier across the HUD for a few seconds, and Vision cannot
+    read the timer or score under it."""
+    for attempt in range(tries):
+        shot = ui.shoot(name)
+        timer, score = hud(shot)
+        if timer is not None and score is not None:
+            break
+        if attempt + 1 < tries:
+            print(f"  the timer or score is unreadable ({mmss(timer)}, {score}) — "
+                  "reading again once the multiplier has floated off", flush=True)
+            time.sleep(wait)
+    return shot, timer, score
 
 
 def mmss(seconds: int | None) -> str:

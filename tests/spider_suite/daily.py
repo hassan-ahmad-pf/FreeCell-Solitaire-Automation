@@ -56,6 +56,7 @@ TOTALS = 0
 
 QA_DAILY_WIN = (686, 1746)
 VICTORY_BACK = (140, 347)
+MONTHLY_TIP_TAP = (645, 1050)  # on the monthly-score tip, over the month's name, not a date
 
 
 # ── calendar ───────────────────────────────────────────────────────
@@ -207,12 +208,21 @@ def win_to_victory(where: str, started: bool = False) -> int:
     return score
 
 
-def back_to_calendar(where: str) -> None:
-    """Daily Victory's back returns to the calendar (Solo's goes to the menu)."""
+def back_to_calendar(where: str) -> bool:
+    """Daily Victory's back returns to the calendar (Solo's goes to the menu).
+    True when FreeCell's monthly-score tip ("Tap on the monthly score to see
+    its breakdown") came up there once and was dismissed."""
     if not ui.tap("page_back", settle=1.6):
         helpers.wda_tap(VICTORY_BACK, settle=1.6)
     fc.clear_ad(f"{where} Victory back", wait=fc.LATE_AD if fc.is_online() else 2.0)
+    tip = ui.wait_daily_tip(3.0)
+    if tip:
+        shot = ui.shoot("DailyMonthlyTip")
+        helpers.wda_tap(MONTHLY_TIP_TAP, settle=1.6)
+        ui.expect(not ui.wait_daily_tip(1.5),
+                  f"the monthly-score tip did not go away when tapped (see {shot})")
     ui.expect(on_calendar(10.0), f"Victory's back did not return to the calendar ({where})")
+    return tip
 
 
 # ── score popup ────────────────────────────────────────────────────
@@ -260,9 +270,25 @@ def popup_scores(shot: str, top: int) -> dict[int, list[int]]:
 
 
 def monthly_score(shot: str) -> int | None:
-    """The monthly score box on the calendar in *shot*."""
-    found = [n for line in ocr.read(shot, box=MONTHLY_BOX) for n in ocr.numbers(line.text)]
-    return found[0] if found else None
+    """The monthly score box on the calendar in *shot*. Vision now and then
+    reads this font's "2" as "8", so a grey and a black-on-white copy are
+    read as well and the majority wins."""
+    from collections import Counter
+
+    import numpy as np
+    from PIL import Image, ImageOps
+
+    crop = Image.open(shot).convert("RGB").crop(MONTHLY_BOX)
+    rgb = np.asarray(crop).astype(int)
+    ink = (rgb[:, :, 0] > 180) & (rgb[:, :, 1] > 140) & (rgb[:, :, 2] < 140)
+    copies = (crop, ImageOps.grayscale(crop).convert("RGB"),
+              Image.fromarray(np.where(ink, 0, 255).astype("uint8")).convert("RGB"))
+    reads = []
+    for copy in copies:
+        found = [n for line in ocr.read(copy) for n in ocr.numbers(line.text)]
+        if found:
+            reads.append(found[0])
+    return Counter(reads).most_common(1)[0][0] if reads else None
 
 
 def check_popup(rows: dict[int, list[int]], monthly: int | None, shot: str) -> str:

@@ -97,8 +97,8 @@ def run() -> None:
                   f"the footer reads {footer}, not '{TAP_TO_START}' (see {idle})")
         _before, _after, card = fc.play_to_foundation()
         time.sleep(TIMER_RUN)
-        moved = c.shot(ui.shoot("GamePlayCardUp"))
-        timer1, score1 = fc.hud(moved)
+        moved, timer1, score1 = fc.hud_after_move("GamePlayCardUp")
+        c.shot(moved)
         ui.expect(timer1 is not None and timer1 > 0,
                   f"the timer did not start: 0:00 before {card} went up, {fc.mmss(timer1)} "
                   f"after (see {moved})")

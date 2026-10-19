@@ -23,6 +23,11 @@ DY-10  back returns to the main menu
 DY-14  Statistics → Daily shows exactly those games: played and won 2, best
        score the higher Victory score, in the totals and the level played
 
+An unfinished Daily game left by an earlier failed run makes FreeCell ask
+to abandon it when a date is tapped: it is abandoned, and counts as played.
+After a past date is won, FreeCell shows the tip "Tap on the monthly score
+to see its breakdown" once (after a fresh install); it is dismissed.
+
 The tips show on the first Daily visit after a fresh install only (QA's
 reset alerts does not bring them back), so a rerun skips DY-02 and DY-03.
 Reset Daily Statistics leaves the calendar alone, so a rerun also finds
@@ -137,10 +142,14 @@ def _faq() -> None:
         c.note("the FAQ opened on 'What are Daily games?'; back returned to the calendar")
 
 
-def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> str:
+def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> tuple[str, bool]:
     """Tap *day*, check the Daily table, and play one card up to its
-    foundation: the timer must start and the score count."""
+    foundation: the timer must start and the score count. Also True when an
+    unfinished Daily game had to be abandoned first (it counts as played)."""
     daily.tap_date(day)
+    abandoned = ui.wait_prompt("abandon", timeout=2.0) and ui.answer_prompt("abandon")
+    if abandoned:
+        c.note("an unfinished Daily game from an earlier run was abandoned first")
     up, is_gold = daily.on_daily_table(12.0)
     ui.expect(up, f"tapping the {day}th did not deal a Daily game")
     ui.expect(is_gold == gold, f"the {day}th's table has a {'gold' if is_gold else 'plain'} "
@@ -152,8 +161,8 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> str:
     timer0, score0 = fc.hud(fresh)
     _before, _after, card = fc.play_to_foundation()
     time.sleep(TIMER_RUN)
-    moved = c.shot(ui.shoot(f"Daily{name}CardUp"))
-    timer1, score1 = fc.hud(moved)
+    moved, timer1, score1 = fc.hud_after_move(f"Daily{name}CardUp")
+    c.shot(moved)
     ui.expect(timer1 is not None and timer1 > (timer0 or 0),
               f"the timer did not start: {fc.mmss(timer0)} before the move, "
               f"{fc.mmss(timer1)} after (see {moved})")
@@ -161,13 +170,16 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> str:
               f"the score did not count {card} going up: {daily.fmt(score0 or 0)} before, "
               f"{daily.fmt(score1)} after (see {moved})")
     return (f"'{footer.strip(' •')}'; {card} tapped up to its foundation: timer "
-            f"{fc.mmss(timer0)} → {fc.mmss(timer1)}, score {score0 or 0:,} → {score1:,}")
+            f"{fc.mmss(timer0)} → {fc.mmss(timer1)}, score {score0 or 0:,} → {score1:,}",
+            abandoned)
 
 
 def _win(day: int, name: str, c) -> int:
     score = daily.win_to_victory(f"{name.lower()} {day}", started=True)
     c.shot(ui.shoot(f"Daily{name}Victory"))
-    daily.back_to_calendar(f"the {day}th")
+    if daily.back_to_calendar(f"the {day}th"):
+        c.note("back on the calendar, FreeCell's one-time tip 'Tap on the monthly score to "
+               "see its breakdown' came up; a tap dismissed it")
     return score
 
 
@@ -199,14 +211,17 @@ def _popup(c, played: list[tuple[int, int, bool]], calendar_shot: str) -> str:
     return summary
 
 
-def _play(level: tuple[str, str]) -> list[tuple[int, int, bool]]:
-    """DY-12, DY-13, DY-15 and DY-16 on the dev build."""
+def _play(level: tuple[str, str]) -> tuple[list[tuple[int, int, bool]], int]:
+    """DY-12, DY-13, DY-15 and DY-16 on the dev build: the games won, and
+    how many unfinished ones were abandoned on the way."""
     now = daily.today()
     played: list[tuple[int, int, bool]] = []
+    abandoned = 0
     replay = daily.star_on(ui.screen_rgb(), now.day)[0]
     with caselog.case("DY-12") as c:
-        c.note(f"today ({' '.join(level).title()}) dealt a Daily table: "
-               + _deal(now.day, "Today", True, level, c))
+        dealt, gave_up = _deal(now.day, "Today", True, level, c)
+        abandoned += gave_up
+        c.note(f"today ({' '.join(level).title()}) dealt a Daily table: {dealt}")
     with caselog.case("DY-13") as c:
         score = _win(now.day, "Today", c)
         star, gold = daily.star_on(ui.screen_rgb(), now.day)
@@ -223,7 +238,8 @@ def _play(level: tuple[str, str]) -> list[tuple[int, int, bool]]:
     else:
         replay = daily.star_on(ui.screen_rgb(), past)[0]
         with caselog.case("DY-15") as c:
-            dealt = _deal(past, "Past", False, level, c)
+            dealt, gave_up = _deal(past, "Past", False, level, c)
+            abandoned += gave_up
             score = _win(past, "Past", c)
             star, _gold = daily.star_on(ui.screen_rgb(), past)
             shot = c.shot(ui.shoot("DailyPastStar"))
@@ -234,7 +250,7 @@ def _play(level: tuple[str, str]) -> list[tuple[int, int, bool]]:
                    + (" (already won on this level earlier)" if replay else ""))
     with caselog.case("DY-16") as c:
         c.note("score popup: " + _popup(c, played, ui.shoot("DailyCalendarAfterWins")))
-    return played
+    return played, abandoned
 
 
 def _clean_stats() -> str:
@@ -252,16 +268,20 @@ def _clean_stats() -> str:
     return f"Daily statistics were reset to 0 / none before the run (they read {was})"
 
 
-def _stats(start: str, played: list[tuple[int, int, bool]], level: tuple[str, str]) -> None:
+def _stats(start: str, played: list[tuple[int, int, bool]], level: tuple[str, str],
+           abandoned: int = 0) -> None:
     """From 0 / none, the totals and the level played show exactly this
-    run's games; every other level on screen stays none."""
+    run's games — an abandoned leftover counts as played, not won; every
+    other level on screen stays none."""
     words = {"best": "best score", "played": "games played", "won": "games won"}
     with caselog.case("DY-14") as c:
         c.note(start)
         after, shot = daily.read_stats("DailyStatsAfter")
         c.shot(shot)
         wins = len(played)
-        want = {"best": max(score for _d, score, _r in played), "played": wins, "won": wins}
+        want = {"best": max(score for _d, score, _r in played), "played": wins + abandoned,
+                "won": wins}
+        games = f"{wins} wins" + (f" and {abandoned} abandoned" if abandoned else "")
         index = daily.stats_section(*level)
         name = " ".join(level).title()
         ui.expect(set(words) <= set(after[daily.TOTALS]),
@@ -272,7 +292,7 @@ def _stats(start: str, played: list[tuple[int, int, bool]], level: tuple[str, st
                 continue
             for field, value in after[key].items():
                 ui.expect(value == want[field], f"{label} {words[field]} reads {daily.fmt(value)},"
-                                                f" expected {want[field]:,} after {wins} wins "
+                                                f" expected {want[field]:,} after {games} "
                                                 f"(see {shot})")
             c.note(f"{label}: " + ", ".join(f"{words[f]} {daily.fmt(v)}"
                                              for f, v in after[key].items()))
@@ -298,12 +318,12 @@ def run() -> None:
     level = _levels()
     _future()
     _faq()
-    played = _play(level) if dev else []
+    played, abandoned = _play(level) if dev else ([], 0)
     with caselog.case("DY-10") as c:
         daily.leave_calendar()
         c.note("back returned to the main menu")
     if dev:
-        _stats(start, played, level)
+        _stats(start, played, level, abandoned)
     print("PASS: Daily opened, tips and level list checked"
           + (f", {len(played)} Daily games played, scored and counted" if dev else ""))
 

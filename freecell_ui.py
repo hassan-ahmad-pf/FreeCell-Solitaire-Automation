@@ -575,7 +575,18 @@ def launch_to_menu(force: bool = False) -> bool:
     leave_daily()
     if on_menu(4.0):
         return True
-    return cold_launch()
+    return cold_launch() or _back_out()
+
+
+def _back_out(rounds: int = 3) -> bool:
+    """To the menu after a relaunch: FreeCell reopens the table (Solo or
+    Daily) or the Daily calendar it was killed on."""
+    for _ in range(rounds):
+        if on_menu(2.0):
+            return True
+        if not (leave_table() or leave_daily()):
+            break
+    return on_menu(4.0)
 
 
 def qa_enabled() -> bool:
@@ -1619,13 +1630,15 @@ def drag_hold(start, end, move_ms: int = 1200, hold_ms: int = 700) -> None:
 
 
 def daily_tip_up() -> bool:
-    """True while a white Daily tip card covers the calendar.
+    """True while a white Daily tip card covers the calendar: the first-visit
+    tips sit high, the monthly-score tip (after a past date is won) lower.
 
     The calendar's own "Tap on any date" box is still matchable for a moment
     before the card lands on it, so the card is looked for directly.
     """
-    card = screen_rgb()[700:1080, 180:1110]
-    return float((card.min(axis=2) > 235).mean()) > 0.6
+    img = screen_rgb()
+    return any(float((img[y0:y1, 180:1110].min(axis=2) > 235).mean()) > 0.6
+               for y0, y1 in ((700, 1080), (1150, 1700)))
 
 
 def wait_daily_tip(timeout: float) -> bool:

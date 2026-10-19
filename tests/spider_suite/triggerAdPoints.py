@@ -50,7 +50,7 @@ SHORT = 8.0
 DWELL = 32.0
 NO_AD = 10.0
 WATCH = 5.0
-AD_WAIT = 20.0
+AD_WAIT = 40.0  # a video interstitial has taken over 20 s to show after its trigger
 READY_WAIT = 300.0
 
 DESTINATIONS = {
@@ -92,9 +92,10 @@ def _no_ad(label: str, arrived) -> None:
 
 
 def _ad(label: str) -> None:
+    start = time.time()
     ui.expect(fc.wait_ad(timeout=AD_WAIT), f"no interstitial for {label} within "
-                                           f"{AD_WAIT:.0f}s")
-    print(f"  {label}: interstitial up", flush=True)
+                                           f"{AD_WAIT:.0f}s (see {ui.shoot('TANoAd')})")
+    print(f"  {label}: interstitial up after {time.time() - start:.0f}s", flush=True)
     fc.close_or_wait(label)
 
 
@@ -110,9 +111,23 @@ def _back_to_table() -> None:
     ui.expect(ui.at_table(timeout=8.0), "could not get back to the game table")
 
 
-def _win_with_ad(label: str) -> None:
-    """Synthetic Win on the table; its ad must come up over Victory."""
-    ui.expect(ui.synthetic_win(), f"Synthetic Win could not be fired for {label}")
+def _win_with_ad(table: str, label: str) -> None:
+    """Over DWELL on a loaded table, then Synthetic Win; its ad must come up
+    over Victory. When the QA panel will not open, something is over the
+    table (an ad can land long after its trigger): once more from a loaded
+    table, which waits for the next interstitial if that ad used this one."""
+    for attempt in range(2):
+        fc.loaded_table(table)
+        _dwell(DWELL, f"on the table before {table}")
+        if ui.synthetic_win():
+            break
+        shot = ui.shoot("TASyntheticWin")
+        ui.expect(not attempt, f"Synthetic Win could not be fired for {label}, twice "
+                               f"(see {shot})")
+        covered = fc.clear_ad(f"{label} blocker", wait=2.0)
+        print(f"  Synthetic Win could not be fired (see {shot})"
+              + (" — an ad was over the table, closed it" if covered else "")
+              + "; once more from a loaded table", flush=True)
     _ad(label)
     ui.expect(ui.expect_screen("victory", timeout=8.0),
               f"the Victory screen is not showing after the {label} ad closed")
@@ -123,10 +138,18 @@ def _victory_new() -> None:
 
 
 def _fresh_table() -> None:
-    """A new deal, so TA-01's short clock starts on a table opened just now."""
+    """A new deal, so TA-01's short clock starts on a table opened just now.
+    The test before this one can leave a game on the table past 30 s, and the
+    ad for backing out of it arrives on the next screen ~10 s later."""
     fc.menu()
+    if fc.clear_ad("leftover leave-game", wait=fc.LATE_AD):
+        print("  leaving the previous game showed an ad — closed it", flush=True)
     fc.enter_game("easy")
-    ui.expect(ui.open_table_drawer(), "the table drawer did not open for New")
+    if not ui.open_table_drawer():
+        if fc.clear_ad("fresh-table entry", wait=fc.LATE_AD):
+            print("  entering the game showed an ad — closed it", flush=True)
+        ui.expect(ui.open_table_drawer(),
+                  f"the table drawer did not open for New (see {ui.shoot('TAFreshTable')})")
     ui.expect(ui.tap("drawer_new", settle=2.0), "could not tap the drawer's New")
     if fc.wait_alert("abandon", timeout=2.0):
         helpers.answer_alert("Yes", settle=1.5)
@@ -179,9 +202,7 @@ def run() -> None:
         c.note("Options right after the Help ad, no ad")
 
     with caselog.case("TA-04") as c:
-        fc.loaded_table("the first win")
-        _dwell(DWELL, "on the table before Synthetic Win")
-        _win_with_ad("long table -> Victory")
+        _win_with_ad("the first win", "long table -> Victory")
         c.shot(ui.shoot("AdVictory"))
         _manual_note(c, "long table -> Victory")
         c.note("ad over Victory, closed; Victory showing")
@@ -206,9 +227,7 @@ def run() -> None:
         # New's ad needs the next interstitial to have loaded after the win's
         # ad, which the table detour cannot check from Victory: one rerun.
         for attempt in range(2):
-            fc.loaded_table("the second win")
-            _dwell(DWELL, "on the table before the second Synthetic Win")
-            _win_with_ad("second long table -> Victory")
+            _win_with_ad("the second win", "second long table -> Victory")
             _dwell(DWELL, "on Victory before New")
             _victory_new()
             if fc.wait_ad(timeout=AD_WAIT):
