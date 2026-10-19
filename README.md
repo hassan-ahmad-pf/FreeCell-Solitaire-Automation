@@ -35,12 +35,21 @@ with its time and note, and a status bar with the elapsed time, the current
 case, pass and fail counts and the time left. It ends with a RESULT line,
 opens the HTML report and keeps a plain log in `log/regression_<time>.log`.
 
+If any case fails, the runner writes the report, runs each failed test once
+more (with the network as the first run had it) and writes the report again.
+A failed case that passes on the rerun becomes a pass whose note says it
+passed on the rerun and why the first run failed; one that fails again, or
+cannot rerun (a fresh-install case), keeps its failure. A case that passed
+the first time keeps that pass. This is the runner's default, so
+`tests/spider_suite/run_all.py` does it too.
+
 | Option | Runs |
 | --- | --- |
 | `--main` | main suite only, no standalone tests (about 35 minutes) |
 | `verifyGamePlay verifyDaily` | only the named tests |
 | `--prod` | the App Store build (leaves out the dev-build cases) |
 | `--no-open` | does not open the report at the end |
+| `--no-rerun` | does not rerun failed tests |
 
 Ctrl-C stops the run; the runner still turns the network back on. The
 first-launch and Daily tips cases need FreeCell deleted and reinstalled

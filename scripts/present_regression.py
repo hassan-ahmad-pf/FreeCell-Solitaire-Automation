@@ -6,8 +6,10 @@ output into a readable view: each test as a header, each case when it starts
 and when it ends (PASS / FAIL / SKIP and its time), the runner's step notes
 dimmed, and a status bar kept at the bottom with the case running and its
 clock, progress, passes and failures, and the time left (estimated from the
-last run). The plain output is saved to log/regression_<time>.log, and the
-HTML report opens at the end (--no-open keeps it closed).
+last run). A rerun of failed tests (the runner's default) shows as its own
+section, and a case that passes there moves from failed to passed. The
+plain output is saved to log/regression_<time>.log, and the HTML report
+opens at the end (--no-open keeps it closed).
 
 Run:  ./scripts/regression.sh   (starts WDA and keeps the Mac awake first)
 """
@@ -36,12 +38,16 @@ MARKS = {"PASS": ("✓ PASS ", GREEN), "FAIL": ("✗ FAIL ", RED), "SKIP": ("–
 
 PLAN = re.compile(r"^\s+(\d+)/(\d+)\s+(\S+)\s*(?:SKIP — (.*))?$")
 CASES = re.compile(r"^cases:\s+(.*?) — (\d+) run")
-TEST_START = re.compile(r"^>>> \[(\d+)/(\d+)\] (START|SKIP)\s+(\S+)(?: — (.*))?$")
+TEST_START = re.compile(r"^>>> \[(\d+)/(\d+)\] (START|SKIP|RERUN)\s+(\S+)(?: — (.*))?$")
 TEST_END = re.compile(r"^<<< \[(\d+)/(\d+)\] (PASS|FAIL|SKIP)\s+(\S+)(?:\s+\(\s*([\d.]+)s\))?")
 CASE_RUN = re.compile(r"^\s+\[RUN \] (\S+) ?(.*)$")
 CASE_END = re.compile(r"^\s+\[(PASS|FAIL|SKIP|LATER|BLOCKED|ONLINE)\] (\S+) (.+?)"
                       r"(?: \((\d+(?:\.\d+)?)s\))?(?: — (.*))?$")
-SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP)  (\S+)\s+\(\s*([\d.]+)s\)$")
+SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP)  (\S+)\s+\(\s*([\d.]+)s\)"
+                          r"(?:\s+\+ rerun ([\d.]+)s)?$")
+RERUN_HEAD = re.compile(r"^  RERUN — (.*)$")
+RERUN_ITEM = re.compile(r"^    (\S+) (.*)  \((\S+)\)$")
+RERUN_CASE = re.compile(r"^\s+\[RERUN (PASS|FAIL)\] (\S+) (.*?) — (.*)$")
 NOISE = re.compile(r"Warning|warnings\.warn")
 ERROR = re.compile(r"^(Traceback|\s+File \"|\w+(Error|Exception)\b)")
 DEV_SKIP = "needs the dev build"
@@ -84,7 +90,12 @@ class Console:
         self.case_t0 = 0.0
         self.bar = False
         self.closed = False
+        self.paused = False
         self.summary = False
+        self.summaries = 0
+        self.rerun = False
+        self.rescued: list[str] = []
+        self.took: dict[str, float] = {}
         self.report = ""
 
     def emit(self, text: str = "") -> None:
@@ -112,12 +123,13 @@ class Console:
         return total if known else None
 
     def _draw(self) -> None:
-        if not TTY or self.closed or not self.test:
+        if not TTY or self.closed or self.paused or not self.test:
             self.bar = False
             return
         now = time.time()
         parts = [f"elapsed {clock(now - self.t0)}",
-                 f"test {self.test_at[0]}/{self.test_at[1]} {self.test}"]
+                 f"{'rerun' if self.rerun else 'test'} {self.test_at[0]}/{self.test_at[1]} "
+                 f"{self.test}"]
         if self.case:
             parts.append(f"now {self.case} {clock(now - self.case_t0)}")
         if self.total:
@@ -140,13 +152,17 @@ class Console:
                     self._draw()
                     sys.stdout.flush()
 
-    def close(self) -> None:
+    def pause(self, paused: bool = True) -> None:
         with self.lock:
-            self.closed = True
+            self.paused = paused
             if self.bar:
                 sys.stdout.write("\r\033[K")
                 sys.stdout.flush()
             self.bar = False
+
+    def close(self) -> None:
+        self.pause()
+        self.closed = True
 
 
 def last_durations() -> dict[str, float]:
@@ -161,8 +177,24 @@ def handle(con: Console, raw: str) -> None:
     line = raw.rstrip("\n")
     if NOISE.search(line):
         return
+    m = RERUN_HEAD.match(line)
+    if m:
+        rerun_start(con, m.group(1))
+        return
     if con.summary:
-        summary_line(con, line)
+        if not line.startswith("-" * 20):
+            summary_line(con, line)
+        return
+    m = RERUN_ITEM.match(line) if con.rerun and not con.test else None
+    if m:
+        if m.group(3) not in con.plan:
+            con.plan.append(m.group(3))
+        con.emit(paint(RED, f"   {m.group(1):6} {m.group(2)}") + paint(DIM, f"  ({m.group(3)})"))
+        return
+
+    m = RERUN_CASE.match(line)
+    if m:
+        rerun_case(con, *m.groups())
         return
 
     m = CASE_RUN.match(line)
@@ -188,6 +220,8 @@ def handle(con: Console, raw: str) -> None:
         con.case = ""
         if verdict != "SKIP":
             spent = float(secs) if secs else time.time() - con.test_t0
+            if not con.rerun:
+                con.took[name] = spent
             code = GREEN if verdict == "PASS" else RED
             con.emit(paint(code, f"   ═ {name} {verdict} in {took(spent)}"))
         return
@@ -198,10 +232,12 @@ def handle(con: Console, raw: str) -> None:
 
     if line.startswith("=" * 20):
         con.summary = True
-        con.close()
+        con.summaries += 1
+        con.pause()
+        heading = "FINAL SUMMARY (after the rerun)" if con.rerun else "SUMMARY"
         con.emit("")
         con.emit(paint(CYAN, "━" * min(width() - 1, 78)))
-        con.emit(paint(CYAN, "  SUMMARY"))
+        con.emit(paint(CYAN, f"  {heading}"))
         con.emit(paint(CYAN, "━" * min(width() - 1, 78)))
         return
 
@@ -211,8 +247,35 @@ def handle(con: Console, raw: str) -> None:
         con.wrap(line[6:], 6, DIM)
     elif line.startswith("FAIL: "):
         con.wrap("test failed: " + line[6:], 6, RED)
+    elif line.startswith("WARNING") or line.strip().startswith("note:"):
+        con.wrap(line.strip(), 6, YELLOW)
     elif line.strip():
         con.wrap("· " + line.strip(), 6, DIM)
+
+
+def rerun_start(con: Console, what: str) -> None:
+    con.summary, con.rerun = False, True
+    con.test, con.case, con.running = "", "", False
+    con.plan, con.finished, con.estimate = [], set(), dict(con.took)
+    con.pause(False)
+    con.emit("")
+    con.emit(paint(YELLOW, "━" * min(width() - 1, 78)))
+    con.emit(paint(YELLOW, "  RERUN OF FAILED TESTS — " + what))
+    con.emit(paint(YELLOW, "━" * min(width() - 1, 78)))
+
+
+def rerun_case(con: Console, verdict: str, cid: str, title: str, detail: str) -> None:
+    if verdict == "PASS":
+        con.passed += 1
+        con.failed -= 1
+        if cid in con.failures:
+            con.failures.remove(cid)
+        con.rescued.append(cid)
+        con.emit(paint(GREEN, f"   ↻ PASS ON RERUN  {cid:6} {title}"))
+        con.wrap(detail, 13, DIM)
+    else:
+        con.emit(paint(RED, f"   ↻ STILL FAILING  {cid:6} {title}"))
+        con.wrap(detail, 13, RED)
 
 
 def header_line(con: Console, line: str) -> None:
@@ -244,26 +307,30 @@ def header_line(con: Console, line: str) -> None:
 def test_start(con: Console, i: int, n: int, kind: str, name: str, reason: str | None) -> None:
     if not con.test:
         known = [con.estimate[t] for t in con.plan if t in con.estimate]
-        if known:
+        if sum(known) >= 1:
+            source = "the first run" if con.rerun else "the last run"
             con.emit("")
-            con.emit(paint(BOLD, f"   estimated time ~{clock(sum(known))} (from the last run)"))
+            con.emit(paint(BOLD, f"   estimated time ~{clock(sum(known))} (from {source})"))
     con.test, con.test_at, con.test_t0 = name, (i, n), time.time()
-    con.running, con.case = kind == "START", ""
+    con.running, con.case = kind != "SKIP", ""
     stamp = clock(time.time() - con.t0)
     if kind == "SKIP":
         con.emit("")
         con.emit(paint(YELLOW, f"── [{i:2}/{n}] {name} — skipped: {reason or ''}"))
         return
-    title = f"━━ [{i:2}/{n}] {name} "
+    title = f"{'↻ rerun' if kind == 'RERUN' else '━━'} [{i:2}/{n}] {name} "
     con.emit("")
-    con.emit(paint(CYAN, title + "━" * max(min(width(), 80) - len(title) - len(stamp) - 2, 3)
+    con.emit(paint(YELLOW if kind == "RERUN" else CYAN,
+                   title + "━" * max(min(width(), 80) - len(title) - len(stamp) - 2, 3)
                    + f" {stamp}"))
 
 
 def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
               detail: str | None) -> None:
     label, code = MARKS[mark]
-    if mark == "PASS":
+    if con.rerun:
+        pass  # a rerun is counted from the runner's [RERUN PASS] / [RERUN FAIL] lines
+    elif mark == "PASS":
         con.passed += 1
         con.done += 1
     elif mark == "FAIL":
@@ -284,14 +351,21 @@ def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
 def summary_line(con: Console, line: str) -> None:
     m = SUMMARY_TEST.match(line)
     if m:
-        verdict, name, secs = m.groups()
+        verdict, name, secs, again = m.groups()
         code = {"PASS": GREEN, "FAIL": RED}.get(verdict, YELLOW)
-        con.emit(paint(code, f"   {verdict}  {name:26} {took(float(secs)):>9}"))
+        text = paint(code, f"   {verdict}  {name:26} {took(float(secs)):>9}")
+        if again:
+            text += paint(YELLOW, f"   + rerun {took(float(again))}")
+        con.emit(text)
         return
     if line.startswith("  report: "):
         con.report = line.split(": ", 1)[1].strip()
+        if not con.rerun:
+            con.emit(paint(DIM, f"   report written: {con.report}"))
         return
-    if "failed cases:" in line or line.startswith("    ") and con.failures:
+    if line.strip().startswith("passed on the rerun:"):
+        con.emit(paint(GREEN, line))
+    elif "failed cases:" in line or line.startswith("    ") and con.failures:
         con.emit(paint(RED, line))
     elif line.strip().startswith("cases:"):
         con.emit(paint(BOLD, line))
@@ -350,12 +424,16 @@ def main() -> int:
                             f"{con.failed} failed so far"))
     elif con.failed:
         print(paint(RED, f"   RESULT  ✗ {con.failed} of {executed} cases failed "
-                         f"({', '.join(con.failures)})  ·  {clock(total)}"))
+                         f"({', '.join(con.failures)}){' after a rerun' if con.rerun else ''}"
+                         f"  ·  {clock(total)}"))
     elif executed:
         print(paint(GREEN, f"   RESULT  ✓ all {executed} cases passed  ·  {clock(total)}"))
     else:
         print(paint(RED, f"   the runner stopped before any case ran (exit {code}) — "
                          f"see {log_path}"))
+    if con.rescued and not stopped:
+        print(paint(GREEN, f"           {len(con.rescued)} passed on the rerun after failing "
+                           f"the first time: {', '.join(con.rescued)}"))
     if con.skipped:
         print(paint(YELLOW, f"           {con.skipped} skipped on this install (not failures)"))
     if con.report:

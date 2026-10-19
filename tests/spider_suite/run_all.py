@@ -41,6 +41,11 @@ For a live, coloured console (presentations): ./scripts/regression.sh
 
 Results: log/spider_suite_results.json after every test, then
 scripts/gen_spider_format_report.py writes log/freecell_spider_regression.html.
+
+When a test fails, the report is written, each failed test runs once more
+(the network set as on the first run), and the report is written again.
+A failed case that passes on the rerun is a pass with a note saying so;
+--no-rerun turns this off.
 """
 from __future__ import annotations
 
@@ -182,9 +187,141 @@ def _write(payload: dict, kept: tuple[list, list, str]) -> None:
     if kept[0]:
         starts = [t.get("started") or kept[2] for t in out["tests"]]
         out["started"] = min(filter(None, starts + [payload["started"]]))
-        out["duration_seconds"] = round(sum(t.get("seconds", 0) for t in out["tests"]), 1)
+        out["duration_seconds"] = round(sum(t.get("seconds", 0) + t.get("rerun_seconds", 0)
+                                            for t in out["tests"]), 1)
     config.LOG.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
+
+
+def _run_one(i: int, total: int, spider: str, module: str, ids: list[str], dev: bool,
+             offline: bool, word: str = "START") -> tuple[dict, list[dict]]:
+    """Run one test; its test row and case rows."""
+    print(f"\n>>> [{i}/{total}] {word:6} {spider}", flush=True)
+    caselog.begin(spider)
+    os.environ["TEST_NAME"] = spider
+    t0 = time.time()
+    error = ""
+    try:
+        _load(module).run()
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc) or type(exc).__name__
+        print(f"FAIL: {error}", flush=True)
+    dt = time.time() - t0
+
+    rows = []
+    recorded = {r["id"]: r for r in caselog.results()}
+    runnable = [cid for cid in ids if cid not in catalog.LATER
+                and (dev or cid not in catalog.DEV_CASES)]
+    bad = False
+    for cid in ids:
+        if offline and cid in catalog.ONLINE_CASES:
+            print(f"    [ONLINE] {cid} {catalog.TITLES[cid]} — online pass; "
+                  "keeps its last result", flush=True)
+            continue
+        if cid in catalog.LATER:
+            print(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}",
+                  flush=True)
+            rows.append(_case_row(cid, spider, "later", catalog.LATER[cid]))
+            continue
+        if cid not in runnable:
+            why = catalog.DEV_CASES[cid]
+            print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {why}", flush=True)
+            rows.append(_case_row(cid, spider, "dev", why))
+            continue
+        rec = recorded.get(cid)
+        if rec is None:
+            detail = ("not reached — the test stopped first: " + error if error
+                      else "the test did not record this case")
+            print(f"    [FAIL] {cid} {catalog.TITLES[cid]} — {detail}", flush=True)
+            rows.append(_case_row(cid, spider, "fail", detail))
+            bad = True
+            continue
+        rows.append(_case_row(cid, spider, rec["status"], rec["detail"], rec))
+        bad = bad or rec["status"] == "fail"
+    ok = not error and not bad
+    print(f"<<< [{i}/{total}] {'PASS' if ok else 'FAIL'}  {spider}  ({dt:.1f}s)", flush=True)
+    return ({"name": spider, "module": module, "status": "pass" if ok else "fail",
+             "started": _iso(t0), "seconds": round(dt, 1), "error": error}, rows)
+
+
+def _rerun(plan: list[tuple], tests: list[dict], cases: list[dict], dev: bool,
+           offline: bool) -> None:
+    """Run each test that failed once more. A case that failed takes the
+    rerun's result only if it passes there; a case that passed keeps its
+    first result. The network is set as the first run had it."""
+    redo = [p for p in plan if p[0] in {t["name"] for t in tests if t["status"] == "fail"}]
+    first = {c["id"]: c for c in cases if c["status"] == "fail"}
+    print("\n" + "-" * 64, flush=True)
+    print(f"  RERUN — {len(first)} failed case(s) in {len(redo)} test(s); "
+          "each test runs once more", flush=True)
+    for c in first.values():
+        print(f"    {c['id']} {c['title']}  ({c['test']})", flush=True)
+    order = [spider for spider, *_rest in catalog.RUN_ORDER]
+    online_at = order.index(catalog.ONLINE_FROM)
+    for i, (spider, module, _runs, ids, _why) in enumerate(redo, 1):
+        if not offline:
+            if order.index(spider) >= online_at:
+                fc.go_online()
+            else:
+                fc.go_offline()
+        row, rows = _run_one(i, len(redo), spider, module, ids, dev, offline, "RERUN")
+        again = {r["id"]: r for r in rows}
+        for cid in ids:
+            new = again.get(cid)
+            if cid not in first:
+                if new and new["status"] == "fail":
+                    print(f"    note: {cid} passed on the first run and failed on the rerun "
+                          f"— it keeps the first-run pass: {new['detail']}", flush=True)
+                continue
+            old = first[cid]
+            if new and new["status"] == "pass":
+                new = dict(new, rerun="pass",
+                           detail="; ".join(filter(None, [
+                               new["detail"], "passed on the rerun — the first run failed: "
+                               + old["detail"]])))
+                cases[cases.index(old)] = new
+                print(f"    [RERUN PASS] {cid} {old['title']} — first run: {old['detail']}",
+                      flush=True)
+            else:
+                why = (f"{new['status']}: {new['detail']}" if new
+                       else "not recorded")
+                old["rerun"] = new["status"] if new else "fail"
+                old["detail"] = f"{old['detail']} — rerun {why}"
+                print(f"    [RERUN FAIL] {cid} {old['title']} — {why}", flush=True)
+        t = next(t for t in tests if t["name"] == spider)
+        t["rerun_seconds"], t["rerun_status"] = row["seconds"], row["status"]
+        still = any(c["status"] == "fail" for c in cases if c["test"] == spider)
+        unexplained = row["status"] == "fail" and not any(r["status"] == "fail" for r in rows)
+        if still or unexplained:
+            if row["error"] and row["error"] != t["error"]:
+                t["error"] = f"{t['error']} — rerun: {row['error']}" if t["error"] else row["error"]
+        else:
+            t["status"], t["error"] = "pass", ""
+
+
+def _summary(tests: list[dict], cases: list[dict], heading: str) -> list[dict]:
+    print("\n" + "=" * 64, flush=True)
+    print(f"  {heading}", flush=True)
+    for t in tests:
+        mark = {"pass": "PASS", "fail": "FAIL", "skip": "SKIP"}[t["status"]]
+        again = f"  + rerun {t['rerun_seconds']:.1f}s" if t.get("rerun_status") else ""
+        print(f"  {mark}  {t['name']:24} ({t['seconds']:6.1f}s){again}", flush=True)
+    by = {}
+    for c in cases:
+        by[c["status"]] = by.get(c["status"], 0) + 1
+    executed = by.get("pass", 0) + by.get("fail", 0)
+    print(f"\n  cases: {by.get('pass', 0)}/{executed} executed passed, "
+          f"{by.get('fail', 0)} failed, {by.get('skip', 0)} skipped, "
+          f"{by.get('dev', 0)} dev build, {by.get('later', 0)} later", flush=True)
+    rescued = [c["id"] for c in cases if c.get("rerun") == "pass"]
+    if rescued:
+        print(f"  passed on the rerun: {', '.join(rescued)}", flush=True)
+    failed = [c for c in cases if c["status"] == "fail"]
+    if failed:
+        print("\n  failed cases:", flush=True)
+        for c in failed:
+            print(f"    {c['id']} {c['title']} — {c['detail']}", flush=True)
+    return failed
 
 
 def _report() -> None:
@@ -207,6 +344,7 @@ def main() -> int:
     offline = "--offline" in args
     picked = [a for a in args if not a.startswith("-")]
     everything = "--all" in args
+    rerun = "--no-rerun" not in args
     plan = _plan(picked, dev, offline, everything)
     total = len(plan)
     started = time.time()
@@ -219,6 +357,8 @@ def main() -> int:
         return 2
 
     build = helpers.installed_build() or ("", "")
+    heading = ("Spider regression suite on FreeCell "
+               f"({'dev' if dev else 'prod'} build {build[0]} ({build[1]}))")
     print(f"device: {config.DEVICE_UDID}", flush=True)
     print(f"wda:    {config.WDA_URL}", flush=True)
     print(f"build:  FreeCell {build[0]} ({build[1]}) — {'dev' if dev else 'prod'} run"
@@ -277,55 +417,20 @@ def main() -> int:
                 print(f"<<< [{i}/{total}] SKIP   {spider}", flush=True)
                 continue
 
-            print(f"\n>>> [{i}/{total}] START  {spider}", flush=True)
-            caselog.begin(spider)
-            os.environ["TEST_NAME"] = spider
-            t0 = time.time()
-            error = ""
-            try:
-                _load(module).run()
-            except Exception as exc:  # noqa: BLE001
-                error = str(exc) or type(exc).__name__
-                print(f"FAIL: {error}", flush=True)
-            dt = time.time() - t0
-
-            recorded = {r["id"]: r for r in caselog.results()}
-            runnable = [cid for cid in ids if cid not in catalog.LATER
-                        and (dev or cid not in catalog.DEV_CASES)]
-            bad = False
-            for cid in ids:
-                if offline and cid in catalog.ONLINE_CASES:
-                    print(f"    [ONLINE] {cid} {catalog.TITLES[cid]} — online pass; "
-                          "keeps its last result", flush=True)
-                    continue
-                if cid in catalog.LATER:
-                    print(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}",
-                          flush=True)
-                    cases.append(_case_row(cid, spider, "later", catalog.LATER[cid]))
-                    continue
-                if cid not in runnable:
-                    why = catalog.DEV_CASES[cid]
-                    print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {why}", flush=True)
-                    cases.append(_case_row(cid, spider, "dev", why))
-                    continue
-                rec = recorded.get(cid)
-                if rec is None:
-                    detail = ("not reached — the test stopped first: " + error if error
-                              else "the test did not record this case")
-                    print(f"    [FAIL] {cid} {catalog.TITLES[cid]} — {detail}", flush=True)
-                    cases.append(_case_row(cid, spider, "fail", detail))
-                    bad = True
-                    continue
-                cases.append(_case_row(cid, spider, rec["status"], rec["detail"], rec))
-                bad = bad or rec["status"] == "fail"
-            ok = not error and not bad
-            tests.append({"name": spider, "module": module, "status": "pass" if ok else "fail",
-                          "started": _iso(t0), "seconds": round(dt, 1), "error": error})
-            print(f"<<< [{i}/{total}] {'PASS' if ok else 'FAIL'}  {spider}  ({dt:.1f}s)",
-                  flush=True)
+            row, rows = _run_one(i, total, spider, module, ids, dev, offline)
+            tests.append(row)
+            cases.extend(rows)
             payload["finished"] = _iso()
             payload["duration_seconds"] = round(time.time() - started, 1)
             _write(payload, kept)
+
+        if rerun and any(t["status"] == "fail" for t in tests):
+            _summary(tests, cases, f"{heading} — first run")
+            _report()
+            try:
+                _rerun(plan, tests, cases, dev, offline)
+            except Exception as exc:  # noqa: BLE001
+                print(f"WARNING: the rerun stopped: {exc}", flush=True)
     finally:
         if os.environ.get("SPIDER_SUITE_ONLINE") != "1":
             print("\n  putting the network back on", flush=True)
@@ -338,24 +443,7 @@ def main() -> int:
     payload["duration_seconds"] = round(time.time() - started, 1)
     _write(payload, kept)
 
-    print("\n" + "=" * 64, flush=True)
-    print("  Spider regression suite on FreeCell "
-          f"({'dev' if dev else 'prod'} build {build[0]} ({build[1]}))", flush=True)
-    for t in tests:
-        mark = {"pass": "PASS", "fail": "FAIL", "skip": "SKIP"}[t["status"]]
-        print(f"  {mark}  {t['name']:24} ({t['seconds']:6.1f}s)", flush=True)
-    by = {}
-    for c in cases:
-        by[c["status"]] = by.get(c["status"], 0) + 1
-    executed = by.get("pass", 0) + by.get("fail", 0)
-    print(f"\n  cases: {by.get('pass', 0)}/{executed} executed passed, "
-          f"{by.get('fail', 0)} failed, {by.get('skip', 0)} skipped, "
-          f"{by.get('dev', 0)} dev build, {by.get('later', 0)} later", flush=True)
-    failed = [c for c in cases if c["status"] == "fail"]
-    if failed:
-        print("\n  failed cases:", flush=True)
-        for c in failed:
-            print(f"    {c['id']} {c['title']} — {c['detail']}", flush=True)
+    failed = _summary(tests, cases, heading)
     _report()
     return 1 if failed else 0
 

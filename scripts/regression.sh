@@ -6,12 +6,14 @@
 #   ./scripts/regression.sh verifyGamePlay verifyDaily   # just these tests
 #   ./scripts/regression.sh --prod             # the App Store build
 #   ./scripts/regression.sh --no-open          # do not open the report at the end
+#   ./scripts/regression.sh --no-rerun         # do not rerun failed tests
 #
 # Checks the phone, starts WDA (re-signing it when its profile is due),
 # keeps the Mac awake, and shows each test and case live with its result
-# and time (scripts/present_regression.py). Phone plugged in, unlocked and
-# online. For the first-launch and Daily tips cases, delete FreeCell and
-# reinstall it without opening it first; otherwise they show SKIP.
+# and time (scripts/present_regression.py). Failed tests run once more and
+# the report is rewritten. Phone plugged in, unlocked and online. For the
+# first-launch and Daily tips cases, delete FreeCell and reinstall it
+# without opening it first; otherwise they show SKIP.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,8 +31,8 @@ for arg in "$@"; do
     --dev) build="--dev" ;;
     --main) scope="" ;;
     --all) scope="--all" ;;
-    --no-open) extra+=("$arg") ;;
-    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --no-open|--no-rerun) extra+=("$arg") ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
     *) extra+=("$arg"); scope="" ;;
   esac
