@@ -9,7 +9,9 @@ TA-02  over 30 s on the table, Help: ad
 TA-03  Options within 30 s of the Help ad: no ad
 TA-04  over 30 s on the table, Synthetic Win: ad over Victory
 TA-05  New within 30 s of that Victory ad: an ad too (Spider shows none;
-       FreeCell's New after Victory is not held by the cooldown)
+       FreeCell's New after Victory is not held by the cooldown). New waits
+       24 s on Victory: the Victory ad used the loaded interstitial, and New
+       has none to show until the next one loads
 TA-06  a second win after 30 s on the table, its ad closed, over 30 s on
        Victory, then New: ad
 TA-07  over 30 s on the table, Back: ad, closing onto the main menu
@@ -51,6 +53,7 @@ DWELL = 32.0
 NO_AD = 10.0
 WATCH = 5.0
 AD_WAIT = 40.0  # a video interstitial has taken over 20 s to show after its trigger
+VICTORY_LOAD = 24.0  # TA-05's New still lands inside 30 s of the Victory ad
 READY_WAIT = 300.0
 
 DESTINATIONS = {
@@ -208,16 +211,29 @@ def run() -> None:
         c.note("ad over Victory, closed; Victory showing")
 
     with caselog.case("TA-05", soft=True) as c:
-        _victory_new()
-        ui.expect(fc.wait_ad(timeout=AD_WAIT), f"no interstitial for Victory ad closed -> New "
-                                               f"within {AD_WAIT:.0f}s")
-        print("  Victory ad closed -> New: interstitial up", flush=True)
+        # Loading can outlast VICTORY_LOAD when ads are slow: once more from a
+        # fresh Victory ad.
+        for attempt in range(2):
+            if attempt:
+                _win_with_ad("the TA-05 win", "long table -> Victory (TA-05)")
+            _dwell(VICTORY_LOAD, "on Victory for the next interstitial to load")
+            _victory_new()
+            start = time.time()
+            if fc.wait_ad(timeout=AD_WAIT):
+                break
+            ui.expect(not attempt, f"no interstitial for Victory ad closed -> New within "
+                                   f"{AD_WAIT:.0f}s, twice (see {ui.shoot('TANoAd')})")
+            print("  no ad on New — the next interstitial had not loaded; once more from a "
+                  "fresh Victory ad", flush=True)
+        print(f"  Victory ad closed -> New: interstitial up after {time.time() - start:.0f}s",
+              flush=True)
         c.shot(ui.shoot("AdVictoryNewCooldown"))
         fc.close_or_wait("Victory -> New inside the cooldown")
         _manual_note(c, "Victory -> New inside the cooldown")
         ui.settle_prompts()
         ui.expect(ui.at_table(timeout=8.0), "New within the cooldown did not reach a table")
-        c.note("New within 30s of the Victory ad showed an ad, closed onto the new deal")
+        c.note(f"New {VICTORY_LOAD:.0f}s after the Victory ad (inside 30s) showed an ad, "
+               "closed onto the new deal")
     if fc.ad_up():
         fc.close_or_wait("Victory -> New inside the cooldown")
     ui.settle_prompts()
