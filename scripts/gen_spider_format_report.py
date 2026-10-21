@@ -16,6 +16,7 @@ import base64
 import html
 import io
 import json
+import math
 import os
 import sys
 from collections import OrderedDict
@@ -42,10 +43,14 @@ CSS = r"""
 body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   color:var(--ink); background:var(--page); min-height:100vh; }
 .wrap { max-width:1040px; margin:0 auto; padding:32px 20px 64px; }
-.hero { display:flex; align-items:center; justify-content:space-between;
-  gap:28px; flex-wrap:wrap; margin-bottom:22px; padding:24px 28px; border-radius:20px;
+.hero { display:flex; align-items:flex-start; justify-content:space-between;
+  gap:20px 28px; flex-wrap:wrap; padding:28px 32px 96px; border-radius:22px;
   color:#fff; background:linear-gradient(160deg, var(--blue-light) 0%, var(--blue) 55%,
   var(--blue-deep) 100%); box-shadow:0 10px 30px rgba(30,76,197,.25); }
+.hero-meta { text-align:right; font-size:13px; color:rgba(255,255,255,.88); line-height:1.6; }
+.badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px;
+  font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#fff;
+  background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.45); margin-bottom:4px; }
 .brand { display:flex; align-items:center; gap:16px; min-width:240px; }
 .mark { width:68px; height:68px; border-radius:16px; object-fit:cover;
   border:2px solid rgba(255,255,255,.85); box-shadow:0 4px 14px rgba(9,36,110,.35); }
@@ -54,20 +59,43 @@ div.mark { display:grid; place-items:center; background:#fff; color:var(--blue);
 h1 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
   font-size:26px; margin:0; font-weight:700; letter-spacing:0; color:#fff; }
 .sub { color:rgba(255,255,255,.88); font-size:14px; margin-top:4px; }
-.hero-stat { display:flex; align-items:center; gap:20px; }
-.donut { width:132px; height:132px; border-radius:50%;
-  display:grid; place-items:center; flex:0 0 132px;
-  box-shadow:0 0 0 3px rgba(255,255,255,.9); }
-.donut-hole { width:86px; height:86px; border-radius:50%; background:#fff;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; }
-.donut-pct { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:26px; font-weight:700; line-height:1; color:var(--blue-deep); }
-.donut-lbl { color:var(--muted); font-size:10px; letter-spacing:.3px; margin-top:3px; }
-.legend { display:flex; flex-direction:column; gap:7px; font-size:13px;
-  color:rgba(255,255,255,.88); }
-.legend b { color:#fff; font-weight:600; }
-.swatch { display:inline-block; width:10px; height:10px; border-radius:50%;
-  margin-right:7px; vertical-align:middle; box-shadow:0 0 0 2px #fff; }
+.score { position:relative; margin:-72px 20px 24px; padding:30px 36px;
+  background:#fff; border-radius:22px; display:grid; grid-template-columns:auto 1fr;
+  gap:40px; align-items:center;
+  box-shadow:0 18px 40px rgba(18,48,95,.12), 0 2px 6px rgba(18,48,95,.06); }
+.ring { position:relative; width:240px; height:240px; }
+.ring svg { display:block; width:100%; height:100%; }
+.ring .track { fill:none; stroke:#e9effa; stroke-width:20; }
+.ring .arc { fill:none; stroke-width:20; stroke-linecap:round;
+  animation:draw 1.3s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes draw { from { stroke-dasharray:0 1000; } }
+.ring-center { position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; }
+.ring-pct { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
+  font-size:66px; font-weight:700; line-height:1; color:var(--blue-deep); }
+.ring-pct small { font-size:30px; margin-left:2px; }
+.ring-lbl { font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--muted); margin-top:10px; }
+.ring-sub { font-size:12px; color:var(--muted); margin-top:3px; }
+.score-k { font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--blue); }
+.verdict { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
+  font-size:26px; font-weight:700; margin:6px 0 20px; display:flex; align-items:center;
+  gap:12px; }
+.verdict .dot { flex:0 0 12px; height:12px; border-radius:50%; background:var(--pass);
+  box-shadow:0 0 0 5px rgba(30,158,90,.16); }
+.verdict.bad .dot { background:var(--fail); box-shadow:0 0 0 5px rgba(214,59,59,.16); }
+.tiles { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
+.tile { background:var(--tint); border:1px solid var(--line); border-top:4px solid var(--pass);
+  border-radius:14px; padding:14px 16px; }
+.tile.fail { border-top-color:var(--fail); }
+.tile.skip { border-top-color:var(--skip); }
+.tile-n { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
+  font-size:38px; font-weight:700; line-height:1; color:var(--pass); }
+.tile.fail .tile-n { color:var(--fail); }
+.tile.skip .tile-n, .tile.none .tile-n { color:var(--skip); }
+.tile-k { font-size:13px; font-weight:700; margin-top:8px; }
+.tile-s { font-size:12px; color:var(--muted); margin-top:2px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
 .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
 .filter { appearance:none; background:#fff; border:1px solid var(--line);
@@ -132,9 +160,12 @@ summary::-webkit-details-marker { display:none; }
   border-radius:8px; padding:10px; color:var(--ink); font-size:12px;
   white-space:pre-wrap; overflow-x:auto; margin:0 0 12px; }
 footer { color:var(--muted); font-size:12px; text-align:center; margin-top:36px; }
-@media (max-width:720px) {
-  .hero-stat { width:100%; }
+@media (max-width:760px) {
+  .hero-meta { text-align:left; }
+  .score { grid-template-columns:1fr; justify-items:center; margin:-72px 0 24px; padding:24px; }
+  .score-side { width:100%; }
 }
+@media (prefers-reduced-motion: reduce), print { .ring .arc { animation:none; } }
 """
 
 STATUS = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "skipped",
@@ -244,25 +275,71 @@ def _case_card(row: dict, uri_cache: dict, open_failed: bool = True) -> str:
             f'<div class="detail">{"".join(detail)}</div></details>')
 
 
-def _donut(counts: dict, executed: int, rate: float) -> str:
-    total = max(sum(counts.values()), 1)
-    pass_pct = 100.0 * counts["passed"] / total
-    fail_end = pass_pct + 100.0 * counts["failed"] / total
-    gradient = (f"conic-gradient(var(--pass) 0 {pass_pct:.2f}%, "
-                f"var(--fail) {pass_pct:.2f}% {fail_end:.2f}%, var(--skip) {fail_end:.2f}% 100%)")
-    if executed == 0:
-        gradient = "conic-gradient(rgba(255,255,255,.35) 0 100%)"
-    center = f"{rate:.0f}%" if executed else "—"
-    return f"""<div class="hero-stat">
-<div class="donut" style="background:{gradient}">
-<div class="donut-hole"><div class="donut-pct">{center}</div>
-<div class="donut-lbl">pass rate</div></div></div>
-<div class="legend">
-<div><span class="swatch" style="background:var(--pass)"></span><b>{counts["passed"]}</b> passed</div>
-<div><span class="swatch" style="background:var(--fail)"></span><b>{counts["failed"]}</b> failed</div>
-<div><span class="swatch" style="background:var(--skip)"></span><b>{counts["skipped"]}</b> skipped</div>
-<div style="margin-top:4px">{counts["passed"]}/{executed or 0} executed</div>
-</div></div>"""
+RING_SIZE, RING_RADIUS, RING_WIDTH, RING_GAP = 240, 100, 20, 8
+
+
+def _ring(counts: dict, executed: int) -> str:
+    """The executed cases as an SVG ring, passed then failed. Round caps
+    reach past each arc's ends, hence the gap; a share too small to see is
+    drawn as a dot, taken from the larger arc."""
+    centre = RING_SIZE / 2
+    circ = 2 * math.pi * RING_RADIUS
+    circle = f'cx="{centre}" cy="{centre}" r="{RING_RADIUS}"'
+    shapes = [f'<circle class="track" {circle}/>']
+    parts = [(n, color) for n, color in ((counts["passed"], "var(--pass)"),
+                                         (counts["failed"], "var(--fail)")) if n]
+    if len(parts) == 1:
+        shapes.append(f'<circle class="arc" {circle} stroke="{parts[0][1]}" '
+                      f'stroke-dasharray="{circ:.2f} 0" '
+                      f'transform="rotate(-90 {centre} {centre})"/>')
+    elif parts:
+        lengths = [max(circ * n / executed, RING_WIDTH + RING_GAP + 2) for n, _ in parts]
+        lengths[lengths.index(max(lengths))] -= sum(lengths) - circ
+        start = 0.0
+        for length, (_n, color) in zip(lengths, parts):
+            angle = -90 + 360 * (start + (RING_WIDTH + RING_GAP) / 2) / circ
+            shapes.append(f'<circle class="arc" {circle} stroke="{color}" '
+                          f'stroke-dasharray="{length - RING_WIDTH - RING_GAP:.2f} {circ:.2f}" '
+                          f'transform="rotate({angle:.2f} {centre} {centre})"/>')
+            start += length
+    return (f'<svg viewBox="0 0 {RING_SIZE} {RING_SIZE}" role="img" aria-label="'
+            f'{counts["passed"]} passed, {counts["failed"]} failed">{"".join(shapes)}</svg>')
+
+
+def _score(counts: dict, executed: int) -> str:
+    """The result card under the header: the pass-rate ring, a verdict and
+    a tile per status. The rate is never rounded up to 100% past a failure."""
+    passed, failed, skipped = counts["passed"], counts["failed"], counts["skipped"]
+
+    def share(n: int) -> str:
+        return f"{100 * n / executed:.0f}% of executed" if executed else "none executed"
+
+    pct = "—"
+    if executed:
+        rate = 100 * passed / executed
+        pct = f"{math.floor(rate) if failed else round(rate)}<small>%</small>"
+    if not executed:
+        verdict, mood = "No cases were executed", "bad"
+    elif failed:
+        verdict = f"{failed} case{'s' if failed != 1 else ''} need{'s' if failed == 1 else ''} attention"
+        mood = "bad"
+    else:
+        verdict, mood = f"All {executed} executed cases passed", "good"
+    tiles = [("pass", passed, "Passed", share(passed)),
+             ("fail" if failed else "fail none", failed, "Failed",
+              share(failed) if failed else "nothing failed"),
+             ("skip", skipped, "Skipped", "not run on this build")]
+    tile_html = "".join(f'<div class="tile {cls}"><div class="tile-n">{n}</div>'
+                        f'<div class="tile-k">{label}</div><div class="tile-s">{note}</div></div>'
+                        for cls, n, label, note in tiles)
+    return f"""<section class="score">
+<div class="ring">{_ring(counts, executed)}
+<div class="ring-center"><div class="ring-pct">{pct}</div><div class="ring-lbl">pass rate</div>
+<div class="ring-sub">{passed} of {executed} executed</div></div></div>
+<div class="score-side"><div class="score-k">Run result</div>
+<div class="verdict {mood}"><span class="dot"></span>{html.escape(verdict)}</div>
+<div class="tiles">{tile_html}</div></div>
+</section>"""
 
 
 def _filters(counts: dict) -> str:
@@ -326,7 +403,6 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
         body.append("</section>")
 
     executed = counts["passed"] + counts["failed"]
-    rate = (100 * counts["passed"] / executed) if executed else 0
     device, app = payload.get("device", {}), payload.get("app", {})
     app_value = " ".join(x for x in (app.get("name"), app.get("version"),
                                      f"(build {app['build']})" if app.get("build") else "")
@@ -342,6 +418,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
     mark = (f'<img class="mark" src="{logo}" alt="FreeCell Solitaire logo">'
             if logo else '<div class="mark">F</div>')
     build_kind = payload.get("build_kind", "prod")
+    run_time = _format_run_time(payload.get("finished") or payload.get("started"))
 
     document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -351,15 +428,17 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <div class="hero">
 <div class="brand">{mark}<div><h1>FreeCell Solitaire</h1>
 <div class="sub">Regression report · Spider suite and FreeCell's own cases on the {html.escape(build_kind)} build</div></div></div>
-{_donut(counts, executed, rate)}
+<div class="hero-meta"><span class="badge">{html.escape(build_kind)} build</span><br>
+{html.escape(run_time)}<br>{html.escape(app_value)}</div>
 </div>
+{_score(counts, executed)}
 <div class="chips">
 {_chip("Device", device.get("model"))}
 {_chip("Platform", "iOS " + device.get("ios", "") if device.get("ios") else "")}
 {_chip("App", app_value)}
 {_chip("Screen", device.get("screen"))}
 {_chip("Duration", _format_duration(payload.get("duration_seconds")))}
-{_chip("Run", _format_run_time(payload.get("finished") or payload.get("started")))}
+{_chip("Run", run_time)}
 {_chip("Scope", scope)}
 </div>
 {_filters(counts)}
