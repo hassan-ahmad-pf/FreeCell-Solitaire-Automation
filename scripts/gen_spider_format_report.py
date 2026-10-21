@@ -31,6 +31,7 @@ import catalog  # noqa: E402
 import config  # noqa: E402
 
 HEADER_LOGO = os.path.join(ROOT, "assets", "report_icon.png")  # the App Store icon
+DISPLAY_FONT = os.path.join(ROOT, "assets", "report_font_outfit.woff2")  # SIL OFL, see *_OFL.txt
 DEFAULT_RESULTS = os.path.join(config.LOG, "spider_suite_results.json")
 DEFAULT_OUT = os.path.join(config.LOG, "freecell_spider_regression.html")
 
@@ -38,7 +39,8 @@ CSS = r"""
 :root { color-scheme: light;
   --blue-light:#54a4f6; --blue:#316edc; --blue-deep:#1e4cc5;
   --ink:#12305f; --muted:#5a6f95; --line:#d9e4f6; --page:#f3f7fe; --tint:#eef5ff;
-  --pass:#1e9e5a; --fail:#d63b3b; --skip:#7d8fb0; }
+  --pass:#1e9e5a; --fail:#d63b3b; --skip:#7d8fb0;
+  --display:"Outfit",-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   color:var(--ink); background:var(--page); min-height:100vh; }
@@ -56,8 +58,8 @@ body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-
   border:2px solid rgba(255,255,255,.85); box-shadow:0 4px 14px rgba(9,36,110,.35); }
 div.mark { display:grid; place-items:center; background:#fff; color:var(--blue);
   font-size:32px; font-weight:700; }
-h1 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:26px; margin:0; font-weight:700; letter-spacing:0; color:#fff; }
+h1 { font-family:var(--display); font-size:28px; margin:0; font-weight:600;
+  letter-spacing:0; color:#fff; }
 .sub { color:rgba(255,255,255,.88); font-size:14px; margin-top:4px; }
 .score { position:relative; margin:-72px 20px 24px; padding:30px 36px;
   background:#fff; border-radius:22px; display:grid; grid-template-columns:auto 1fr;
@@ -71,16 +73,17 @@ h1 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
 @keyframes draw { from { stroke-dasharray:0 1000; } }
 .ring-center { position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; }
-.ring-pct { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:66px; font-weight:700; line-height:1; color:var(--blue-deep); }
-.ring-pct small { font-size:30px; margin-left:2px; }
+.ring-pct { font-family:var(--display); font-size:80px; font-weight:300; line-height:1;
+  letter-spacing:-1.5px; color:var(--blue-deep); }
+.ring-pct small { font-size:34px; font-weight:400; margin-left:2px; letter-spacing:0; }
+.ring-pct.wide { font-size:66px; }
+.ring-pct.wide small { font-size:28px; }
 .ring-lbl { font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
   color:var(--muted); margin-top:10px; }
 .ring-sub { font-size:12px; color:var(--muted); margin-top:3px; }
 .score-k { font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
   color:var(--blue); }
-.verdict { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:26px; font-weight:700; margin:6px 0 20px; display:flex; align-items:center;
+.verdict { font-family:var(--display); font-size:26px; font-weight:600; margin:6px 0 20px; display:flex; align-items:center;
   gap:12px; }
 .verdict .dot { flex:0 0 12px; height:12px; border-radius:50%; background:var(--pass);
   box-shadow:0 0 0 5px rgba(30,158,90,.16); }
@@ -90,8 +93,7 @@ h1 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
   border-radius:14px; padding:14px 16px; }
 .tile.fail { border-top-color:var(--fail); }
 .tile.skip { border-top-color:var(--skip); }
-.tile-n { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:38px; font-weight:700; line-height:1; color:var(--pass); }
+.tile-n { font-family:var(--display); font-size:38px; font-weight:500; line-height:1; color:var(--pass); }
 .tile.fail .tile-n { color:var(--fail); }
 .tile.skip .tile-n, .tile.none .tile-n { color:var(--skip); }
 .tile-k { font-size:13px; font-weight:700; margin-top:8px; }
@@ -123,11 +125,9 @@ body[data-filter="skipped"] .group:not([data-has~="skipped"]) { display:none; }
 .chip .v { font-size:13px; font-weight:600; margin-top:2px; }
 .attention { background:#fff; border:1px solid var(--line); border-left:4px solid var(--fail);
   border-radius:12px; padding:16px 16px 8px; margin-bottom:28px; }
-.attention h2 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:17px; margin:0 0 4px; font-weight:700; }
+.attention h2 { font-family:var(--display); font-size:18px; margin:0 0 4px; font-weight:600; }
 .attention .lead { color:var(--muted); font-size:13px; margin:0 0 12px; }
-.sec { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:17px; font-weight:700; margin:28px 0 10px; padding-left:12px;
+.sec { font-family:var(--display); font-size:18px; font-weight:600; margin:28px 0 10px; padding-left:12px;
   border-left:3px solid var(--blue); display:flex; align-items:baseline; gap:10px; }
 .secstat { font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   font-size:12px; font-weight:500; color:var(--muted); }
@@ -233,6 +233,17 @@ def _image_uri(path: str, box=(900, 900)):
         return None
 
 
+def _font_face() -> str:
+    """Outfit embedded, so the report looks the same where it is not installed."""
+    try:
+        with open(DISPLAY_FONT, "rb") as fh:
+            data = base64.b64encode(fh.read()).decode("ascii")
+    except OSError:
+        return ""
+    return ('@font-face { font-family:"Outfit"; font-weight:200 700; font-display:swap; '
+            f'src:url(data:font/woff2;base64,{data}) format("woff2"); }}\n')
+
+
 def _chip(label: str, value) -> str:
     return (f'<div class="chip"><span class="k">{html.escape(label)}</span>'
             f'<span class="v">{html.escape(str(value or "—"))}</span></div>')
@@ -314,10 +325,11 @@ def _score(counts: dict, executed: int) -> str:
     def share(n: int) -> str:
         return f"{100 * n / executed:.0f}% of executed" if executed else "none executed"
 
-    pct = "—"
+    pct, wide = "—", ""
     if executed:
         rate = 100 * passed / executed
-        pct = f"{math.floor(rate) if failed else round(rate)}<small>%</small>"
+        shown = math.floor(rate) if failed else round(rate)
+        pct, wide = f"{shown}<small>%</small>", " wide" if shown == 100 else ""
     if not executed:
         verdict, mood = "No cases were executed", "bad"
     elif failed:
@@ -334,7 +346,7 @@ def _score(counts: dict, executed: int) -> str:
                         for cls, n, label, note in tiles)
     return f"""<section class="score">
 <div class="ring">{_ring(counts, executed)}
-<div class="ring-center"><div class="ring-pct">{pct}</div><div class="ring-lbl">pass rate</div>
+<div class="ring-center"><div class="ring-pct{wide}">{pct}</div><div class="ring-lbl">pass rate</div>
 <div class="ring-sub">{passed} of {executed} executed</div></div></div>
 <div class="score-side"><div class="score-k">Run result</div>
 <div class="verdict {mood}"><span class="dot"></span>{html.escape(verdict)}</div>
@@ -424,7 +436,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FreeCell Solitaire — Regression Report</title>
-<style>{CSS}</style></head><body><div class="wrap">
+<style>{_font_face()}{CSS}</style></head><body><div class="wrap">
 <div class="hero">
 <div class="brand">{mark}<div><h1>FreeCell Solitaire</h1>
 <div class="sub">Regression report · Spider suite and FreeCell's own cases on the {html.escape(build_kind)} build</div></div></div>
