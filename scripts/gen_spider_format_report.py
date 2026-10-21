@@ -29,47 +29,56 @@ from PIL import Image  # noqa: E402
 import catalog  # noqa: E402
 import config  # noqa: E402
 
-HEADER_LOGO = os.path.join(ROOT, "assets", "menu_logo.png")
+HEADER_LOGO = os.path.join(ROOT, "assets", "report_icon.png")  # the App Store icon
 DEFAULT_RESULTS = os.path.join(config.LOG, "spider_suite_results.json")
 DEFAULT_OUT = os.path.join(config.LOG, "freecell_spider_regression.html")
 
 CSS = r"""
-:root { color-scheme: dark; }
+:root { color-scheme: light;
+  --blue-light:#54a4f6; --blue:#316edc; --blue-deep:#1e4cc5;
+  --ink:#12305f; --muted:#5a6f95; --line:#d9e4f6; --page:#f3f7fe; --tint:#eef5ff;
+  --pass:#1e9e5a; --fail:#d63b3b; --skip:#7d8fb0; }
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  color:#f4ece4; background:#2a211c; min-height:100vh; }
+  color:var(--ink); background:var(--page); min-height:100vh; }
 .wrap { max-width:1040px; margin:0 auto; padding:32px 20px 64px; }
 .hero { display:flex; align-items:center; justify-content:space-between;
-  gap:28px; flex-wrap:wrap; margin-bottom:22px; }
+  gap:28px; flex-wrap:wrap; margin-bottom:22px; padding:24px 28px; border-radius:20px;
+  color:#fff; background:linear-gradient(160deg, var(--blue-light) 0%, var(--blue) 55%,
+  var(--blue-deep) 100%); box-shadow:0 10px 30px rgba(30,76,197,.25); }
 .brand { display:flex; align-items:center; gap:16px; min-width:240px; }
-.mark { width:64px; height:64px; border-radius:16px; object-fit:contain;
-  background:#1f6f5c; box-shadow:0 4px 16px rgba(0,0,0,.25); }
+.mark { width:68px; height:68px; border-radius:16px; object-fit:cover;
+  border:2px solid rgba(255,255,255,.85); box-shadow:0 4px 14px rgba(9,36,110,.35); }
+div.mark { display:grid; place-items:center; background:#fff; color:var(--blue);
+  font-size:32px; font-weight:700; }
 h1 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:26px; margin:0; font-weight:700; letter-spacing:0; color:#f4ece4; }
-.sub { color:#c4b2a3; font-size:14px; margin-top:4px; }
+  font-size:26px; margin:0; font-weight:700; letter-spacing:0; color:#fff; }
+.sub { color:rgba(255,255,255,.88); font-size:14px; margin-top:4px; }
 .hero-stat { display:flex; align-items:center; gap:20px; }
 .donut { width:132px; height:132px; border-radius:50%;
   display:grid; place-items:center; flex:0 0 132px;
-  box-shadow:inset 0 0 0 1px #4a3b33; }
-.donut-hole { width:86px; height:86px; border-radius:50%; background:#2a211c;
+  box-shadow:0 0 0 3px rgba(255,255,255,.9); }
+.donut-hole { width:86px; height:86px; border-radius:50%; background:#fff;
   display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .donut-pct { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
-  font-size:26px; font-weight:700; line-height:1; }
-.donut-lbl { color:#c4b2a3; font-size:10px; letter-spacing:.3px; margin-top:3px; }
-.legend { display:flex; flex-direction:column; gap:7px; font-size:13px; color:#c4b2a3; }
-.legend b { color:#f4ece4; font-weight:600; }
-.swatch { display:inline-block; width:9px; height:9px; border-radius:50%;
-  margin-right:7px; vertical-align:middle; }
+  font-size:26px; font-weight:700; line-height:1; color:var(--blue-deep); }
+.donut-lbl { color:var(--muted); font-size:10px; letter-spacing:.3px; margin-top:3px; }
+.legend { display:flex; flex-direction:column; gap:7px; font-size:13px;
+  color:rgba(255,255,255,.88); }
+.legend b { color:#fff; font-weight:600; }
+.swatch { display:inline-block; width:10px; height:10px; border-radius:50%;
+  margin-right:7px; vertical-align:middle; box-shadow:0 0 0 2px #fff; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
 .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
-.filter { appearance:none; background:#3a2e28; border:1px solid #4a3b33;
-  color:#c4b2a3; border-radius:999px; padding:6px 12px; font:inherit;
+.filter { appearance:none; background:#fff; border:1px solid var(--line);
+  color:var(--muted); border-radius:999px; padding:6px 12px; font:inherit;
   font-size:13px; cursor:pointer; }
-.filter b { color:#f4ece4; font-weight:600; }
-.filter.is-on { color:#f4ece4; border-color:#c45c32; background:#4a342c; }
-.filter[data-filter="passed"].is-on { border-color:#6f9e7a; }
-.filter[data-filter="failed"].is-on { border-color:#b85a48; }
-.filter[data-filter="skipped"].is-on { border-color:#d4b483; }
+.filter b { color:var(--ink); font-weight:600; }
+.filter.is-on, .filter.is-on b { color:#fff; }
+.filter.is-on { border-color:var(--blue); background:var(--blue); }
+.filter[data-filter="passed"].is-on { border-color:var(--pass); background:var(--pass); }
+.filter[data-filter="failed"].is-on { border-color:var(--fail); background:var(--fail); }
+.filter[data-filter="skipped"].is-on { border-color:var(--skip); background:var(--skip); }
 body[data-filter="passed"] .attention,
 body[data-filter="failed"] .attention,
 body[data-filter="skipped"] .attention { display:none; }
@@ -79,47 +88,50 @@ body[data-filter="skipped"] .case:not(.skipped) { display:none; }
 body[data-filter="passed"] .group:not([data-has~="passed"]),
 body[data-filter="failed"] .group:not([data-has~="failed"]),
 body[data-filter="skipped"] .group:not([data-has~="skipped"]) { display:none; }
-.chip { background:#3a2e28; border:1px solid #4a3b33; border-radius:10px;
-  padding:7px 11px; display:flex; flex-direction:column; min-width:88px; }
-.chip .k { font-size:11px; letter-spacing:.2px; color:#c4b2a3; }
+.chip { background:#fff; border:1px solid var(--line); border-radius:10px;
+  padding:7px 11px; display:flex; flex-direction:column; min-width:88px;
+  box-shadow:0 1px 2px rgba(18,48,95,.05); }
+.chip .k { font-size:11px; letter-spacing:.2px; color:var(--muted); }
 .chip .v { font-size:13px; font-weight:600; margin-top:2px; }
-.attention { background:#3a2e28; border:1px solid #4a3b33; border-left:4px solid #b85a48;
+.attention { background:#fff; border:1px solid var(--line); border-left:4px solid var(--fail);
   border-radius:12px; padding:16px 16px 8px; margin-bottom:28px; }
 .attention h2 { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
   font-size:17px; margin:0 0 4px; font-weight:700; }
-.attention .lead { color:#c4b2a3; font-size:13px; margin:0 0 12px; }
+.attention .lead { color:var(--muted); font-size:13px; margin:0 0 12px; }
 .sec { font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
   font-size:17px; font-weight:700; margin:28px 0 10px; padding-left:12px;
-  border-left:3px solid #c45c32; display:flex; align-items:baseline; gap:10px; }
+  border-left:3px solid var(--blue); display:flex; align-items:baseline; gap:10px; }
 .secstat { font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  font-size:12px; font-weight:500; color:#c4b2a3; }
-.case { background:#3a2e28; border:1px solid #4a3b33; border-radius:10px;
-  margin-bottom:8px; overflow:hidden; border-left:8px solid #6f9e7a; }
-.case.failed { border-left-color:#b85a48; }
-.case.skipped { border-left-color:#d4b483; }
+  font-size:12px; font-weight:500; color:var(--muted); }
+.case { background:#fff; border:1px solid var(--line); border-radius:10px;
+  margin-bottom:8px; overflow:hidden; border-left:8px solid var(--pass);
+  box-shadow:0 1px 2px rgba(18,48,95,.05); }
+.case.failed { border-left-color:var(--fail); }
+.case.skipped { border-left-color:var(--skip); }
 summary { list-style:none; cursor:pointer; display:flex; align-items:center;
   gap:12px; padding:12px 14px; }
+summary:hover { background:var(--tint); }
 summary::-webkit-details-marker { display:none; }
-.cid { color:#c4b2a3; font-size:12px; min-width:44px; }
+.cid { color:var(--muted); font-size:12px; min-width:44px; }
 .title { flex:1; font-weight:600; font-size:14px; }
-.pill { color:#2a211c; font-weight:700; font-size:10px; padding:3px 8px;
+.pill { color:#fff; font-weight:700; font-size:10px; padding:3px 8px;
   border-radius:999px; letter-spacing:.3px; }
-.dur { color:#c4b2a3; font-size:12px; min-width:52px; text-align:right; }
+.dur { color:var(--muted); font-size:12px; min-width:52px; text-align:right; }
 .detail { padding:0 14px 14px; }
 .shots { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
   gap:12px; margin-top:4px; }
 .shot-card { margin:0; }
 .shot { display:block; width:100%; max-height:420px; object-fit:contain;
-  border-radius:8px; border:1px solid #4a3b33; background:#2a211c; }
-.shot-caption { color:#c4b2a3; font-size:11px; margin:6px 0 0; }
-.noshot { color:#c4b2a3; font-size:13px; margin:0 0 10px; }
-.msg { background:#2a211c; border:1px solid #4a3b33; border-radius:8px;
-  padding:10px; color:#e8cfc4; font-size:12px; white-space:pre-wrap;
+  border-radius:8px; border:1px solid var(--line); background:var(--tint); }
+.shot-caption { color:var(--muted); font-size:11px; margin:6px 0 0; }
+.noshot { color:var(--muted); font-size:13px; margin:0 0 10px; }
+.msg { background:#fff5f5; border:1px solid #f2c9c9; border-radius:8px;
+  padding:10px; color:#8f1d1d; font-size:12px; white-space:pre-wrap;
   overflow-x:auto; margin:0 0 12px; }
-.evidence { background:#322822; border:1px solid #4a3b33; border-left:3px solid #c45c32;
-  border-radius:8px; padding:10px; color:#f4ece4; font-size:12px;
+.evidence { background:var(--tint); border:1px solid #d3e2fa; border-left:3px solid var(--blue);
+  border-radius:8px; padding:10px; color:var(--ink); font-size:12px;
   white-space:pre-wrap; overflow-x:auto; margin:0 0 12px; }
-footer { color:#c4b2a3; font-size:12px; text-align:center; margin-top:36px; }
+footer { color:var(--muted); font-size:12px; text-align:center; margin-top:36px; }
 @media (max-width:720px) {
   .hero-stat { width:100%; }
 }
@@ -127,7 +139,7 @@ footer { color:#c4b2a3; font-size:12px; text-align:center; margin-top:36px; }
 
 STATUS = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "skipped",
           "dev": "skipped", "later": "skipped"}
-STATUS_PILL = {"passed": "#6f9e7a", "failed": "#b85a48", "skipped": "#d4b483"}
+STATUS_PILL = {"passed": "var(--pass)", "failed": "var(--fail)", "skipped": "var(--skip)"}
 PILL_TEXT = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "blocked",
              "dev": "dev build", "later": "later"}
 
@@ -236,19 +248,19 @@ def _donut(counts: dict, executed: int, rate: float) -> str:
     total = max(sum(counts.values()), 1)
     pass_pct = 100.0 * counts["passed"] / total
     fail_end = pass_pct + 100.0 * counts["failed"] / total
-    gradient = (f"conic-gradient(#6f9e7a 0 {pass_pct:.2f}%, "
-                f"#b85a48 {pass_pct:.2f}% {fail_end:.2f}%, #d4b483 {fail_end:.2f}% 100%)")
+    gradient = (f"conic-gradient(var(--pass) 0 {pass_pct:.2f}%, "
+                f"var(--fail) {pass_pct:.2f}% {fail_end:.2f}%, var(--skip) {fail_end:.2f}% 100%)")
     if executed == 0:
-        gradient = "conic-gradient(#4a3b33 0 100%)"
+        gradient = "conic-gradient(rgba(255,255,255,.35) 0 100%)"
     center = f"{rate:.0f}%" if executed else "—"
     return f"""<div class="hero-stat">
 <div class="donut" style="background:{gradient}">
 <div class="donut-hole"><div class="donut-pct">{center}</div>
 <div class="donut-lbl">pass rate</div></div></div>
 <div class="legend">
-<div><span class="swatch" style="background:#6f9e7a"></span><b>{counts["passed"]}</b> passed</div>
-<div><span class="swatch" style="background:#b85a48"></span><b>{counts["failed"]}</b> failed</div>
-<div><span class="swatch" style="background:#d4b483"></span><b>{counts["skipped"]}</b> skipped</div>
+<div><span class="swatch" style="background:var(--pass)"></span><b>{counts["passed"]}</b> passed</div>
+<div><span class="swatch" style="background:var(--fail)"></span><b>{counts["failed"]}</b> failed</div>
+<div><span class="swatch" style="background:var(--skip)"></span><b>{counts["skipped"]}</b> skipped</div>
 <div style="margin-top:4px">{counts["passed"]}/{executed or 0} executed</div>
 </div></div>"""
 
