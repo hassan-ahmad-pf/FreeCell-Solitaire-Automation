@@ -29,7 +29,7 @@ def run() -> None:
     fc.go_offline()
     if not ui.expect_screen("options", timeout=1.0):
         fc.menu()
-    ui.expect(ui.open_options(), "Options did not open from the main menu")
+        ui.expect(ui.open_options(), "Options did not open from the main menu")
     if not ui.is_on("contact_us"):
         fc.options_top()
     ui.expect(ui.is_on("contact_us"), "Contact Us is missing from Options")
