@@ -6,10 +6,7 @@ Standalone Objective-C UI automation for FingerArts FreeCell:
 - QA code: `943010`
 - target: a real USB-connected iPhone through WebDriverAgent and Airtest
 
-This repository is intentionally separate from Spider. Spider is retained only
-under [`reference/spider/`](reference/spider/) for implementation patterns and
-historical comparison. Active FreeCell code must use FreeCell captures and
-FreeCell-specific assertions.
+All code uses FreeCell captures and FreeCell-specific assertions.
 
 ## Current status
 
@@ -28,7 +25,7 @@ cd /Users/hassan/Automation-FA/FreeCell-Solitaire-Automation && ./scripts/regres
 ```
 
 `scripts/regression.sh` starts WDA (re-signing it if due), keeps the Mac
-awake and runs the Spider suite on the dev build, standalone tests
+awake and runs the FreeCell suite on the dev build, standalone tests
 included (about 80 minutes). The console shows the plan with each test's
 time on the last run, every case as it starts and its PASS / FAIL / SKIP
 with its time and note, and a status bar with the elapsed time, the current
@@ -38,11 +35,11 @@ opens the HTML report and keeps a plain log in `log/regression_<time>.log`.
 If any case fails, the runner writes the report, runs each failed test once
 more (with the network as the first run had it) and writes the report again.
 A failed case that passes on the rerun is a plain pass in the report; its
-first failure stays only in `log/spider_suite_results.json`
+first failure stays only in `log/freecell_suite_results.json`
 (`first_failure`) and the console log. One that fails again, or cannot
 rerun (a fresh-install case), keeps its failure. A case that passed the
 first time keeps that pass. This is the runner's default, so
-`tests/spider_suite/run_all.py` does it too.
+`tests/freecell_suite/run_all.py` does it too.
 
 | Option | Runs |
 | --- | --- |
@@ -123,8 +120,8 @@ menu.
 
 ## Capture-first workflow
 
-FreeCell assets are not copied from Spider. Capture the fresh install and every
-screen on the target device:
+Every FreeCell asset is cropped from the FreeCell build. Capture the fresh
+install and every screen on the target device:
 
 ```bash
 ./.venv/bin/python tests/capture_walkthrough.py

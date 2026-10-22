@@ -72,8 +72,7 @@ run. Re-confirm the items marked *(dev build)* on it.
   time a table is left. OK closes it, and Options opens Options. It is a
   native alert, so WDA reads its text.
 - The **promo icon strip** ("more fun with us!", five icons) appeared on the
-  menu after the first game was *played*. No game had been won. Spider shows
-  it only after a win.
+  menu after the first game was *played*. No game had been won.
 
 ### Play picker
 

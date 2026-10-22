@@ -2,7 +2,7 @@
 """Capture the fresh FreeCell walkthrough for asset authoring.
 
 This is intentionally a guided capture: navigation coordinates and semantic
-assets are not guessed from Spider. Run it with the device visible and record
+assets are never guessed. Run it with the device visible and record
 the screen names printed by the script before cropping assets.
 """
 from __future__ import annotations

@@ -1,9 +1,9 @@
 """TestRail cases for the Objective-C build of FreeCell.
 
 Written for a person on the phone, not for Airtest. One case per behaviour
-a tester can fail independently. Adapted from Spider's list and extended with
-what only FreeCell has (Daily, the Solo / Daily statistics, the FAQ tabs, the
-rules toggle, the in-game drawer's extras). Behaviour is as observed on the
+a tester can fail independently, including what only FreeCell has (Daily,
+the Solo / Daily statistics, the FAQ tabs, the rules toggle, the in-game
+drawer's extras). Behaviour is as observed on the
 device — see docs/OBSERVED_FREECELL.md.
 
 The run assumes a DEV build, installed fresh before the run: the QA code

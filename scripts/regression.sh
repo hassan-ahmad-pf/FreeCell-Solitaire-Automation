@@ -30,7 +30,7 @@ export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 stop_run() {
   local now="$1" console runner starting pid
   console="$(pgrep -if "python[^ ]* .*scripts/present_regression\.py" | tr '\n' ' ' || true)"
-  runner="$(pgrep -if "python[^ ]* .*tests/spider_suite/run_all\.py" | tr '\n' ' ' || true)"
+  runner="$(pgrep -if "python[^ ]* .*tests/freecell_suite/run_all\.py" | tr '\n' ' ' || true)"
   if [[ -z "${console// }${runner// }" ]]; then
     starting=""
     for pid in $(pgrep -f "bash .*scripts/regression\.sh" || true); do
@@ -58,7 +58,7 @@ stop_run() {
   # shellcheck disable=SC2086
   kill -INT $console $runner 2>/dev/null || true
   for _ in $(seq 1 240); do
-    if ! pgrep -if "python[^ ]* .*tests/spider_suite/run_all\.py" >/dev/null; then
+    if ! pgrep -if "python[^ ]* .*tests/freecell_suite/run_all\.py" >/dev/null; then
       echo ">>> regression stopped; its window shows the summary. WDA is still up"
       echo "    (./scripts/wda.sh stop ends it)."
       return 0

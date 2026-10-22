@@ -1,6 +1,5 @@
 """FreeCell-specific automation configuration.
 
-The active project deliberately has no Spider bundle or asset assumptions.
 Values may be overridden for a different device or local WDA port.
 """
 from __future__ import annotations

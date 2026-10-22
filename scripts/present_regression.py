@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the regression with a live console an audience can follow.
 
-Runs tests/spider_suite/run_all.py (arguments passed through) and turns its
+Runs tests/freecell_suite/run_all.py (arguments passed through) and turns its
 output into a readable view: each test as a header, each case when it starts
 and when it ends (PASS / FAIL / SKIP and its time), the runner's step notes
 dimmed, and a status bar kept at the bottom with the case running and its
@@ -28,8 +28,8 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RUNNER = ROOT / "tests" / "spider_suite" / "run_all.py"
-RESULTS = ROOT / "log" / "spider_suite_results.json"
+RUNNER = ROOT / "tests" / "freecell_suite" / "run_all.py"
+RESULTS = ROOT / "log" / "freecell_suite_results.json"
 TTY = sys.stdout.isatty()
 
 GREEN, RED, YELLOW, CYAN, DIM, BOLD, BAR = "1;32", "1;31", "1;33", "1;36", "2", "1", "7"

@@ -1,7 +1,6 @@
 # FreeCell capture manifest
 
 Capture these states from the installed FreeCell build before cropping assets.
-The list is intentionally independent of Spider's screen names.
 
 ## First launch
 
@@ -45,5 +44,5 @@ The list is intentionally independent of Spider's screen names.
 - victory navigation and return to menu
 
 Each crop must come from a FreeCell screenshot on the target device. Never
-substitute an inherited Spider crop merely because the control has the same
+substitute a crop from another app merely because the control has the same
 label.

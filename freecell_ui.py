@@ -1,8 +1,7 @@
 """Template-driven FreeCell UI primitives.
 
-This module intentionally starts with no Spider coordinates or crops. The
-capture walkthrough populates ``assets/`` after the FreeCell build is observed
-on the target device.
+Every coordinate and crop comes from the FreeCell build observed on the
+target device; the capture walkthrough populates ``assets/``.
 """
 from __future__ import annotations
 

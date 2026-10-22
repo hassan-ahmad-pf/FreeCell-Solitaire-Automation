@@ -14,9 +14,9 @@ If the user wants to start it themselves (a demo, or "give me a command"),
 give them `cd /Users/hassan/Automation-FA/FreeCell-Solitaire-Automation &&
 ./scripts/regression.sh` (options: `--main`, `--prod`, `--no-open`,
 `--no-rerun`, test names). It starts WDA, runs
-`tests/spider_suite/run_all.py --dev --all` under `caffeinate` and shows
+`tests/freecell_suite/run_all.py --dev --all` under `caffeinate` and shows
 each case live through `scripts/present_regression.py`; see the README's
-"One command". The Spider runner reruns each failed test once after
+"One command". The runner reruns each failed test once after
 writing the report and rewrites it; a case that passes there is a plain
 pass in the HTML (no rerun note — the user wants it that way), with its
 first failure kept in the results JSON as `first_failure`. Tell the user
