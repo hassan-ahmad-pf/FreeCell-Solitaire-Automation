@@ -8,7 +8,8 @@ OP-05  Auto Mute Sounds flips and flips back
 OP-06  Card Lowering reaches min, max and the middle
 
 Values are read from the UISlider / UISwitch themselves. The starting values
-are restored from a finally.
+are restored from a finally. It ends on Options, where verifyHelpShift
+carries on with Contact Us.
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyOptions.py
 """
@@ -100,8 +101,6 @@ def run() -> None:
         if mute is not None:
             fc.switch_set("Auto Mute Sounds", mute)
 
-    ui.back()
-    ui.expect(ui.on_menu(6.0), "Options back did not return to the main menu")
     print("PASS: Options — Applause Volume and Card Lowering reach both ends and the "
           "middle, Applause is kept, Auto Mute flips both ways; values restored")
 

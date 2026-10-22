@@ -6,7 +6,8 @@ RL-02  carry on with that board, one more move, Home, kill, ~35 s, reopen:
        the same board again
 
 Each leg plays its own move and is recorded on its own, so a failed first
-leg does not stop the second (the test still ends FAIL).
+leg does not stop the second (the test still ends FAIL). The first leg
+carries on with a game already on the table (verifyAbandonNo resumes one).
 
 The kill: terminate through the open session, then wait until
 FreeCell is no longer the foreground app; the relaunch starts from the Home
@@ -119,7 +120,6 @@ def _kill_and_reopen(wait: float, tag: str):
 
 
 def run() -> None:
-    fc.menu()
     for cid, (tag, wait) in zip(("RL-01", "RL-02"), LEGS):
         with caselog.case(cid, soft=True) as c:
             start = _resume_or_deal()

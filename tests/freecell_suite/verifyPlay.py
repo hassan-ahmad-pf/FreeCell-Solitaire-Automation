@@ -5,6 +5,9 @@ PL-01  Play opens the difficulty picker; no game starts
 PL-02  Easy, Medium, Hard, Expert and Master are listed
 PL-03  Easy (Yes to abandon a paused game) reaches the game table
 
+One move is then played before leaving, so the game stays paused for
+verifyAbandonNo instead of that test dealing its own.
+
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyPlay.py
 """
 from __future__ import annotations
@@ -44,6 +47,10 @@ def run() -> None:
                   "the table's top bar (back, menu) is not showing")
         c.shot(ui.shoot("PlayEasy"))
         c.note("Easy dealt a table")
+    try:
+        fc.play_one_move()
+    except Exception as exc:  # noqa: BLE001
+        print(f"  no move played ({exc}) — verifyAbandonNo will deal its own game", flush=True)
     ui.expect(ui.to_menu(), "could not return to the menu after Play")
     print("PASS: the picker lists five levels and Easy dealt a table")
 

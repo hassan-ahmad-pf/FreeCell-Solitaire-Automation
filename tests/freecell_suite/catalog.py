@@ -1,16 +1,24 @@
 """The FreeCell suite: its tests, their cases, and where each one stands.
 
 The suite's case IDs, titles and sections are in docs/testrail/suite_cases.py.
-RUN_ORDER is the main suite, then the six standalone tests (STANDALONE).
-Each test's case ids are in the order it runs them: the console lists them
-that way before the test starts.
+RUN_ORDER is a full run (--all): the six STANDALONE tests in it run only
+with --all or when named. Each test's case ids are in the order it runs
+them: the console lists them that way before the test starts.
+
+The order visits each screen once, as far as these allow: the first launch
+comes first (a fresh install's Terms card), the middle runs offline (no
+interstitial over a deal), QA is unlocked before the tests that win with it,
+More Games runs before it (QA's Test Banner sits at the bottom of pages),
+and Statistics, whose resets wipe the wins, runs after the promo strip,
+which needs one. Where one test leaves the screen the next needs, the next
+carries on from it: Options → Contact Us, Play → abandon → relaunch.
 
 The Daily cases come from FreeCell's TestRail list (docs/testrail/cases.py)
 as written there, plus EXTRA_CASES for the steps that list has no case for.
-They run in two tests in the offline part of the main suite: verifyDaily (the
-Daily flow) and resetDailyStats right after it. The timer case (GP-12) and
-the score case beside it (GP-25) run in verifyGamePlay. Each sits in its
-section after the cases with lower IDs.
+The Daily flow runs in verifyDaily, its statistics reset in verifyStatistics
+with the Solo one. The timer case (GP-12) and the score case beside it
+(GP-25) run in verifyGamePlay. Each sits in its section after the cases with
+lower IDs.
 
 Each test is one of:
   run  — a FreeCell port in tests/freecell_suite/<module>.py
@@ -67,19 +75,18 @@ RUN_ORDER = [
     ("verifyFirstLaunch", "verifyFirstLaunch", "run",
      ["FL-04", "FL-05", "FL-02", "FL-03", "FL-01"], ""),
     ("verifyMainMenu", "verifyMainMenu", "run", ["MM-01"], ""),
-    ("verifyStatsPage", "verifyStatsPage", "run", ["ST-01", "ST-03", "ST-04"], ""),
     ("verifyOptions", "verifyOptions", "run",
      ["OP-01", "OP-03", "OP-04", "OP-05", "OP-06"], ""),
     ("verifyHelpShift", "verifyHelpShift", "run", ["HS-02"], ""),
     ("verifyHelpPage", "verifyHelpPage", "run", ["HP-01", "HP-02", "HP-03"], ""),
+    ("verifyMoreGamesBtn", "verifyMoreGamesBtn", "run", ["MG-01", "MG-02", "MG-03"], ""),
     ("verifyFreeCellLogo", "verifyFreeCellLogo", "run",
      ["AB-01", "AB-03", "AB-04", "AB-05", "AB-06"], ""),
-    ("verifyMoreGamesBtn", "verifyMoreGamesBtn", "run", ["MG-01", "MG-02", "MG-03"], ""),
+    ("openDebugTools", "openDebugTools", "dev", ["QA-02", "QA-03", "QA-04"],
+     "needs the dev build (the prod build has no QA entry point)"),
     ("verifyPlay", "verifyPlay", "run", ["PL-01", "PL-02", "PL-03"], ""),
     ("verifyAbandonNo", "verifyAbandonNo", "run", ["PL-04"], ""),
     ("verifyRelaunch", "verifyRelaunch", "run", ["RL-01", "RL-02"], ""),
-    ("openDebugTools", "openDebugTools", "dev", ["QA-02", "QA-03", "QA-04"],
-     "needs the dev build (the prod build has no QA entry point)"),
     ("verifyGamePlay", "verifyGamePlay", "run",
      ["GP-01", "GP-12", "GP-25", "GP-03", "GP-04", "GP-05", "GP-06",
       "GP-07", "GP-10", "GP-11", "GP-14"], ""),
@@ -88,18 +95,21 @@ RUN_ORDER = [
     ("verifyDifficultyLevels", "verifyDifficultyLevels", "dev",
      ["DL-01", "DL-02", "DL-03", "DL-04"],
      "needs the dev build (each level is completed with Synthetic Win)"),
+    ("verifyChooseLook", "verifyChooseLook", "run",
+     ["CL-01", "CL-03", "CL-04", "CL-05"], ""),
     ("verifyDaily", "verifyDaily", "run",
      ["DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-11", "DY-12", "DY-13",
       "DY-15", "DY-16", "DY-10", "DY-14"], ""),
-    ("resetDailyStats", "resetDailyStats", "run", ["RS-06", "RS-04", "RS-05"], ""),
     ("verifyMoreGamesIcons", "verifyMoreGamesIcons", "dev",
      ["PI-01", "PI-02", "PI-03", "PI-04", "PI-05", "PI-06"],
      "needs the dev build (the promo strip is drawn only after a won game)"),
-    ("verifyResetCancelled", "verifyResetCancelled", "run", ["RS-03"], ""),
-    ("resetStats", "resetStats", "run", ["RS-01", "RS-02"], ""),
+    ("verifyStatistics", "verifyStatistics", "run",
+     ["ST-01", "RS-06", "RS-04", "RS-05", "ST-03", "RS-03", "RS-01", "RS-02", "ST-04"], ""),
     ("verifyHelpShiftOnline", "verifyHelpShiftOnline", "run", ["HS-01"], ""),
-    ("verifyChooseLook", "verifyChooseLook", "run",
-     ["CL-01", "CL-03", "CL-04", "CL-05"], ""),
+    ("verifyAdFreeVersion", "verifyAdFreeVersion", "run",
+     ["AF-02", "AF-01", "AF-03", "AF-04"], ""),
+    ("submitFeedback", "submitFeedback", "run",
+     ["FB-02", "FB-03", "FB-04", "FB-05", "FB-06"], ""),
     ("verifyAds", "verifyAds", "dev",
      ["AD-01", "AD-02", "AD-03", "AD-04", "AD-06", "AD-07"],
      "needs the dev build (QA page → Max: Adapters pins AppLovin)"),
@@ -111,10 +121,6 @@ RUN_ORDER = [
     ("visitLastScore", "visitLastScore", "dev",
      ["LS-01", "LS-02", "LS-03", "LS-04", "LS-05"],
      "needs the dev build (Last Score needs a win; prod has no Synthetic Win)"),
-    ("verifyAdFreeVersion", "verifyAdFreeVersion", "run",
-     ["AF-02", "AF-01", "AF-03", "AF-04"], ""),
-    ("submitFeedback", "submitFeedback", "run",
-     ["FB-02", "FB-03", "FB-04", "FB-05", "FB-06"], ""),
 ]
 
 # Cases inside a run test that cannot run on the prod build.
@@ -127,9 +133,9 @@ STANDALONE = (
     "verifyAdFreeVersion", "submitFeedback",
 )
 
-# The promo-strip test brings the phone online; the reset tests and Contact
-# Us online run after that transition, so the runner makes it even when the
-# test itself is skipped.
+# The promo-strip test brings the phone online; Statistics, Contact Us online
+# and the online standalone tests run after that transition, so the runner
+# makes it even when the test itself is skipped.
 ONLINE_FROM = "verifyMoreGamesIcons"
 
 # Run cases that need the network. FL-02..05 also need a fresh install: the

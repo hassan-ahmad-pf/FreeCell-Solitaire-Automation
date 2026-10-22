@@ -653,6 +653,8 @@ def launch_to_menu(force: bool = False) -> bool:
             return True
     if leave_stats() and on_menu(2.0):
         return True
+    if expect_screen("options", timeout=0.8) and back() and on_menu(3.0):
+        return True
     leave_daily()
     if on_menu(3.0):
         return True

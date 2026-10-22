@@ -4,7 +4,8 @@
 HS-02  with Airplane Mode on and Wi-Fi off, Contact Us still leaves Options
        (the page shows no connection; the redirect is what is checked)
 
-The no-network page's "close icon" returns to Options.
+The no-network page's "close icon" returns to Options. Run after
+verifyOptions, it carries on from the Options page that test leaves open.
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyHelpShift.py
 """
@@ -26,8 +27,11 @@ SUPPORT_X = (30, 85)   # points
 
 def run() -> None:
     fc.go_offline()
-    fc.menu()
+    if not ui.expect_screen("options", timeout=1.0):
+        fc.menu()
     ui.expect(ui.open_options(), "Options did not open from the main menu")
+    if not ui.is_on("contact_us"):
+        fc.options_top()
     ui.expect(ui.is_on("contact_us"), "Contact Us is missing from Options")
     with caselog.case("HS-02") as c:
         ui.expect(ui.tap("contact_us", settle=4.0), "Contact Us could not be tapped")

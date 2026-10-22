@@ -2,10 +2,11 @@
 """Run the FreeCell suite and print a PASS/FAIL summary.
 
 The suite's tests in order, one line per case with its ID and title, then
-the report. The Daily cases (from FreeCell's TestRail list) run in
-verifyDaily and resetDailyStats; the timer and score cases (GP-12, GP-25)
-run in verifyGamePlay. tests/freecell_suite/catalog.py says where every
-test stands:
+the report. The order visits each screen once where the network and the
+data allow (catalog.py says why). The Daily cases (from FreeCell's TestRail
+list) run in verifyDaily, their statistics reset in verifyStatistics; the
+timer and score cases (GP-12, GP-25) run in verifyGamePlay.
+tests/freecell_suite/catalog.py says where every test stands:
 
   run    a test in tests/freecell_suite/<module>.py runs and records its
          cases
@@ -15,8 +16,8 @@ test stands:
 
 A bare run is the main suite; the standalone tests (Choose Look, Ad-free,
 Feedback, and the dev-only Ads, Ad trigger points, Last Score) run only when
-named. Every invocation merges into the same results, so the report covers
-both.
+named or with --all, which slots each in where its screen and network fit.
+Every invocation merges into the same results, so the report covers both.
 
 Network: the radios are set in Settings before FreeCell first opens;
 verifyFirstLaunch opens the policy links online, then goes offline for the

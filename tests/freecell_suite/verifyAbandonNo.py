@@ -4,7 +4,9 @@
 PL-04  with a paused game, Easy asks to abandon it; No keeps the picker open,
        no table starts, and the paused game (its Resume ribbon) is still there
 
-A paused game is made first if the picker has no Resume ribbon.
+A paused game is made first if the picker has no Resume ribbon (verifyPlay
+leaves one). It ends by resuming that game, so verifyRelaunch carries on
+with it on the table.
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyAbandonNo.py
 """
@@ -56,8 +58,8 @@ def run() -> None:
         c.shot(ui.shoot("AbandonNo"))
         c.note("No kept the picker and the paused game")
 
-    ui.back()
-    ui.expect(ui.to_menu(), "could not return to the menu after the picker")
+    ui.expect(ui.tap("resume", settle=2.0), "Resume could not be tapped")
+    ui.expect(ui.at_table(), "Resume did not reach the game table")
     print("PASS: declining abandon kept the picker open and the paused game")
 
 

@@ -1,4 +1,4 @@
-"""FreeCell's Daily mode, shared by verifyDaily and resetDailyStats.
+"""FreeCell's Daily mode, shared by verifyDaily and verifyStatistics.
 
 The calendar, its tips, the table HUD, the score popup and the statistics
 are drawn images with nothing in the accessibility tree, so screens are
