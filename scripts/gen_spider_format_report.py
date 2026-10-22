@@ -160,6 +160,31 @@ summary::-webkit-details-marker { display:none; }
   border-radius:8px; padding:10px; color:var(--ink); font-size:12px;
   white-space:pre-wrap; overflow-x:auto; margin:0 0 12px; }
 footer { color:var(--muted); font-size:12px; text-align:center; margin-top:36px; }
+.deck { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
+  -webkit-mask-image:linear-gradient(90deg, #000 0, #000 12%, rgba(0,0,0,.3) 28%,
+    rgba(0,0,0,.3) 72%, #000 88%, #000 100%);
+  mask-image:linear-gradient(90deg, #000 0, #000 12%, rgba(0,0,0,.3) 28%,
+    rgba(0,0,0,.3) 72%, #000 88%, #000 100%); }
+.wrap { position:relative; z-index:1; }
+.pc { position:absolute; left:0; top:0; will-change:transform; }
+.pc > i { display:block; animation:deal 1.1s cubic-bezier(.2,.7,.2,1) both; }
+.pc b { display:block; position:relative; width:46px; height:64px; border-radius:7px;
+  animation:bob var(--dur, 9s) ease-in-out var(--delay, 0s) infinite alternate; }
+.pc .face { background:#fff; border:1px solid #cddcf5; color:var(--blue-deep);
+  box-shadow:0 8px 18px rgba(30,76,197,.12); font:600 11px/1.05 var(--display); }
+.pc .face.red { color:#e05a5a; }
+.pc .ix { position:absolute; left:6px; top:5px; text-align:center; }
+.pc .pip { position:absolute; inset:0; display:grid; place-items:center; font-size:24px; }
+.pc .back { border:3px solid #fff; box-shadow:0 0 0 1px #cddcf5, 0 8px 18px rgba(30,76,197,.18);
+  background:repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 4px, transparent 4px 9px),
+    linear-gradient(160deg, var(--blue-light), var(--blue-deep)); }
+.pc .back::after { content:"\2660\FE0E"; position:absolute; inset:0; display:grid;
+  place-items:center; color:rgba(255,255,255,.8); font-size:18px; }
+@keyframes deal { from { opacity:0; transform:translateY(-60px) rotate(-25deg) scale(.7); } }
+@keyframes bob { from { transform:translateY(-7px) rotate(-5deg); }
+  to { transform:translateY(7px) rotate(5deg); } }
+@media (prefers-reduced-motion: reduce) { .pc > i, .pc b { animation:none; } }
+@media print { .deck { display:none; } }
 @media (max-width:760px) {
   .hero-meta { text-align:left; }
   .score { grid-template-columns:1fr; justify-items:center; margin:-72px 0 24px; padding:24px; }
@@ -191,6 +216,81 @@ FILTER_JS = """
     });
   });
   apply("all");
+})();
+"""
+
+# The background deck: cards on a jittered grid, each at its own depth.
+# Nearer cards are larger, stronger and move further per pixel scrolled,
+# turning a little; they wrap off-screen so the deck never runs out.
+DECK_JS = """
+(function () {
+  var deck = document.querySelector(".deck");
+  if (!deck) return;
+  var still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  var SUITS = [["\\u2660", ""], ["\\u2665", " red"], ["\\u2666", " red"], ["\\u2663", ""]];
+  var CELL = 180, SPARE = 240, cards = [], seed, width = 0;
+  function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+  function build() {
+    width = innerWidth;
+    seed = 20261019;
+    deck.textContent = "";
+    cards = [];
+    var span = innerHeight + SPARE;
+    var cols = Math.max(4, Math.round(width / CELL)), rows = Math.max(4, Math.round(span / CELL));
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var depth = 0.15 + rnd() * 0.55;
+        var card = {x: (c + 0.15 + rnd() * 0.7) / cols * width - 23,
+                    y: (r + 0.15 + rnd() * 0.7) / rows * span,
+                    depth: depth, rot: rnd() * 60 - 30, spin: (rnd() - 0.5) * 0.06,
+                    scale: 0.65 + depth * 0.75};
+        var outer = document.createElement("div"), deal = document.createElement("i"),
+            face = document.createElement("b");
+        outer.className = "pc";
+        outer.style.opacity = (0.35 + depth * 0.85).toFixed(2);
+        deal.style.animationDelay = (card.y / span * 0.9 + rnd() * 0.3).toFixed(2) + "s";
+        if (rnd() < 0.3) {
+          face.className = "back";
+        } else {
+          var suit = SUITS[Math.floor(rnd() * 4)], rank = RANKS[Math.floor(rnd() * 13)];
+          var pip = suit[0] + "\\ufe0e";
+          face.className = "face" + suit[1];
+          face.innerHTML = '<span class="ix">' + rank + "<br>" + pip + '</span><span class="pip">'
+                           + pip + "</span>";
+        }
+        face.style.setProperty("--dur", (7 + rnd() * 6).toFixed(1) + "s");
+        face.style.setProperty("--delay", (-rnd() * 12).toFixed(1) + "s");
+        deal.appendChild(face);
+        outer.appendChild(deal);
+        deck.appendChild(outer);
+        card.el = outer;
+        cards.push(card);
+      }
+    }
+    place();
+  }
+  function place() {
+    var scroll = still ? 0 : window.scrollY, span = innerHeight + SPARE;
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      var y = ((card.y - scroll * card.depth) % span + span) % span - SPARE / 2;
+      card.el.style.transform = "translate3d(" + card.x.toFixed(1) + "px," + y.toFixed(1) + "px,0)"
+        + " rotate(" + (card.rot + scroll * card.spin).toFixed(2) + "deg) scale("
+        + card.scale.toFixed(2) + ")";
+    }
+  }
+  var queued = false, resizing;
+  addEventListener("scroll", function () {
+    if (queued || still) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; place(); });
+  }, {passive: true});
+  addEventListener("resize", function () {
+    clearTimeout(resizing);
+    resizing = setTimeout(function () { innerWidth !== width ? build() : place(); }, 150);
+  });
+  build();
 })();
 """
 
@@ -436,7 +536,8 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FreeCell Solitaire — Regression Report</title>
-<style>{_font_face()}{CSS}</style></head><body><div class="wrap">
+<style>{_font_face()}{CSS}</style></head><body><div class="deck" aria-hidden="true"></div>
+<div class="wrap">
 <div class="hero">
 <div class="brand">{mark}<div><h1>FreeCell Solitaire</h1>
 <div class="sub">Regression report · Spider suite and FreeCell's own cases on the {html.escape(build_kind)} build</div></div></div>
@@ -458,7 +559,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <footer>Generated by scripts/gen_spider_format_report.py · cases and titles from the
 Spider TestRail suite, plus FreeCell's own cases (Daily, the gameplay timer and score) ·
 screenshots are compressed JPEG evidence from log/</footer>
-</div><script>{FILTER_JS}</script></body></html>
+</div><script>{FILTER_JS}{DECK_JS}</script></body></html>
 """
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as fh:
