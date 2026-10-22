@@ -4,7 +4,7 @@
 Header, pass-rate ring, run chips, filters, "Needs attention", then every
 TestRail case grouped by section with its screenshots — fed by
 tests/freecell_suite/run_all.py's log/freecell_suite_results.json. Each case carries its own status and
-evidence; dev-build and later cases show as skipped with the reason.
+evidence; dev-build cases show as skipped with the reason.
 
 Run:  ./.venv/bin/python scripts/gen_suite_report.py
 """
@@ -229,10 +229,10 @@ footer { color:var(--muted); font-size:12px; text-align:center; margin-top:36px;
 """
 
 STATUS = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "skipped",
-          "dev": "skipped", "later": "skipped", "stop": "skipped"}
+          "dev": "skipped", "stop": "skipped"}
 STATUS_PILL = {"passed": "var(--pass)", "failed": "var(--fail)", "skipped": "var(--skip)"}
 PILL_TEXT = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "blocked",
-             "dev": "dev build", "later": "later", "stop": "not run"}
+             "dev": "dev build", "stop": "not run"}
 NOT_RUN = "not run — the regression was stopped before this case"
 
 FILTER_JS = """
@@ -458,7 +458,7 @@ def _case_card(row: dict, uri_cache: dict, open_failed: bool = True) -> str:
     color = STATUS_PILL[status]
     parent = catalog.owner(row["id"]) or row["test"]
     detail = [f'<div class="evidence">Automated parent: {html.escape(parent)}</div>']
-    if row["status"] in ("dev", "later", "skip", "block"):
+    if row["status"] in ("dev", "skip", "block"):
         detail.append(f'<p class="noshot">Not run on this build: '
                       f'{html.escape(row["detail"] or "")}</p>')
     elif row["status"] == "fail":
@@ -596,11 +596,10 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
         row = recorded.get(cid)
         if row is None:
             owner = catalog.owner(cid)
-            reason = (catalog.LATER.get(cid) or catalog.DEV_CASES.get(cid)
+            reason = (catalog.DEV_CASES.get(cid)
                       or (catalog.entry(owner) or [None] * 5)[4] or "not run in this invocation")
-            status = "later" if cid in catalog.LATER else "dev" if reason.startswith("needs") else "skip"
-            if (stopped and owner in planned and cid not in catalog.LATER
-                    and (dev_build or cid not in catalog.DEV_CASES)):
+            status = "dev" if reason.startswith("needs") else "skip"
+            if stopped and owner in planned and (dev_build or cid not in catalog.DEV_CASES):
                 status, reason = "stop", NOT_RUN
             row = {"id": cid, "title": catalog.TITLES[cid], "section": catalog.SECTIONS[cid],
                    "test": owner, "status": status, "detail": reason, "shots": [], "seconds": 0}
@@ -643,8 +642,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
         kinds[row["status"]] = kinds.get(row["status"], 0) + 1
     scope = (f"{kinds.get('pass', 0) + kinds.get('fail', 0)} run · "
              f"{kinds.get('dev', 0)} dev build · "
-             f"{kinds.get('skip', 0) + kinds.get('block', 0)} skipped · "
-             f"{kinds.get('later', 0)} later")
+             f"{kinds.get('skip', 0) + kinds.get('block', 0)} skipped")
     if kinds.get("stop"):
         scope += f" · {kinds['stop']} not run (stopped)"
     subtitle = (f"Regression report · stopped midway — the cases run so far on the "

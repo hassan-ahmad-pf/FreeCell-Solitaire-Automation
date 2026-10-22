@@ -12,7 +12,6 @@ test stands:
   dev    needs the dev build — SKIP on the prod build; --dev runs the ones
          that have a module
   skip   cannot run on this install (FL-06: not installed from TestFlight)
-  later  a feature FreeCell does not have — listed, not run
 
 A bare run is the main suite; the standalone tests (Choose Look, Ad-free,
 Feedback, and the dev-only Ads, Ad trigger points, Last Score) run only when
@@ -138,7 +137,7 @@ def _load(module: str):
 
 
 def _offline_ids(ids: list[str]) -> list[str]:
-    return [c for c in ids if c not in catalog.ONLINE_CASES and c not in catalog.LATER]
+    return [c for c in ids if c not in catalog.ONLINE_CASES]
 
 
 def _plan(picked: list[str], dev: bool, offline: bool, everything: bool = False) -> list[tuple]:
@@ -255,17 +254,12 @@ def _case_rows(name: str, ids: list[str], dev: bool, offline: bool, error: str =
     log = print if say else _quiet
     if recorded is None:
         recorded = {r["id"]: r for r in caselog.results()}
-    runnable = [cid for cid in ids if cid not in catalog.LATER
-                and (dev or cid not in catalog.DEV_CASES)]
+    runnable = [cid for cid in ids if dev or cid not in catalog.DEV_CASES]
     rows, bad = [], False
     for cid in ids:
         if offline and cid in catalog.ONLINE_CASES:
             log(f"    [ONLINE] {cid} {catalog.TITLES[cid]} — online pass; "
                 "keeps its last result", flush=True)
-            continue
-        if cid in catalog.LATER:
-            log(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}", flush=True)
-            rows.append(_case_row(cid, name, "later", catalog.LATER[cid]))
             continue
         if cid not in runnable:
             why = catalog.DEV_CASES[cid]
@@ -312,9 +306,8 @@ def _stop_rows(plan: list[tuple], current: tuple[str, float] | None, tests: list
 def _list_cases(ids: list[str], dev: bool, offline: bool) -> None:
     """The test's cases in the order it runs them, before it starts; then
     the ones it leaves out, with why."""
-    left_out = {cid: catalog.LATER[cid] for cid in ids if cid in catalog.LATER}
-    left_out.update({cid: catalog.DEV_CASES[cid] for cid in ids
-                     if not dev and cid in catalog.DEV_CASES})
+    left_out = {cid: catalog.DEV_CASES[cid] for cid in ids
+                if not dev and cid in catalog.DEV_CASES}
     left_out.update({cid: "online pass; keeps its last result" for cid in ids
                      if offline and cid in catalog.ONLINE_CASES})
     runs = [cid for cid in ids if cid not in left_out]
@@ -424,7 +417,7 @@ def _summary(tests: list[dict], cases: list[dict], heading: str) -> list[dict]:
     stop = f", {by['stop']} not run (stopped)" if by.get("stop") else ""
     print(f"\n  cases: {by.get('pass', 0)}/{executed} executed passed, "
           f"{by.get('fail', 0)} failed, {by.get('skip', 0)} skipped, "
-          f"{by.get('dev', 0)} dev build, {by.get('later', 0)} later{stop}", flush=True)
+          f"{by.get('dev', 0)} dev build{stop}", flush=True)
     rescued = [c["id"] for c in cases if c.get("rerun") == "pass"]
     if rescued:
         print(f"  passed on the rerun: {', '.join(rescued)}", flush=True)
@@ -477,22 +470,20 @@ def main() -> int:
     print(f"wda:    {config.WDA_URL}", flush=True)
     print(f"build:  FreeCell {build[0]} ({build[1]}) — {'dev' if dev else 'prod'} run"
           f"{', offline cases only' if offline else ''}", flush=True)
-    n_run = n_dev = n_skip = n_later = 0
+    n_run = n_dev = n_skip = 0
     for name, _m, runs, ids, _w in plan:
-        n_later += sum(c in catalog.LATER for c in ids)
-        mine = [c for c in ids if c not in catalog.LATER]
         if runs:
-            n_run += len(_offline_ids(ids) if offline else mine)
+            n_run += len(_offline_ids(ids) if offline else ids)
         elif catalog.entry(name)[2] == "skip":
-            n_skip += len(mine)
+            n_skip += len(ids)
         else:
-            n_dev += len(mine)
+            n_dev += len(ids)
     label = ("offline cases only" if offline
              else "full regression (main suite and standalone tests)" if everything and not picked
              else "main suite" if not picked
              else "named tests")
-    print(f"cases:  {label} — {n_run} run, {n_dev} dev build (skipped), {n_skip} skipped, "
-          f"{n_later} later", flush=True)
+    print(f"cases:  {label} — {n_run} run, {n_dev} dev build (skipped), {n_skip} skipped",
+          flush=True)
     for i, (name, _module, runs, ids, reason) in enumerate(plan, 1):
         print(f"  {i:2}/{total}  {name:24} {'' if runs else 'SKIP — ' + reason}", flush=True)
 
@@ -523,14 +514,9 @@ def main() -> int:
                     print(f"\n>>> [{i}/{total}] SKIP   {name} — {reason}", flush=True)
                     status = "skip" if catalog.entry(name)[2] == "skip" else "dev"
                     for cid in ids:
-                        if cid in catalog.LATER:
-                            print(f"    [LATER] {cid} {catalog.TITLES[cid]} — "
-                                  f"{catalog.LATER[cid]}", flush=True)
-                            cases.append(_case_row(cid, name, "later", catalog.LATER[cid]))
-                        else:
-                            print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {reason}",
-                                  flush=True)
-                            cases.append(_case_row(cid, name, status, reason))
+                        print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {reason}",
+                              flush=True)
+                        cases.append(_case_row(cid, name, status, reason))
                     tests.append({"name": name, "module": module, "status": "skip",
                                   "started": _iso(), "seconds": 0.0, "error": reason})
                     print(f"<<< [{i}/{total}] SKIP   {name}", flush=True)

@@ -18,8 +18,8 @@ Each test is one of:
          on prod, run by ``run_all.py --dev``
   skip — cannot run on this install at all; skipped with its reason
 
-LATER lists the cases whose behaviour FreeCell does not have. They stay in
-the report and are filled in later against FreeCell's own gameplay.
+OP-07, GP-02, GP-08 and GP-09 are not in the case list: FreeCell has no
+Use Hearts option and no stock pile to deal from.
 """
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ RUN_ORDER = [
     ("verifyMainMenu", "verifyMainMenu", "run", ["MM-01"], ""),
     ("verifyStatsPage", "verifyStatsPage", "run", ["ST-01", "ST-03", "ST-04"], ""),
     ("verifyOptions", "verifyOptions", "run",
-     ["OP-01", "OP-03", "OP-04", "OP-05", "OP-06", "OP-07"], ""),
+     ["OP-01", "OP-03", "OP-04", "OP-05", "OP-06"], ""),
     ("verifyHelpShift", "verifyHelpShift", "run", ["HS-02"], ""),
     ("verifyHelpPage", "verifyHelpPage", "run", ["HP-01", "HP-02", "HP-03"], ""),
     ("verifyFreeCellLogo", "verifyFreeCellLogo", "run",
@@ -81,8 +81,8 @@ RUN_ORDER = [
     ("openDebugTools", "openDebugTools", "dev", ["QA-02", "QA-03", "QA-04"],
      "needs the dev build (the prod build has no QA entry point)"),
     ("verifyGamePlay", "verifyGamePlay", "run",
-     ["GP-01", "GP-12", "GP-25", "GP-02", "GP-03", "GP-04", "GP-05", "GP-06",
-      "GP-07", "GP-08", "GP-09", "GP-10", "GP-11", "GP-14"], ""),
+     ["GP-01", "GP-12", "GP-25", "GP-03", "GP-04", "GP-05", "GP-06",
+      "GP-07", "GP-10", "GP-11", "GP-14"], ""),
     ("verifyVictory", "verifyVictory", "dev", ["VI-01", "VI-02", "VI-03", "VI-04"],
      "needs the dev build (Complete Game / Synthetic Win)"),
     ("verifyDifficultyLevels", "verifyDifficultyLevels", "dev",
@@ -139,14 +139,6 @@ ONLINE_CASES = (
     "AF-01", "AF-02", "AF-03", "AF-04",
     "FB-02", "FB-03", "FB-04", "FB-05", "FB-06",
 )
-
-# Behaviour FreeCell does not have — filled in later.
-LATER = OrderedDict([
-    ("OP-07", "FreeCell difference — FreeCell's Options have no Use Hearts"),
-    ("GP-02", "FreeCell difference — FreeCell has no stock pile to deal from"),
-    ("GP-08", "FreeCell difference — FreeCell has no Use Hearts"),
-    ("GP-09", "FreeCell difference — FreeCell has no Use Hearts"),
-])
 
 # How the FreeCell build carries out a case, where its title alone does not say.
 ADAPTED = OrderedDict([
@@ -240,22 +232,20 @@ def entry(name: str):
 
 
 def runnable_ids(ids: list[str]) -> list[str]:
-    return [cid for cid in ids if cid not in LATER and cid not in DEV_CASES]
+    return [cid for cid in ids if cid not in DEV_CASES]
 
 
 def counts() -> dict:
-    executed = dev = later = skipped = 0
+    executed = dev = skipped = 0
     for _name, _module, kind, ids, _why in RUN_ORDER:
         for cid in ids:
-            if cid in LATER:
-                later += 1
-            elif kind == "skip":
+            if kind == "skip":
                 skipped += 1
             elif kind == "dev" or cid in DEV_CASES:
                 dev += 1
             else:
                 executed += 1
-    return {"run": executed, "dev build": dev, "skip": skipped, "later": later}
+    return {"run": executed, "dev build": dev, "skip": skipped}
 
 
 def validate() -> dict:
@@ -279,7 +269,7 @@ def validate() -> dict:
     missing = sorted(set(FREECELL_ONLY) - set(ids))
     if missing:
         raise ValueError(f"FreeCell cases not found in {FREECELL_CASES}: {missing}")
-    stray = sorted((set(LATER) | set(DEV_CASES) | set(ADAPTED)) - set(ids))
+    stray = sorted((set(DEV_CASES) | set(ADAPTED)) - set(ids))
     if stray:
         raise ValueError(f"notes for unknown cases: {stray}")
     return counts()

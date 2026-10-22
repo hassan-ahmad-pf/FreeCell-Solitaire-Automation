@@ -37,7 +37,7 @@ TTY = sys.stdout.isatty()
 
 GREEN, RED, YELLOW, CYAN, DIM, BOLD, BAR = "1;32", "1;31", "1;33", "1;36", "2", "1", "7"
 MARKS = {"PASS": ("✓ PASS ", GREEN), "FAIL": ("✗ FAIL ", RED), "SKIP": ("– SKIP ", YELLOW),
-         "LATER": ("… LATER", YELLOW), "BLOCKED": ("! BLOCK", YELLOW), "ONLINE": ("~ KEPT ", DIM)}
+         "BLOCKED": ("! BLOCK", YELLOW), "ONLINE": ("~ KEPT ", DIM)}
 
 PLAN = re.compile(r"^\s+(\d+)/(\d+)\s+(\S+)\s*(?:SKIP — (.*))?$")
 CASES = re.compile(r"^cases:\s+(.*?) — (\d+) run")
@@ -46,7 +46,7 @@ TEST_END = re.compile(r"^<<< \[(\d+)/(\d+)\] (PASS|FAIL|SKIP)\s+(\S+)(?:\s+\(\s*
 CASE_RUN = re.compile(r"^\s+\[RUN \] (\S+) ?(.*)$")
 CASE_LIST = re.compile(r"^\s+\[LIST\] (\d+|-)/(\d+) (\S+) (.+?)(?: \(not run here: (.*)\))?$")
 STEP = re.compile(r"^\s+\[STEP\] (.*)$")
-CASE_END = re.compile(r"^\s+\[(PASS|FAIL|SKIP|LATER|BLOCKED|ONLINE)\] (\S+) (.+?)"
+CASE_END = re.compile(r"^\s+\[(PASS|FAIL|SKIP|BLOCKED|ONLINE)\] (\S+) (.+?)"
                       r"(?: \((\d+(?:\.\d+)?)s\))?(?: — (.*))?$")
 SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP|STOP)  (\S+)\s+\((?:\s*([\d.]+)s|not started)\)"
                           r"(?:\s+\+ rerun ([\d.]+)s)?$")
