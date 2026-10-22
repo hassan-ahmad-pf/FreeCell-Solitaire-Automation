@@ -33,11 +33,13 @@ def run() -> None:
         ui.expect(ui.tap("contact_us", settle=4.0), "Contact Us could not be tapped")
         time.sleep(1.0)
         shot = c.shot(ui.shoot("HelpShift"))
+        caselog.step("Check Contact Us left Options for the support page")
         ui.expect(not ui.is_on("screen_options"),
                   f"Contact Us did not leave Options (see {shot})")
         c.note("left Options for the no-network support page")
 
     if not fc.tap_named("Button", "close icon", settle=2.0):
+        caselog.step("Tap the X at the top left of the support page")
         fc.tap_point(*SUPPORT_X, settle=2.0)
     ui.expect(ui.expect_screen("options", timeout=8.0),
               "closing the support page did not return to Options")

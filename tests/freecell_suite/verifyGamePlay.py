@@ -61,6 +61,7 @@ def _top_y() -> float:
 def _toggle_lower(start: float) -> float:
     """Tap the lower / raise control; the playfield's new top."""
     for point in LOWER:
+        caselog.step("Tap 'tap to lower / raise' under the cards")
         helpers.wda_tap(point, settle=2.5)
         now = _top_y()
         if abs(now - start) > SHIFT:
@@ -77,6 +78,7 @@ def run() -> None:
     ui.expect(ui.at_table(), "Easy did not reach the table")
 
     with caselog.case("GP-01") as c:
+        caselog.step("Check the table shows Back, menu, undo, lower / raise and hints")
         missing = [name for name in CONTROLS if not ui.is_on(name)]
         lowered = ui.is_on("back_game") and ui.find("back_game")[1] > 400
         if not (ui.is_on("hint_lower") or lowered):
@@ -87,18 +89,22 @@ def run() -> None:
     ui.await_rules_prompt()
 
     with caselog.case("GP-12") as c:
+        caselog.step(f"Wait {IDLE:.0f} s without touching the cards")
         time.sleep(IDLE)
         idle = c.shot(ui.shoot("GamePlayIdle"))
         timer0, score0 = fc.hud(idle)
         footer = fc.table_footer(idle)
+        caselog.step(f"Check the timer still reads 0:00 under '{TAP_TO_START}'")
         ui.expect(timer0 == 0, f"the timer reads {fc.mmss(timer0)} after {IDLE:.0f}s on a new "
                                f"deal without a move (see {idle})")
         ui.expect(any(TAP_TO_START in line.lower() for line in footer),
                   f"the footer reads {footer}, not '{TAP_TO_START}' (see {idle})")
         _before, _after, card = fc.play_to_foundation()
+        caselog.step(f"Wait {TIMER_RUN:.0f} s for the timer to run")
         time.sleep(TIMER_RUN)
         moved, timer1, score1 = fc.hud_after_move("GamePlayCardUp")
         c.shot(moved)
+        caselog.step("Check the timer has started")
         ui.expect(timer1 is not None and timer1 > 0,
                   f"the timer did not start: 0:00 before {card} went up, {fc.mmss(timer1)} "
                   f"after (see {moved})")
@@ -106,6 +112,8 @@ def run() -> None:
                f"foundation: timer 0:00 → {fc.mmss(timer1)}")
     with caselog.case("GP-25") as c:
         c.shot(moved)
+        caselog.step(f"Check the score went up when {card} reached its foundation "
+                     f"(it was {score0 or 0:,})")
         ui.expect(score1 is not None and score1 > (score0 or 0),
                   f"the score did not count {card} going up to its foundation: "
                   f"{score0 or 0:,} before, {'unreadable' if score1 is None else f'{score1:,}'} "
@@ -115,9 +123,11 @@ def run() -> None:
     with caselog.case("GP-03") as c:
         before, after, card = fc.play_one_move()
         c.shot(ui.shoot("GamePlayMoved"))
+        caselog.step("Tap 'tap to undo' under the cards")
         helpers.wda_tap(UNDO, settle=1.5)
         undone = fc.settled_board()
         c.shot(ui.shoot("GamePlayUndone"))
+        caselog.step(f"Check every card is back where it was before {card} moved")
         ui.expect(undone == before, f"undo did not restore the board after moving {card}: "
                                     f"{before.moved(undone) if undone else 'unreadable'}")
         c.note(f"moved {card}, undo restored every card")
@@ -130,12 +140,14 @@ def run() -> None:
             start = now
             now = _toggle_lower(start)
         c.shot(ui.shoot("GamePlayLowered"))
+        caselog.step("Check the cards moved down the screen")
         ui.expect(now > start + SHIFT, f"tap to lower did not drop the playfield "
                                        f"(top {start:.0f} -> {now:.0f} pt)")
         c.note(f"top {start:.0f} -> {now:.0f} pt")
     with caselog.case("GP-05") as c:
         back = _toggle_lower(now)
         c.shot(ui.shoot("GamePlayRaised"))
+        caselog.step("Check the cards moved back up to where they started")
         ui.expect(abs(back - start) <= SHIFT / 3,
                   f"tap to raise did not bring the playfield back ({now:.0f} -> {back:.0f}, "
                   f"started at {start:.0f} pt)")
@@ -145,8 +157,10 @@ def run() -> None:
         before = ui.shoot("_hint_before")
         deck = ui.find("hint_deck")
         ui.expect(deck, "the hint deck (bottom right) is not on the table")
+        caselog.step("Tap 'tap for hints' (the hint deck, bottom right)")
         helpers.tap(deck, settle=0.8)
         after = c.shot(ui.shoot("GamePlayHint"))
+        caselog.step("Check a hint is highlighted on the cards")
         more = ui.is_on("hint_more")
         moved = fc.diff_frac(before, after, PLAYFIELD)
         ui.expect(more or moved >= HINT_SHOWN,
@@ -156,6 +170,7 @@ def run() -> None:
 
     with caselog.case("GP-07") as c:
         ui.expect(ui.open_table_drawer(), "the in-game menu did not open")
+        caselog.step("Check the table menu lists Replay, Abandon, Options, New, Help and FAQ")
         missing = [name for name in DRAWER if not ui.is_on(name)]
         c.shot(ui.shoot("GamePlayDrawer"))
         ui.expect(not missing, f"the in-game menu is missing {missing}")
@@ -165,6 +180,7 @@ def run() -> None:
     touched = False
     try:
         with caselog.case("GP-10") as c:
+            caselog.step("Check the timer, score, multiplier and move count show on the table")
             on_shot = ui.settled_shot("RichFeaturesTableOn")
             on_ink = ui.hud_ink(on_shot)
             absent = [name for name in ui.HUD_ITEMS if on_ink[name] < ui.HUD_SEEN]
@@ -174,6 +190,7 @@ def run() -> None:
             touched = True
             c.shot(ui.switch_to(RICH, False, RICH_TITLE, "RichFeaturesOptionOff"))
             off_shot = c.shot(ui.back_to_table_shot("RichFeaturesOff"))
+            caselog.step("Check the timer, score, multiplier and move count are hidden")
             off_ink = ui.hud_ink(off_shot)
             still = [name for name in ui.HUD_ITEMS if off_ink[name] > ui.HUD_GONE]
             ui.expect(not still, f"Rich Features OFF still draws {still} ({off_ink})")
@@ -184,6 +201,7 @@ def run() -> None:
             ui.switch_to(RICH, True, RICH_TITLE, "RichFeaturesOptionBackOn")
             touched = False
             again_shot = c.shot(ui.back_to_table_shot("RichFeaturesBackOn"))
+            caselog.step("Check the timer, score, multiplier and move count are back")
             again_ink = ui.hud_ink(again_shot)
             gone = [name for name in ui.HUD_ITEMS if again_ink[name] < ui.HUD_SEEN]
             ui.expect(not gone, f"Rich Features ON did not bring back {gone} ({again_ink})")
@@ -202,6 +220,7 @@ def run() -> None:
         ui.expect(ui.at_table(timeout=8.0), "New did not leave a game table")
         after = fc.settled_board()
         c.shot(ui.shoot("GamePlayNew"))
+        caselog.step("Check a different deal is on the table")
         ui.expect(before is not None and after is not None, "could not read the boards")
         moved = len(before.moved(after))
         ui.expect(moved >= NEW_DEAL, f"New left the same deal ({moved} cards moved)")

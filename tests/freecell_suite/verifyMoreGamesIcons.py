@@ -68,6 +68,7 @@ def run() -> None:
     fc.menu()
 
     with caselog.case("PI-01") as c:
+        caselog.step(f"Check all {len(ICONS)} promo icons show on the main menu")
         deadline = time.time() + STRIP_WAIT
         missing = [label for _c, button, label, _e in ICONS if not _icon_rect(button)]
         while missing and time.time() < deadline:
@@ -83,7 +84,9 @@ def run() -> None:
         with caselog.case(cid) as c:
             r = _icon_rect(button)
             ui.expect(r, f"the {label} icon is no longer on the menu")
+            caselog.step(f"Tap the {label} promo icon on the main menu")
             fc.tap_rect(r, settle=3.0)
+            caselog.step(f"Check the App Store opens on {expected}")
             went = fc.left_app()
             ui.expect(went == fc.APP_STORE,
                       f"the {label} icon did not open the App Store — in front: "
@@ -95,6 +98,7 @@ def run() -> None:
             ui.expect(not why, f"the {label} icon opened the wrong page: {why}")
             ui.expect(fc.tap_back_to_app() or fc.resume(),
                       f"could not switch back to FreeCell from {label}'s store page")
+            caselog.step("Check the main menu is showing")
             ui.expect(ui.on_menu(10.0),
                       f"came back from {label}'s store page, but not to the main menu")
             c.note(f"App Store: {title}; back on the menu")

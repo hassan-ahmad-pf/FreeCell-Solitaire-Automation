@@ -39,6 +39,7 @@ import caselog  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
+from caselog import says  # noqa: E402
 
 DEBUGGER = "MAX Mediation Debugger"
 LIVE_NETWORK = "Select Live Network"
@@ -66,6 +67,7 @@ def _live_row() -> tuple[str, dict] | None:
     return None
 
 
+@says(f"Scroll the debugger down to its Ads section ({LIVE_NETWORK})")
 def _scroll_to_live_row() -> tuple[str, dict] | None:
     for _ in range(SWIPES):
         found = _live_row()
@@ -100,6 +102,7 @@ def _unwind() -> None:
         ui.tap("qa_page_back", settle=2.0)
 
 
+@says("Go back into the game: Play, then Resume")
 def _resume_table() -> None:
     """Back onto the paused game from the menu: Play → Resume (or Easy)."""
     if ui.at_table(timeout=2.0):
@@ -119,6 +122,7 @@ def _resume_table() -> None:
 
 def run() -> None:
     fc.go_online()
+    caselog.step("Bring FreeCell to the front")
     try:
         helpers.launch_app(force=False)
     except Exception:  # noqa: BLE001
@@ -130,6 +134,7 @@ def run() -> None:
         fc.ensure_qa()
         ui.expect(ui.tap("qa_watermark", settle=3.0),
                   "the menu has no CONFIDENTIAL watermark to open the QA page from")
+        caselog.step("Check the QA page opened with its 'Max: Adapters' row")
         ui.expect(ui.seen("qa_page_adapters", timeout=6.0),
                   "the QA page did not open, or it has no 'Max: Adapters' row")
         c.shot(ui.shoot("ad_dev_panel"))
@@ -137,6 +142,7 @@ def run() -> None:
 
     with caselog.case("AD-02") as c:
         _open_debugger()
+        caselog.step(f"Check the {DEBUGGER} opened inside FreeCell")
         ui.expect(_debugger_open(timeout=12.0),
                   f"'Adapters' did not open the {DEBUGGER} — in front: "
                   f"{helpers.active_app() or 'unknown'}")
@@ -164,7 +170,9 @@ def run() -> None:
         already = row_label == LIVE_NETWORK_SELECTED and _same_row(
             row, fc.visible_rect("StaticText", NETWORK))
         print(f"  {NETWORK} already the live network: {already}", flush=True)
+        caselog.step(f"Tap '{row_label}' in the debugger")
         fc.tap_rect(row, settle=3.0)
+        caselog.step(f"Check the '{LIVE_NETWORK}' picker opened and lists {NETWORK}")
         ui.expect(_window(LIVE_NETWORK), f"tapping {row_label!r} did not open the "
                                          f"{LIVE_NETWORK!r} picker")
         pick = fc.visible_rect("StaticText", NETWORK)
@@ -172,7 +180,9 @@ def run() -> None:
         tick = fc.named("Button", "checkmark")
         print(f"  a network was already ticked: {bool(tick)}", flush=True)
         if not _same_row(pick, fc.rect(tick) if tick else None):
+            caselog.step(f"Tap {NETWORK} to make it the live network")
             fc.tap_rect(pick, settle=3.0)
+        caselog.step(f"Check the checkmark is on {NETWORK}")
         tick = fc.named("Button", "checkmark", timeout=8.0)
         ui.expect(_same_row(fc.visible_rect("StaticText", NETWORK),
                             fc.rect(tick) if tick else None),
@@ -189,7 +199,7 @@ def run() -> None:
         ui.expect(ui.tap("qa_page_back", settle=2.0), "the QA page has no back control")
         ui.expect(ui.on_menu(6.0), "back from the QA page did not reach the main menu")
         fc.loaded_table("the leave-game ad")
-        print(f"  waiting {TABLE_WAIT:.0f}s on the table", flush=True)
+        caselog.step(f"Wait {TABLE_WAIT:.0f} s on the game table (ads have a cooldown)")
         time.sleep(TABLE_WAIT)
         ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
         where = "leave-game"
@@ -199,6 +209,7 @@ def run() -> None:
             _resume_table()
             ui.expect(fc.wait_ad(timeout=ENTER_AD_WAIT),
                       "neither Back nor the next resume showed an interstitial")
+        caselog.step("Check the ad plays inside FreeCell")
         ui.expect(helpers.in_app(), f"the {where} ad left FreeCell for "
                                     f"{helpers.active_app()}")
         c.shot(ui.shoot("ad_interstitial"))
@@ -214,6 +225,7 @@ def run() -> None:
             if fc.ad_up():
                 fc.close_or_wait("resume after the ad")
         ui.settle_prompts()
+        caselog.step("Check the game table is showing after the ad")
         ui.expect(ui.at_table(timeout=10.0), "the game table is not showing after the ad")
         c.shot(ui.shoot("ad_back_on_table"))
         c.note("back on the game table")

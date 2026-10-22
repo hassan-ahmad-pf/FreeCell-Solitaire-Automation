@@ -21,10 +21,12 @@ sys.path[:0] = [HERE, os.path.dirname(os.path.dirname(HERE))]
 import caselog  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
+from caselog import says  # noqa: E402
 
 MAX_SWIPES = 25
 
 
+@says(lambda name, max_swipes=MAX_SWIPES: f"Scroll down until {ui.label(name)} shows")
 def scroll_until(name: str, max_swipes: int = MAX_SWIPES) -> bool:
     for _ in range(max_swipes):
         if ui.is_on(name):
@@ -43,6 +45,7 @@ def run() -> None:
     fc.menu()
     with caselog.case("HP-01") as c:
         ui.expect(ui.tap("menu_help", settle=2.2), "Help control not found on the menu")
+        caselog.step("Check the Help page opened")
         ui.expect(ui.expect_screen("help"), "tapping Help did not open Help")
         ui.expect(not ui.on_menu(1.0), "the main menu is still showing")
         c.shot(ui.shoot("Help"))
@@ -54,6 +57,7 @@ def run() -> None:
         c.note("scrolled down to the FAQ link")
     with caselog.case("HP-03") as c:
         ui.back()
+        caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(6.0), "Help back did not return to the main menu")
         c.note("back on the main menu")
     print("PASS: Help opened, scrolled to its FAQ link, and returned")

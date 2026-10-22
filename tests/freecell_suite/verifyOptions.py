@@ -32,6 +32,7 @@ def _ends_and_middle(name: str) -> list[float]:
     got = []
     for target in (0.0, 1.0, 0.5):
         value = fc.slider_set(name, target, tol=TOL)
+        caselog.step(f"Check {name} reads {target:.0%}")
         ui.expect(value is not None, f"{name} could not be read")
         ui.expect(abs(value - target) <= TOL,
                   f"{name} reads {value:.0%} after dragging to {target:.0%}")
@@ -43,6 +44,7 @@ def run() -> None:
     fc.menu()
     with caselog.case("OP-01") as c:
         ui.expect(ui.open_options(), "Options did not open from the main menu")
+        caselog.step("Check the Options page opened")
         ui.expect(not ui.on_menu(1.0), "the main menu is still showing")
         c.shot(ui.shoot("Options"))
         c.note("Options opened")
@@ -63,6 +65,7 @@ def run() -> None:
             ui.back()
             ui.expect(ui.on_menu(6.0), "Options back did not reach the main menu")
             ui.expect(ui.open_options(), "Options did not open again")
+            caselog.step(f"Check Applause Volume still reads {kept:.0%}")
             again = fc.slider_value("Applause Volume")
             ui.expect(again is not None and abs(again - kept) <= KEPT,
                       f"Applause Volume was {kept:.0%} and reads {again} after reopening")
@@ -72,8 +75,10 @@ def run() -> None:
             start = fc.switch_state("Auto Mute Sounds")
             ui.expect(start is not None, "Auto Mute Sounds could not be read")
             flipped = fc.switch_tap("Auto Mute Sounds")
+            caselog.step(f"Check Auto Mute Sounds turned {'OFF' if start else 'ON'}")
             ui.expect(flipped == (not start), f"the first tap left Auto Mute Sounds {start}")
             back = fc.switch_tap("Auto Mute Sounds")
+            caselog.step(f"Check Auto Mute Sounds is back {'ON' if start else 'OFF'}")
             ui.expect(back == start, f"the second tap did not return Auto Mute Sounds to {start}")
             c.note(f"{'on' if start else 'off'} → {'on' if flipped else 'off'} → "
                    f"{'on' if back else 'off'}")
@@ -87,6 +92,7 @@ def run() -> None:
             c.shot(ui.shoot("OptionsCardLowering"))
             c.note("min {:.0%}, max {:.0%}, middle {:.0%}".format(*got))
     finally:
+        caselog.step("Put the Options values back as they were before the test")
         if lowering is not None:
             fc.slider_set("Card Lowering", lowering, tol=0.02)
         if applause is not None:

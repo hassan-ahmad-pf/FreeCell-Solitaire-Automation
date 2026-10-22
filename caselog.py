@@ -13,10 +13,15 @@ phone's setup prevents (no Mail account).
 
 ``tests/run_all.py`` calls ``begin()`` before every test and reads
 ``results()`` after it. A test run on its own prints its cases at exit.
+
+``step()`` says what the test is doing now, one line under the running case
+(``[STEP] …``); helpers decorated with ``says()`` say it themselves.
 """
 from __future__ import annotations
 
 import atexit
+import functools
+import os
 import time
 from contextlib import contextmanager
 
@@ -25,6 +30,8 @@ _RESULTS: list[dict] = []
 _STANDALONE = True
 _TITLES: dict[str, str] = {}
 _ON_FAIL = None
+_DEPTH = 0  # how many says() helpers are running: their inner steps stay quiet
+_LAST_STEP = ""
 
 
 class _Case:
@@ -35,6 +42,7 @@ class _Case:
 
     def shot(self, path):
         self.shots.append(str(path))
+        step(f"Save the screenshot {os.path.basename(str(path))} as evidence")
         return path
 
     def note(self, text: str) -> None:
@@ -42,10 +50,50 @@ class _Case:
 
 
 def begin(test: str) -> None:
-    global _TEST, _STANDALONE
+    global _TEST, _STANDALONE, _LAST_STEP
     _TEST = test
     _STANDALONE = False
+    _LAST_STEP = ""
     _RESULTS.clear()
+
+
+def step(text: str) -> None:
+    """What the test is doing now, in plain words. Quiet inside a says()
+    helper (its own step covers it) and when it repeats the step before."""
+    global _LAST_STEP
+    if _DEPTH or not text or text == _LAST_STEP:
+        return
+    _LAST_STEP = text
+    print(f"      [STEP] {text}", flush=True)
+
+
+def says(describe, done: bool = False):
+    """Decorator: each call of the helper is one step, worded by *describe*
+    (a string, or a function of the call's arguments returning one or None).
+    *done*: said after the call, and only when it returned something true
+    (a tap that found its control)."""
+    def wrap(fn):
+        @functools.wraps(fn)
+        def inner(*args, **kwargs):
+            global _DEPTH
+            text = None
+            if not _DEPTH:
+                try:
+                    text = describe(*args, **kwargs) if callable(describe) else describe
+                except Exception:  # noqa: BLE001
+                    text = None
+                if text and not done:
+                    step(text)
+            _DEPTH += 1
+            try:
+                result = fn(*args, **kwargs)
+            finally:
+                _DEPTH -= 1
+            if text and done and result:
+                step(text)
+            return result
+        return inner
+    return wrap
 
 
 def titles(mapping: dict[str, str]) -> None:
@@ -101,7 +149,9 @@ def _title(cid: str) -> str:
 
 @contextmanager
 def case(cid: str, soft: bool = False):
+    global _LAST_STEP
     rec = _Case(cid)
+    _LAST_STEP = ""
     print(f"    [RUN ] {cid}{_title(cid)}", flush=True)
     start = time.time()
     try:

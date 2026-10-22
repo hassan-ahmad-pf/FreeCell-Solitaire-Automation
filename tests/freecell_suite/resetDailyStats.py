@@ -36,6 +36,7 @@ def run() -> None:
         daily.tap_reset()
         c.shot(ui.shoot("ResetDailyAsk"))
         ui.expect(helpers.answer_alert("No", settle=1.5), "could not press No")
+        caselog.step("Check the alert closed and Statistics stayed on the Daily tab")
         ui.expect(not helpers.alert_text(), "an alert is still up after No")
         ui.expect(daily.daily_tab_on(ui.screen_rgb()), "No did not leave Statistics on Daily")
         c.shot(ui.shoot("ResetDailyNo"))
@@ -43,6 +44,7 @@ def run() -> None:
         ui.expect(ui.on_menu(6.0) or ui.to_menu(), "Statistics back did not return to the menu")
         after, shot = daily.read_stats("DailyStatsAfterNo")
         c.shot(shot)
+        caselog.step("Check the Daily scores did not change")
         ui.expect(after[:len(before)] == before[:len(after)],
                   f"declining changed the Daily scores ({daily.stats_summary(before)} → "
                   f"{daily.stats_summary(after)}, see {shot})")
@@ -51,9 +53,11 @@ def run() -> None:
 
     with caselog.case("RS-04") as c:
         text = daily.tap_reset()
+        caselog.step("Check the alert offers No and Yes")
         buttons = helpers.alert_buttons()
         ui.expect({"No", "Yes"} <= set(buttons), f"the alert offers {buttons}, not No and Yes")
         ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press Yes")
+        caselog.step("Check the second 'just to be on the safe side' question appears")
         second = fc.wait_alert("safe side", timeout=6.0)
         ui.expect(second, "the second 'safe side' confirmation did not appear")
         c.shot(ui.shoot("ResetDailySafeSide"))
@@ -64,10 +68,12 @@ def run() -> None:
         ui.expect(ui.on_menu(10.0), "the main menu did not come back after both Yes")
         after, shot = daily.read_stats("DailyStatsAfterReset")
         c.shot(shot)
+        caselog.step("Check Daily reads 0 / none on every level")
         ui.expect(daily.stats_empty(after), f"Daily did not go to 0 / none after the reset "
                                             f"({daily.stats_summary(after)}, see {shot})")
         solo_after, solo_shot = daily.read_stats("SoloStatsAfterDailyReset", tab="solo")
         c.shot(solo_shot)
+        caselog.step("Check the Solo scores did not change")
         ui.expect(solo_after[daily.TOTALS] == solo[daily.TOTALS],
                   f"the Daily reset changed the Solo scores ({daily.stats_summary(solo)} → "
                   f"{daily.stats_summary(solo_after)}, see {solo_shot})")

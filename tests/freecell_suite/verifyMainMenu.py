@@ -25,6 +25,7 @@ CONTROLS = ui.MENU_ITEMS + ("menu_logo",)
 def run() -> None:
     fc.menu()
     with caselog.case("MM-01") as c:
+        caselog.step(f"Check the {len(ui.MENU_ITEMS)} main-menu buttons and the FreeCell logo show")
         deadline = time.time() + 20.0
         missing = list(CONTROLS)
         while missing and time.time() < deadline:

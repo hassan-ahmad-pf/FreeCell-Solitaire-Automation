@@ -27,9 +27,11 @@ cd /Users/hassan/Automation-FA/FreeCell-Solitaire-Automation && ./scripts/regres
 `scripts/regression.sh` starts WDA (re-signing it if due), keeps the Mac
 awake and runs the FreeCell suite on the dev build, standalone tests
 included (about 80 minutes). The console shows the plan with each test's
-time on the last run, every case as it starts and its PASS / FAIL / SKIP
-with its time and note, and a status bar with the elapsed time, the current
-case, pass and fail counts and the time left. It ends with a RESULT line,
+time on the last run; for each test, the list of its cases in the order they
+run; then every case as it starts (`▶ 2/3 PL-02 …`), the numbered steps it
+performs (taps, checks, waits, screenshots) and its PASS / FAIL / SKIP with
+its time and note; and a status bar with the elapsed time, the current case,
+the case up next, pass and fail counts and the time left. It ends with a RESULT line,
 opens the HTML report and keeps a plain log in `log/regression_<time>.log`.
 
 If any case fails, the runner writes the report, runs each failed test once

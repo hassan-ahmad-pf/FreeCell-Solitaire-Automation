@@ -50,9 +50,11 @@ def _enter_code() -> None:
     point = ui.find("about_emblem")
     ui.expect(point, "the crown emblem is not on the About screen, so the QA "
                      "gesture has nothing to tap")
+    caselog.step(f"Tap the crown emblem {config.QA_TAPS} times in quick succession")
     ui.expect(helpers.rapid_tap(point, times=config.QA_TAPS),
               "the tap burst could not be sent as one on-device action, so it "
               "was not a rapid gesture and this result is inconclusive")
+    caselog.step("Type the QA code on the keypad that opened")
     ui.expect(helpers.type_keys(config.QA_CODE),
               "the QA code could not be typed — no keypad took the focus after "
               f"{config.QA_TAPS} emblem taps")
@@ -83,6 +85,8 @@ def run() -> None:
             ui.expect(not ui.seen("qa_watermark", timeout=3.0),
                       "entering the code again did not turn QA off — it is "
                       "supposed to toggle")
+        caselog.step("Check the menu has no CONFIDENTIAL watermark and About has no "
+                     "'reset alerts' control")
         ui.expect(not ui.is_on("qa_watermark"),
                   "the menu shows the CONFIDENTIAL watermark before the unlock")
         _about()
@@ -95,12 +99,14 @@ def run() -> None:
     with caselog.case("QA-03") as c:
         _enter_code()
         _menu_after_code()
+        caselog.step("Check the CONFIDENTIAL watermark now shows on the main menu")
         ui.expect(ui.seen("qa_watermark", timeout=6.0),
                   f"{config.QA_TAPS} emblem taps and the code did not put the "
                   "CONFIDENTIAL watermark on the menu")
         c.shot(ui.shoot("debug_tools_menu"))
         # About lays out its QA controls when it opens, so it is opened afresh.
         _about()
+        caselog.step("Check About shows the 'reset alerts' control in its bottom-right corner")
         point = _reset_alerts(timeout=4.0)
         ui.expect(point, "QA is on (CONFIDENTIAL on the menu) but About has no "
                          "'reset alerts' control")
@@ -114,6 +120,7 @@ def run() -> None:
     with caselog.case("QA-04") as c:
         _enter_code()
         _menu_after_code()
+        caselog.step("Check the watermark and the 'reset alerts' control are gone")
         ui.expect(not ui.seen("qa_watermark", timeout=3.0),
                   "the code entered again left the CONFIDENTIAL watermark on the menu")
         _about()
@@ -123,7 +130,7 @@ def run() -> None:
         _menu_after_code()
         c.note("the code again: watermark and 'reset alerts' gone")
 
-    print("  turning QA back on for the tests after this one", flush=True)
+    caselog.step("Turn QA back on for the tests after this one")
     _enter_code()
     _menu_after_code()
     ui.expect(ui.seen("qa_watermark", timeout=6.0),

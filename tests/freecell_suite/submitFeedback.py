@@ -46,6 +46,7 @@ def run() -> None:
 
     with caselog.case("FB-02") as c:
         ui.expect(ui.tap(LINK, settle=3.0), "the 'submit feedback' link could not be tapped")
+        caselog.step("Check FreeCell asks about feedback, offering Cancel and Write Email")
         text = fc.wait_alert("feedback", timeout=6.0)
         ui.expect(text, "tapping 'submit feedback' did not raise the feedback prompt "
                         f"(alert on screen: {helpers.alert_text()!r})")
@@ -58,6 +59,7 @@ def run() -> None:
     with caselog.case("FB-03") as c:
         ui.expect(helpers.answer_alert("Write Email", settle=4.0),
                   "could not press Write Email")
+        caselog.step("Check Mail opens with a new draft")
         went = fc.left_app(timeout=12.0)
         ui.expect(went == fc.MAIL,
                   f"Write Email did not open Mail — in {went} (is a Mail account set up?)")
@@ -71,6 +73,8 @@ def run() -> None:
     discarded = False
     try:
         with caselog.case("FB-04", soft=True) as c:
+            caselog.step("Check the subject names the game, app version, device model and "
+                         "iOS version")
             unread = [label for label, value in fields if not value]
             ui.expect(not unread, f"could not read {unread} off the device")
             subject = draft["subject"].lower()
@@ -87,6 +91,7 @@ def run() -> None:
 
     with caselog.case("FB-06") as c:
         ui.expect(fc.tap_back_to_app(), "the status-bar crumb did not bring FreeCell back")
+        caselog.step("Check FreeCell is back on About or the main menu")
         landed = ("About" if ui.expect_screen("about", timeout=6.0)
                   else "the main menu" if ui.on_menu(6.0) else "")
         c.shot(ui.shoot("SubmitFeedbackBack"))

@@ -41,6 +41,7 @@ def _squash(text: str) -> str:
 
 def _ask() -> list[str]:
     ui.expect(ui.tap(LINK, settle=2.5), "the 'ad free version' link could not be tapped")
+    caselog.step("Check FreeCell asks about the ad-free version, offering No and Yes")
     text = fc.wait_alert(PHRASE, timeout=6.0)
     ui.expect(text, "tapping 'ad free version' did not ask about the ad-free version "
                     f"(alert on screen: {helpers.alert_text()!r})")
@@ -64,6 +65,7 @@ def run() -> None:
 
     with caselog.case("AF-01") as c:
         ui.expect(helpers.answer_alert("No", settle=2.0), "could not press No")
+        caselog.step("Check FreeCell stays on About")
         ui.expect(not helpers.alert_text(), "the question stayed up after No")
         ui.expect(helpers.in_app(), f"No left FreeCell for {helpers.active_app()}")
         ui.expect(ui.expect_screen("about", timeout=5.0), "No did not leave About on screen")
@@ -75,6 +77,7 @@ def run() -> None:
         ui.expect(buttons == ["No", "Yes"],
                   f"the second ad-free question should offer No then Yes, got {buttons}")
         ui.expect(helpers.answer_alert("Yes", settle=4.0), "could not press Yes")
+        caselog.step(f"Check the App Store opens on {EXPECTED_TITLE}")
         went = fc.left_app(timeout=12.0)
         ui.expect(went == fc.APP_STORE, f"Yes did not open the App Store — in {went}")
         title = fc.store_title()
@@ -84,11 +87,13 @@ def run() -> None:
         c.note(f"App Store page {title!r}")
 
     with caselog.case("AF-04") as c:
+        caselog.step("Check FreeCell is still running behind the App Store")
         state = helpers.app_state()
         ui.expect(state in (2, 3),
                   f"FreeCell was not left running behind the App Store (state {state}) "
                   "— coming back would be a restart")
         ui.expect(fc.tap_back_to_app(), "the status-bar crumb did not bring FreeCell back")
+        caselog.step("Check FreeCell is back on About or the main menu")
         landed = ("About" if ui.expect_screen("about", timeout=6.0)
                   else "the main menu" if ui.on_menu(6.0) else "")
         c.shot(ui.shoot("AdFreeVersionBack"))

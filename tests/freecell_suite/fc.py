@@ -29,6 +29,7 @@ import config
 import freecell_ui as ui
 import helpers
 import ocr
+from caselog import says
 
 APP_STORE = "com.apple.AppStore"
 MAIL = "com.apple.mobilemail"
@@ -108,6 +109,7 @@ def go_offline() -> None:
     print("  device is offline", flush=True)
 
 
+@says("Go to FreeCell's main menu")
 def menu() -> None:
     """The main menu, closing an interstitial that covers FreeCell first."""
     if is_online():
@@ -262,6 +264,12 @@ def tap_rect(r: dict, settle: float = 1.0) -> None:
     tap_point(r["x"] + r["width"] / 2, r["y"] + r["height"] / 2, settle=settle)
 
 
+NAMED = {"BackButton": "Back", "close icon": "the close icon",
+         "Mail.cancelSendButton": "Cancel in Mail",
+         "Mail.compose.popoverAlert.deleteDraft": "Delete Draft"}
+
+
+@says(lambda kind, name, settle=1.0, timeout=0.0: f"Tap {NAMED.get(name, name)}", done=True)
 def tap_named(kind: str, name: str, settle: float = 1.0, timeout: float = 0.0) -> bool:
     eid = named(kind, name, timeout=timeout)
     r = rect(eid) if eid else None
@@ -320,6 +328,7 @@ def await_inter(timeout: float = 300.0) -> float:
     return time.time() - t0
 
 
+@says("Open the QA page and wait until an ad has loaded")
 def wait_inter_loaded(timeout: float = 300.0) -> float:
     """From the main menu: wait on the QA page until an interstitial is
     loaded, then return to the menu. Seconds waited."""
@@ -332,6 +341,8 @@ def wait_inter_loaded(timeout: float = 300.0) -> float:
         ui.expect(ui.on_menu(6.0), "back from the QA page did not reach the main menu")
 
 
+@says(lambda deal: "Deal a new game: Play, Easy, Yes to abandon the old one" if deal
+      else "Go back into the game: Play, then Resume")
 def enter_from_menu(deal: bool) -> None:
     """Play, then Resume (or Easy and Yes to abandon when *deal*)."""
     ui.expect(ui.on_menu(4.0), "game entry did not start from the main menu")
@@ -350,6 +361,8 @@ def enter_from_menu(deal: bool) -> None:
 LATE_AD = 12.0
 
 
+@says(lambda label, ready_wait=300.0: "Get onto the game table with an ad loaded and ready "
+                                      "(checked on the QA page)")
 def loaded_table(label: str, ready_wait: float = 300.0) -> None:
     """Onto the table with an interstitial loaded and no cooldown running.
 
@@ -402,6 +415,7 @@ def left_app(timeout: float = 10.0) -> str:
     return helpers.active_app()
 
 
+@says("Bring FreeCell back to the front")
 def resume(settle: float = 2.5) -> bool:
     """Foreground FreeCell without restarting it."""
     helpers.launch_app(force=False, settle=settle)
@@ -413,6 +427,7 @@ def resume(settle: float = 2.5) -> bool:
 _CRUMB = (0.055, 0.042)
 
 
+@says("Return to FreeCell with the '◀ FreeCell' link at the top left")
 def tap_back_to_app(settle: float = 3.0, timeout: float = 10.0) -> bool:
     """Return through the status-bar crumb. Refuses when FreeCell is in front:
     the crumb names the app you came from and would send you out."""
@@ -431,6 +446,7 @@ _STORE_MARK = "▻"
 _STORE_LOADING = ("loading…", "loading...", "loading")
 
 
+@says("Read the app name on the App Store page")
 def store_title(timeout: float = 30.0) -> str:
     """App name on the App Store product page in front, or "".
 
@@ -458,6 +474,7 @@ def store_title(timeout: float = 30.0) -> str:
     return last
 
 
+@says("Read the Mail draft's subject and recipient")
 def mail_draft(timeout: float = 15.0) -> dict:
     """{"subject", "to"} of the Mail compose sheet in front; "" when unreadable."""
     deadline = time.time() + timeout
@@ -477,6 +494,7 @@ def mail_draft(timeout: float = 15.0) -> dict:
     return draft
 
 
+@says("Delete the Mail draft without sending it (Cancel, then Delete Draft)")
 def mail_discard(timeout: float = 12.0) -> bool:
     """Cancel the draft and Delete it. Never sends. True once it is gone."""
     if not tap_named("Button", "Mail.cancelSendButton", settle=2.0):
@@ -615,6 +633,7 @@ def tap_card(b: Board, card: str, settle: float = 1.5) -> None:
     tap_rect(b.rects[card], settle=settle)
 
 
+@says("Play a move: tap bottom cards left to right until one moves")
 def play_one_move(tag: str = "") -> tuple[Board, Board, str]:
     """Tap bottom cards left to right until one moves.
 
@@ -657,6 +676,7 @@ def _up(b: Board) -> int:
     return sum(1 for area, _i, _d in b.cards.values() if area == "F")
 
 
+@says("Play a card up onto its foundation pile (the move that scores)")
 def play_to_foundation(max_cover: int = 4) -> tuple[Board, Board, str]:
     """Put one card up on its foundation, the only move FreeCell scores.
 
@@ -697,11 +717,13 @@ TIMER = re.compile(r"(\d+):(\d{2})")
 SCORE_ONLY = re.compile(r"[\d,.\u201a ]+")
 
 
+@says("Read the text under the cards (level line and captions)")
 def table_footer(shot: str) -> list[str]:
     """The footer's lines, top first."""
     return [text for _y, text in ocr.rows(ocr.read(shot, box=TABLE_FOOTER))]
 
 
+@says("Read the timer and the score under the cards")
 def hud(shot: str) -> tuple[int | None, int | None]:
     """(timer in seconds, score) under the board. A lone "0" score is too
     small for Vision, so None stands for 0 before anything is scored."""
@@ -716,6 +738,7 @@ def hud(shot: str) -> tuple[int | None, int | None]:
     return timer, score
 
 
+@says("Read the timer and the score under the cards")
 def hud_after_move(name: str, tries: int = 6, wait: float = 1.2) -> tuple[str, int | None, int | None]:
     """(shot, timer, score) once both read. A card going up floats a large
     "X156" multiplier across the HUD for a few seconds, and Vision cannot
@@ -782,6 +805,7 @@ def slider_value(human: str) -> float | None:
         return None
 
 
+@says(lambda human, target: f"Drag the {human} slider to {target:.0%}")
 def slider_drag(human: str, target: float) -> float | None:
     """Drag the knob to *target* (0..1); the ends overshoot the track."""
     found = control_rect("Slider", SLIDERS[human])
@@ -820,6 +844,7 @@ def slider_adjust(human: str, target: float) -> float | None:
     return slider_value(human)
 
 
+@says(lambda human, target, tol=0.04, tries=8: f"Move the {human} slider to {target:.0%}")
 def slider_set(human: str, target: float, tol: float = 0.04, tries: int = 8) -> float | None:
     """Bisect the thumb position until the slider reads *target*.
 
@@ -852,6 +877,7 @@ def switch_state(human: str) -> bool | None:
     return str(value).strip() in ("1", "true", "True")
 
 
+@says(lambda human: f"Tap the {human} switch")
 def switch_tap(human: str) -> bool | None:
     found = control_rect("Switch", SWITCHES[human])
     if not found:
@@ -860,6 +886,7 @@ def switch_tap(human: str) -> bool | None:
     return switch_state(human)
 
 
+@says(lambda human, on: f"Turn the {human} switch {'ON' if on else 'OFF'}")
 def switch_set(human: str, on: bool) -> bool | None:
     state = switch_state(human)
     if state is None or state == on:
@@ -867,10 +894,12 @@ def switch_set(human: str, on: bool) -> bool | None:
     return switch_tap(human)
 
 
+@says("Scroll back to the top of Options")
 def options_top() -> None:
     ui.scroll_to_end(False, max_swipes=6)
 
 
+@says("Make sure Game Center is switched on in Options")
 def game_center_on() -> None:
     """From the main menu: Options' Game Center switch on, then back to the menu.
 
@@ -930,6 +959,7 @@ def ad_up() -> bool:
     return helpers.in_app() and not freecell_ui_showing()
 
 
+@says(lambda timeout=20.0: f"Wait up to {timeout:.0f} s for an ad to appear")
 def wait_ad(timeout: float = 20.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -991,6 +1021,7 @@ def _tap_open_store() -> str:
     return f"Open Store at {point}"
 
 
+@says(lambda where, budget=150.0: f"Close the ad ({where}) with its X / close buttons")
 def close_ad(where: str, budget: float = 150.0) -> bool:
     """Close an interstitial chain (video, store sheet, playable) by its
     close controls until FreeCell's own UI is back."""
@@ -1031,6 +1062,7 @@ def close_ad(where: str, budget: float = 150.0) -> bool:
     return False
 
 
+@says(lambda where, wait=3.0: f"An ad came up ({where}) — close it", done=True)
 def clear_ad(where: str, wait: float = 3.0) -> bool:
     """Close an ad if one shows within *wait* seconds. True when one closed."""
     if wait_ad(timeout=wait):
@@ -1038,6 +1070,7 @@ def clear_ad(where: str, wait: float = 3.0) -> bool:
     return False
 
 
+@says(lambda where, budget=150.0: f"Close the ad ({where}) with its X / close buttons")
 def close_or_wait(where: str, budget: float = 150.0) -> bool:
     """close_ad, then the fallback: ask for a hand close and wait for it.
     A hand close is remembered in MANUAL_CLOSES so the case can say so."""
@@ -1059,6 +1092,8 @@ def close_or_wait(where: str, budget: float = 150.0) -> bool:
                          "of waiting for a hand close")
 
 
+@says(lambda level="easy", attempts=3: f"Start a new {level.title()} game: Play, then "
+                                       f"{level.title()}")
 def enter_game(level: str = "easy", attempts: int = 3) -> None:
     """Play → *level* onto a table, closing any ad that comes first."""
     for _ in range(attempts):
@@ -1080,6 +1115,7 @@ def enter_game(level: str = "easy", attempts: int = 3) -> None:
 SUPPORT_TITLES = ("PeopleFun Support", "Helpshift")
 
 
+@says("Wait for the support page to load and read its title")
 def support_title(timeout: float = 24.0) -> str:
     """The loaded support page's header, or "" if it never appeared."""
     deadline = time.time() + timeout

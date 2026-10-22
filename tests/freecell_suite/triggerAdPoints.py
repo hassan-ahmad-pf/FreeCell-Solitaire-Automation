@@ -46,6 +46,7 @@ import caselog  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
+from caselog import says  # noqa: E402
 
 SHORT = 8.0
 DWELL = 32.0
@@ -68,7 +69,7 @@ def _manual_note(c, where: str) -> None:
 
 
 def _dwell(seconds: float, what: str) -> None:
-    print(f"  waiting {seconds:.0f}s {what}", flush=True)
+    caselog.step(f"Wait {seconds:.0f} s {what}")
     time.sleep(seconds)
 
 
@@ -80,6 +81,7 @@ def _open(dest: str) -> None:
 
 def _no_ad(label: str, arrived) -> None:
     """The expected screen arrives, and no ad covers it for WATCH seconds."""
+    caselog.step(f"Check the screen opens with no ad (watched for {WATCH:.0f} s)")
     deadline = time.time() + NO_AD
     while not arrived():
         ui.expect(helpers.in_app(), f"FreeCell left the screen during {label}: "
@@ -131,6 +133,7 @@ def _win_with_ad(table: str, label: str) -> None:
               + (" — an ad was over the table, closed it" if covered else "")
               + "; once more from a loaded table", flush=True)
     _ad(label)
+    caselog.step("Check the Victory screen shows after the ad closed")
     ui.expect(ui.expect_screen("victory", timeout=8.0),
               f"the Victory screen is not showing after the {label} ad closed")
 
@@ -139,6 +142,7 @@ def _victory_new() -> None:
     ui.expect(ui.tap("victory_new", settle=1.0), "Victory's New could not be tapped")
 
 
+@says("Start from a freshly dealt game (table menu, then New)")
 def _fresh_table() -> None:
     """A new deal, so TA-01's short clock starts on a table opened just now.
     The test before this one can leave a game on the table past 30 s, and the
@@ -266,6 +270,7 @@ def run() -> None:
         _dwell(DWELL, "on the table before Back")
         ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
         _ad("long table -> Back")
+        caselog.step("Check the ad closed onto the main menu")
         ui.expect(ui.on_menu(8.0), "the Back ad did not close onto the main menu")
         c.shot(ui.shoot("AdBackMenu"))
         _manual_note(c, "long table -> Back")
@@ -300,6 +305,7 @@ def run() -> None:
         fc.enter_from_menu(deal=True)
         _ad("long menu -> deal")
         ui.settle_prompts()
+        caselog.step("Check the new deal is on the table after the ad")
         ui.expect(ui.at_table(timeout=8.0), "the deal did not reach the table after its ad")
         c.shot(ui.shoot("AdLongMenuEntry"))
         _manual_note(c, "long menu -> deal")

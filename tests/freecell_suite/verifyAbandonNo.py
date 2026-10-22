@@ -43,10 +43,12 @@ def run() -> None:
 
     with caselog.case("PL-04") as c:
         ui.expect(ui.tap("difficulty_easy", settle=1.5), "Easy could not be tapped")
+        caselog.step("Check FreeCell asks whether to abandon the paused game")
         text = fc.wait_alert("abandon", timeout=6.0)
         ui.expect(text, "Easy over a paused game did not ask to abandon it")
         c.shot(ui.shoot("AbandonPrompt"))
         ui.expect(helpers.answer_alert("No", settle=1.5), "could not press No")
+        caselog.step("Check the picker is still open and the paused game kept (Resume shows)")
         ui.expect(not helpers.alert_text(), "the abandon question stayed up after No")
         ui.expect(ui.wait_for("difficulty_easy", timeout=4.0), "No closed the picker")
         ui.expect(not ui.at_table(timeout=1.5), "No started a new table anyway")

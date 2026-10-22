@@ -34,6 +34,7 @@ def run() -> None:
     with caselog.case("RS-01") as c:
         ui.expect(ui.tap("reset_solo_stats", settle=1.5),
                   "Reset Solo Statistics could not be tapped")
+        caselog.step("Check FreeCell asks to confirm resetting the local scores")
         text = fc.wait_alert("reset local scores", timeout=6.0)
         c.shot(ui.shoot("ResetStats"))
         ui.expect(text, "Reset Solo Statistics did not ask to confirm "
@@ -42,6 +43,7 @@ def run() -> None:
 
     with caselog.case("RS-02") as c:
         ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press Yes")
+        caselog.step("Check the second 'just to be on the safe side' question appears")
         text = fc.wait_alert("safe side", timeout=6.0)
         ui.expect(text, "the second 'safe side' confirmation did not appear")
         ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press the second Yes")
@@ -49,6 +51,7 @@ def run() -> None:
         ui.expect(ui.open_stats(), "Stats did not open after the reset")
         ui.open_stats_tab("solo")
         cleared = c.shot(ui.shoot("ResetStatsAfter"))
+        caselog.step("Check every Solo score reads none / 0")
         ui.expect(ui.stats_are_default(cleared),
                   f"Solo did not read none / 0 after the reset (see {cleared})")
         ui.leave_stats()

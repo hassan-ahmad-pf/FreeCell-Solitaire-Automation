@@ -2,11 +2,12 @@
 """Run the regression with a live console an audience can follow.
 
 Runs tests/freecell_suite/run_all.py (arguments passed through) and turns its
-output into a readable view: each test as a header, each case when it starts
-and when it ends (PASS / FAIL / SKIP and its time), the runner's step notes
-dimmed, and a status bar kept at the bottom with the case running and its
-clock, progress, passes and failures, and the time left (estimated from the
-last run). A rerun of failed tests (the runner's default) shows as its own
+output into a readable view: each test as a header followed by the list of
+its cases in the order they run, then each case as it starts (▶ n/N), the
+numbered steps it performs, and its end (PASS / FAIL / SKIP and its time),
+with the runner's notes dimmed. A status bar kept at the bottom shows the
+case running and its clock, the case up next, progress, passes and failures,
+and the time left (estimated from the last run). A rerun of failed tests (the runner's default) shows as its own
 section, and a case that passes there moves from failed to passed. The
 plain output is saved to log/regression_<time>.log, and the HTML report
 opens at the end (--no-open keeps it closed). Stopped midway, the report
@@ -43,6 +44,8 @@ CASES = re.compile(r"^cases:\s+(.*?) — (\d+) run")
 TEST_START = re.compile(r"^>>> \[(\d+)/(\d+)\] (START|SKIP|RERUN)\s+(\S+)(?: — (.*))?$")
 TEST_END = re.compile(r"^<<< \[(\d+)/(\d+)\] (PASS|FAIL|SKIP)\s+(\S+)(?:\s+\(\s*([\d.]+)s\))?")
 CASE_RUN = re.compile(r"^\s+\[RUN \] (\S+) ?(.*)$")
+CASE_LIST = re.compile(r"^\s+\[LIST\] (\d+|-)/(\d+) (\S+) (.+?)(?: \(not run here: (.*)\))?$")
+STEP = re.compile(r"^\s+\[STEP\] (.*)$")
 CASE_END = re.compile(r"^\s+\[(PASS|FAIL|SKIP|LATER|BLOCKED|ONLINE)\] (\S+) (.+?)"
                       r"(?: \((\d+(?:\.\d+)?)s\))?(?: — (.*))?$")
 SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP|STOP)  (\S+)\s+\((?:\s*([\d.]+)s|not started)\)"
@@ -90,6 +93,10 @@ class Console:
         self.running = False
         self.case = ""
         self.case_t0 = 0.0
+        self.case_pos = ""          # "2/5": the running case's place in its test's list
+        self.listed: list[str] = []  # the running test's cases, in the order they run
+        self.ended: set[str] = set()
+        self.steps = 0
         self.bar = False
         self.closed = False
         self.paused = False
@@ -137,7 +144,11 @@ class Console:
                  f"{'rerun' if self.rerun else 'test'} {self.test_at[0]}/{self.test_at[1]} "
                  f"{self.test}"]
         if self.case:
-            parts.append(f"now {self.case} {clock(now - self.case_t0)}")
+            where = f"{self.case_pos} " if self.case_pos else ""
+            parts.append(f"now {where}{self.case} {clock(now - self.case_t0)}")
+        upcoming = self.next_case()
+        if upcoming:
+            parts.append(f"next {upcoming}")
         if self.total:
             parts.append(f"{self.done}/{self.total} cases")
         parts.append(f"{self.passed} passed")
@@ -149,6 +160,9 @@ class Console:
         sys.stdout.write("\r\033[K" + paint(BAR + (";31" if self.failed else ""),
                                             line[:width() - 1]))
         self.bar = True
+
+    def next_case(self) -> str:
+        return next((c for c in self.listed if c not in self.ended and c != self.case), "")
 
     def tick(self) -> None:
         while not self.closed:
@@ -188,6 +202,10 @@ def handle(con: Console, raw: str) -> None:
     if m:
         rerun_start(con, m.group(1))
         return
+    m = STEP.match(line)
+    if m:
+        step_line(con, m.group(1))
+        return
     if con.summary:
         if not line.startswith("-" * 20):
             summary_line(con, line)
@@ -204,10 +222,19 @@ def handle(con: Console, raw: str) -> None:
         rerun_case(con, *m.groups())
         return
 
+    m = CASE_LIST.match(line)
+    if m:
+        list_line(con, *m.groups())
+        return
+
     m = CASE_RUN.match(line)
     if m:
-        con.case, con.case_t0 = m.group(1), time.time()
-        con.emit(paint(BOLD, f"   ▶ {m.group(1):6} {m.group(2)}"))
+        cid = m.group(1)
+        con.case, con.case_t0, con.steps = cid, time.time(), 0
+        con.case_pos = (f"{con.listed.index(cid) + 1}/{len(con.listed)}"
+                        if cid in con.listed else "")
+        where = f"{con.case_pos:>5}  " if con.case_pos else ""
+        con.emit(paint(BOLD, f"   ▶ {where}{cid:6} {m.group(2)}"))
         return
 
     m = CASE_END.match(line)
@@ -325,7 +352,8 @@ def test_start(con: Console, i: int, n: int, kind: str, name: str, reason: str |
             con.emit("")
             con.emit(paint(BOLD, f"   estimated time ~{clock(sum(known))} (from {source})"))
     con.test, con.test_at, con.test_t0 = name, (i, n), time.time()
-    con.running, con.case = kind != "SKIP", ""
+    con.running, con.case, con.case_pos = kind != "SKIP", "", ""
+    con.listed, con.ended = [], set()
     stamp = clock(time.time() - con.t0)
     if kind == "SKIP":
         con.emit("")
@@ -336,6 +364,30 @@ def test_start(con: Console, i: int, n: int, kind: str, name: str, reason: str |
     con.emit(paint(YELLOW if kind == "RERUN" else CYAN,
                    title + "━" * max(min(width(), 80) - len(title) - len(stamp) - 2, 3)
                    + f" {stamp}"))
+
+
+def list_line(con: Console, pos: str, total: str, cid: str, title: str,
+              why: str | None) -> None:
+    """The test's cases before it starts: numbered in the order they run,
+    then the ones it leaves out."""
+    if pos == "1":
+        con.emit(paint(BOLD, f"   {total} case{'' if total == '1' else 's'} "
+                             "in this test, in the order they run:"))
+    if pos != "-":
+        con.listed.append(cid)
+        con.emit(f"     {pos:>2}. {cid:6} {title}")
+    else:
+        con.emit(paint(YELLOW, f"      –  {cid:6} {title}") + paint(DIM, f"  (not run here: {why})"))
+
+
+def step_line(con: Console, text: str) -> None:
+    """What the running case is doing now, numbered within the case; a step
+    between cases (setup, cleanup) is not numbered."""
+    if con.case:
+        con.steps += 1
+        con.emit(paint(CYAN, f"         {con.steps:>2}. ") + text)
+    else:
+        con.emit(paint(CYAN, "          → ") + text)
 
 
 def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
@@ -353,8 +405,9 @@ def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
     elif mark in ("SKIP", "BLOCKED") and con.running and not (detail or "").startswith(DEV_SKIP):
         con.skipped += 1
         con.done += 1
+    con.ended.add(cid)
     if cid == con.case:
-        con.case = ""
+        con.case, con.case_pos = "", ""
     when = f"  ({took(float(secs))})" if secs else ""
     con.emit(paint(code, f"   {label} {cid:6} {title}") + paint(BOLD, when))
     if detail:

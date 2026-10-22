@@ -12,8 +12,69 @@ from pathlib import Path
 
 import config
 import helpers
+from caselog import says
 
 THRESHOLD = 0.72
+
+# Controls by name in plain words, for the run's steps ("Tap Play on the
+# main menu"); a name not listed is worded from its prefix.
+LABELS = {
+    "menu_play": "Play on the main menu",
+    "menu_daily": "Daily on the main menu",
+    "menu_stats": "Statistics on the main menu",
+    "menu_options": "Options on the main menu",
+    "menu_help": "Help on the main menu",
+    "menu_about": "About on the main menu",
+    "menu_logo": "the FreeCell logo on the main menu",
+    "more_games": "More Games on the main menu",
+    "choose_look": "Choose Look on the main menu",
+    "back_game": "Back on the game table",
+    "table_menu": "the table's menu button",
+    "page_back": "the page's back button",
+    "daily_back": "the calendar's back button",
+    "daily_faq_link": "the FAQ link on the calendar",
+    "resume": "Resume in the level picker",
+    "reset_solo_stats": "Reset Solo Statistics",
+    "reset_daily_stats": "Reset Daily Statistics",
+    "reset_yes": "Yes on the reset prompt",
+    "qa_watermark": "the CONFIDENTIAL watermark (opens the QA page)",
+    "qa_page_back": "back on the QA page",
+    "qa_page_adapters": "Max: Adapters on the QA page",
+    "qa_badge_a": "the table's QA badge",
+    "look_close": "the X on Choose Look",
+    "look_surface_tab": "the Surface tab in Choose Look",
+    "look_cards_tab": "the Cards tab in Choose Look",
+    "stats_solo_tab": "the Solo tab on Statistics",
+    "stats_daily_tab": "the Daily tab on Statistics",
+    "tc_continue": "Continue on the Terms & Conditions card",
+    "tc_web_close": "the web page's close button",
+    "att_allow": "Allow on the tracking prompt",
+    "contact_us": "Contact Us on Options",
+    "about_version": "the version line on About",
+}
+_LABEL_PLACES = (
+    ("menu_", "on the main menu"), ("drawer_", "in the table menu"),
+    ("victory_", "on the Victory screen"), ("difficulty_", "in the level picker"),
+    ("about_", "on About"), ("daily_", "on the calendar"), ("mg_", "on More Games"),
+    ("gc_", "in Game Center"), ("look_", "in Choose Look"), ("help_", "on Help"),
+    ("faq_", "on the FAQ"), ("qa_", "on the QA page"), ("tc_", "on the Terms card"),
+    ("last_score_", "on Last Score"), ("stats_", "on Statistics"), ("ad_", "on the ad"),
+)
+_WORDS = {"faq": "FAQ", "qa": "QA", "x": "X"}
+
+
+def label(name: str) -> str:
+    """A control's name in plain words."""
+    if name in LABELS:
+        return LABELS[name]
+    rest, place = name, ""
+    for prefix, where in _LABEL_PLACES:
+        if name.startswith(prefix):
+            rest, place = name[len(prefix):], f" {where}"
+            break
+    words = [_WORDS.get(w, w) for w in rest.split("_")]
+    words[0] = words[0][:1].upper() + words[0][1:]
+    return " ".join(words) + place
 
 MENU_ITEMS = (
     "menu_play",
@@ -156,6 +217,7 @@ def seen(name: str, timeout: float = 8.0) -> bool:
     return False
 
 
+@says(lambda name, settle=1.0: f"Tap {label(name)}", done=True)
 def tap(name: str, settle: float = 1.0) -> bool:
     if not have(name):
         return False
@@ -190,6 +252,7 @@ def shoot(name: str) -> Path:
     return helpers.screenshot(name)
 
 
+@says("Go back (top-left back button)")
 def back(settle: float = 1.4) -> bool:
     """Leave the current page via the top-left back control."""
     if tap("daily_back", settle=settle):
@@ -219,6 +282,11 @@ PROMPTS = {
     "reset_confirm": ("safe side", "No"),
     "problems": ("seems to encounter problems", "OK"),
 }
+PROMPT_NAMES = {"rules": "game rules", "welcome": "welcome", "tip": "tip",
+                "extra_large": "large cards", "rotation": "rotation lock",
+                "abandon": "abandon the paused game", "replay": "play this game again",
+                "daily_offline": "Daily needs the internet", "reset": "reset scores",
+                "reset_confirm": "reset, are you sure", "problems": "problems"}
 
 
 def prompt_now() -> str | None:
@@ -232,15 +300,13 @@ def prompt_now() -> str | None:
     return ""
 
 
+@says(lambda key, answer=None: f"Answer the '{PROMPT_NAMES.get(key, key)}' prompt: "
+                               f"{answer or PROMPTS[key][1]}", done=True)
 def answer_prompt(key: str, answer: str | None = None) -> bool:
     """Answer the *key* alert if it is up — *answer* or its safe default."""
     if prompt_now() != key:
         return False
-    choice = answer or PROMPTS[key][1]
-    if not helpers.answer_alert(choice):
-        return False
-    print(f"  answered the {key} prompt: {choice}", flush=True)
-    return True
+    return helpers.answer_alert(answer or PROMPTS[key][1])
 
 
 def wait_prompt(key: str, timeout: float = 8.0) -> bool:
@@ -268,6 +334,7 @@ def settle_prompts(answers: dict | None = None, rounds: int = 4) -> list[str]:
     return answered
 
 
+@says("Close FreeCell's cross-promo card", done=True)
 def close_house_promo(wait: float = 0.0) -> bool:
     """Close FreeCell's own cross-promo card (e.g. "Try our top rated Sudoku").
 
@@ -281,13 +348,13 @@ def close_house_promo(wait: float = 0.0) -> bool:
         point = find("promo_close")
         if point:
             helpers.tap(point, settle=1.5)
-            print("  closed FreeCell's cross-promo card", flush=True)
             return True
         if time.time() >= deadline:
             return False
         time.sleep(0.4)
 
 
+@says("Leave the game table (Back)", done=True)
 def leave_table(settle: float = 1.6) -> bool:
     """If the gameplay screen is up, tap Back. Never cold-launch from here."""
     settle_prompts()
@@ -300,7 +367,6 @@ def leave_table(settle: float = 1.6) -> bool:
         settle_prompts()
         close_house_promo(wait=2.5)
         return True
-    print("  on gameplay — tapping back", flush=True)
     if not tap("back_game", settle=settle):
         helpers.wda_tap((140, 250), settle=settle)
     settle_prompts()
@@ -308,6 +374,7 @@ def leave_table(settle: float = 1.6) -> bool:
     return True
 
 
+@says("Close the Daily calendar", done=True)
 def leave_daily(settle: float = 1.6) -> bool:
     """Close the Daily calendar if it is up."""
     if not (is_on("screen_daily") or is_on("daily_back")):
@@ -320,6 +387,7 @@ def leave_daily(settle: float = 1.6) -> bool:
     return True
 
 
+@says("Close Statistics", done=True)
 def leave_stats(settle: float = 1.4) -> bool:
     """Close Statistics via its own back control — never the menu Daily button."""
     if not expect_screen("stats", timeout=0.8):
@@ -330,6 +398,7 @@ def leave_stats(settle: float = 1.4) -> bool:
     return True
 
 
+@says("Leave the Victory screen for the main menu (Back)")
 def leave_victory(settle: float = 1.6) -> bool:
     """Tap the victory Back chevron (not New) and wait for the main menu."""
     if on_menu(1.0):
@@ -344,6 +413,7 @@ def leave_victory(settle: float = 1.6) -> bool:
     return on_menu(6.0)
 
 
+@says("Return to the main menu")
 def to_menu(timeout: float = 12.0) -> bool:
     """Return to the main menu without a cold launch if possible."""
     if is_on("look_close"):
@@ -377,11 +447,13 @@ def to_menu(timeout: float = 12.0) -> bool:
     return launch_to_menu()
 
 
+@says("Tap the table to start the deal")
 def start_deal() -> None:
     """Dismiss 'tap a card to start' so Synthetic Win and hints can fire."""
     helpers.wda_tap((180, 980), settle=1.1)
 
 
+@says("Open the QA Synthetic Win card on the table", done=True)
 def open_qa_panel() -> bool:
     """Open the table Synthetic Win card (badge or drawer QA).
 
@@ -397,6 +469,7 @@ def open_qa_panel() -> bool:
     return wait_for("qa_panel", timeout=4.0)
 
 
+@says("Allow tracking on the App Tracking prompt", done=True)
 def answer_tracking() -> bool:
     """Allow the ATT prompt, by alert text or, failing that, by its crop."""
     if helpers.allow_tracking():
@@ -429,6 +502,8 @@ POLICY_LINK_MATCH = 0.60
 POLICY_LINK_WORD = {"tc_terms_link": (187, 85), "tc_privacy_link": (585, 22)}
 
 
+@says(lambda name: "Tap the " + ("Terms & Conditions" if "terms" in name else "Privacy Policy")
+      + " link on the Terms card", done=True)
 def tap_policy_link(name: str) -> bool:
     """Tap the underlined word of a Terms-card link ("Conditions", "Privacy").
 
@@ -445,6 +520,7 @@ def tap_policy_link(name: str) -> bool:
     return True
 
 
+@says("Close the web page (back to the Terms card)")
 def close_web_page() -> bool:
     """Close an in-app policy webview and return to the Terms card."""
     if have("tc_web_close") and tap("tc_web_close", settle=2.0):
@@ -453,6 +529,7 @@ def close_web_page() -> bool:
     return True
 
 
+@says("Force-quit FreeCell and launch it again")
 def cold_launch() -> bool:
     """Terminate + relaunch, sweeping first-launch gates twice."""
     helpers.terminate()
@@ -469,6 +546,7 @@ def cold_launch() -> bool:
     return on_menu(10.0)
 
 
+@says("Close FreeCell: Home button, then quit the app")
 def close_app() -> None:
     """Home (FreeCell writes its state), then kill the process."""
     if helpers.in_app():
@@ -479,6 +557,7 @@ def close_app() -> None:
     helpers.recover_after_app_kill()
 
 
+@says("Take the phone offline: Airplane Mode on, Wi-Fi off (in Settings)")
 def offline(restore: bool = True) -> bool:
     """Enable Airplane Mode and turn Wi-Fi off. True when both succeed.
 
@@ -508,6 +587,7 @@ def ensure_offline() -> bool:
     return offline()
 
 
+@says("Put the phone online: close FreeCell, Airplane Mode off, Wi-Fi on (in Settings)")
 def online() -> bool:
     """Close FreeCell, then leave Airplane Mode and turn Wi-Fi on.
 
@@ -542,6 +622,8 @@ def ensure_online() -> bool:
     return online()
 
 
+@says(lambda force=False: "Launch FreeCell fresh and bring it to the main menu" if force
+      else "Open FreeCell on its main menu")
 def launch_to_menu(force: bool = False) -> bool:
     """Foreground FreeCell on the main menu, clearing first-launch gates.
 
@@ -627,6 +709,7 @@ def _enter_qa_code_on_about() -> bool:
     return True
 
 
+@says("Turn QA on: About, version line, emblem taps, then the QA code")
 def open_dev_panel() -> bool:
     """Enable QA: About gesture + code, then the menu watermark.
 
@@ -654,6 +737,7 @@ def open_dev_panel() -> bool:
     return wait_for("qa_watermark", timeout=8.0) or qa_enabled()
 
 
+@says("Enter the QA code on the keypad")
 def enter_qa_code() -> bool:
     """Enter the configured QA code using named keypad crops."""
     for digit in config.QA_CODE:
@@ -662,6 +746,7 @@ def enter_qa_code() -> bool:
     return wait_for("qa_panel")
 
 
+@says("Win the game with the QA Synthetic Win card (90% - 99%, then WIN)")
 def synthetic_win() -> bool:
     """Fire Synthetic Win (90% - 99%, WIN) on the active table. True once WIN is tapped."""
     start_deal()
@@ -674,6 +759,7 @@ def synthetic_win() -> bool:
     return True
 
 
+@says("Win the game with Synthetic Win and wait for the Victory screen")
 def complete_game() -> bool:
     """Complete the active table through the Synthetic Win panel."""
     if not synthetic_win():
@@ -703,6 +789,8 @@ def await_rules_prompt(answer: str = "No", timeout: float = RULES_WAIT) -> bool:
     return answer_prompt("rules", answer)
 
 
+@says(lambda level="easy", rules="No": f"Start a new {level.title()} game: Play, then "
+                                       f"{level.title()}")
 def start_game(level: str = "easy", rules: str = "No") -> bool:
     """Open Play, choose a FreeCell level, accept an abandon prompt, and
     answer the session's rules prompt with *rules*.
@@ -757,6 +845,7 @@ def hint_bar_shown(timeout: float = 5.0) -> bool:
     return False
 
 
+@says("Launch FreeCell again after it was killed")
 def relaunch_after_kill() -> bool:
     """Launch the killed app. Does not steer to the menu — the table must come back.
 
@@ -783,6 +872,8 @@ VICTORY_SCORE = (40, 1240, 520, 1380)
 VICTORY_BEST = (780, 1235, 1100, 1345)
 
 
+@says(lambda down=True, duration=0.55: "Swipe up to scroll the page down" if down
+      else "Swipe down to scroll the page up")
 def scroll(down: bool = True, duration: float = 0.55) -> None:
     """Swipe the Stats list. down=True swipes up so the BOTTOM of the page comes in."""
     ms = max(int(duration * 1000), 200)
@@ -793,10 +884,12 @@ def scroll(down: bool = True, duration: float = 0.55) -> None:
     time.sleep(0.5)
 
 
+@says(lambda name, max_swipes=10: f"Scroll until {label(name)} shows")
 def scroll_to(name: str, max_swipes: int = 10) -> bool:
     return scroll_to_bottom(name, max_swipes=max_swipes)
 
 
+@says(lambda name="reset_solo_stats", max_swipes=20: f"Scroll down until {label(name)} shows")
 def scroll_to_bottom(name: str = "reset_solo_stats", max_swipes: int = 20) -> bool:
     """Swipe up until Reset Solo Statistics (the Solo footer) is on screen."""
     for n in range(max_swipes):
@@ -808,6 +901,7 @@ def scroll_to_bottom(name: str = "reset_solo_stats", max_swipes: int = 20) -> bo
     return is_on(name)
 
 
+@says("Open Statistics from the main menu")
 def open_stats() -> bool:
     """Open Statistics from the main menu. Taps Stats only — never Play or Daily."""
     if expect_screen("stats", timeout=1.0):
@@ -819,6 +913,7 @@ def open_stats() -> bool:
     return expect_screen("stats")
 
 
+@says(lambda tab: f"Open the {tab.title()} tab on Statistics")
 def open_stats_tab(tab: str) -> bool:
     name = "stats_solo_tab" if tab == "solo" else "stats_daily_tab"
     point = STATS_SOLO_TAB if tab == "solo" else STATS_DAILY_TAB
@@ -877,6 +972,7 @@ def _tap_reset_yes() -> bool:
     return True
 
 
+@says("Confirm the reset: Yes on both popups, then wait for the main menu")
 def confirm_reset() -> bool:
     """Two Yes popups. After the second, wait for the main menu — tap nothing else."""
     if not _tap_reset_yes():
@@ -888,6 +984,7 @@ def confirm_reset() -> bool:
     return on_menu(10.0)
 
 
+@says("Reset the Solo statistics: scroll to Reset Solo Statistics, tap it, Yes twice")
 def reset_solo_stats() -> bool:
     """Swipe up to Reset Solo Statistics, Yes both popups, wait for the menu.
 
@@ -1067,6 +1164,7 @@ def _leave_for_look_restore() -> None:
     leave_daily()
 
 
+@says("Open Choose Look from the main menu")
 def open_choose_look(settle: float = 2.0) -> bool:
     """Open the Choose Look modal. The icon crop bakes default felt."""
     if look_modal_open():
@@ -1083,6 +1181,7 @@ def open_choose_look(settle: float = 2.0) -> bool:
     return look_modal_open()
 
 
+@says(lambda tab, settle=1.4: f"Open the {tab.title()} tab in Choose Look")
 def open_look_tab(tab: str, settle: float = 1.4) -> bool:
     """Show Surface or Cards. Template first, then the measured tab tap."""
     name = "look_surface_tab" if tab == "surface" else "look_cards_tab"
@@ -1093,6 +1192,7 @@ def open_look_tab(tab: str, settle: float = 1.4) -> bool:
     return True
 
 
+@says("Close Choose Look (X)")
 def close_choose_look(settle: float = 1.2) -> bool:
     if tap("look_close", settle=settle):
         return not look_modal_open()
@@ -1100,6 +1200,7 @@ def close_choose_look(settle: float = 1.2) -> bool:
     return not look_modal_open()
 
 
+@says(lambda tab, n, settle=1.6: f"Pick {tab.title()} {n} in Choose Look")
 def look_pick(tab: str, n: int, settle: float = 1.6):
     """Tap palette *n* (1-based) on the open tab. Returns its RGB colour."""
     centres = look_centres(tab)
@@ -1111,6 +1212,7 @@ def look_pick(tab: str, n: int, settle: float = 1.6):
     return colour
 
 
+@says(lambda tab, rng=None: f"Pick a different {tab.title()} colour in Choose Look")
 def look_pick_other(tab: str, rng: random.Random | None = None):
     """Tap a random palette that is not the current one, and not the same colour.
 
@@ -1181,6 +1283,7 @@ def on_painted_table(timeout: float = 12.0) -> bool:
     return False
 
 
+@says("Put the default look back: Surface 1 and Cards 1")
 def restore_default_look() -> bool:
     """Put Surface 1 and Cards 1 back. Never raises — used from finally.
 
@@ -1260,6 +1363,7 @@ def _locate_in(name: str, img):
     return (int(top_left[0] + width / 2), int(top_left[1] + height / 2))
 
 
+@says("Open the table menu (menu button, top right)", done=True)
 def open_table_drawer() -> bool:
     """Tap the table's "menu" so the replay / options / new drawer slides up."""
     if is_on("drawer_options"):
@@ -1273,6 +1377,8 @@ def open_table_drawer() -> bool:
     return wait_for("drawer_options", timeout=4.0)
 
 
+@says(lambda from_table=False: "Open Options from the table: menu, then Options" if from_table
+      else "Open Options from the main menu")
 def open_options(from_table: bool = False) -> bool:
     """Options from the main menu, or from the table via menu → drawer → options."""
     if expect_screen("options", timeout=0.8):
@@ -1347,6 +1453,7 @@ def switch_on(img, y: int) -> bool:
     return float(lit.mean()) > 0.15
 
 
+@says(lambda name, on, title: f"Turn {title} {'ON' if on else 'OFF'} on Options")
 def set_option(name: str, on: bool, title: str) -> bool:
     """Leave the switch alone if it already reads *on*, otherwise flip it."""
     want = "ON" if on else "OFF"
@@ -1375,6 +1482,7 @@ def set_option(name: str, on: bool, title: str) -> bool:
     return False
 
 
+@says(lambda name, on, title, where: f"Check {title} reads {'ON' if on else 'OFF'} on Options")
 def confirm_switch(name: str, on: bool, title: str, where: str) -> None:
     """Raise unless the Options switch *name* reads *on*."""
     state = option_state(name)
@@ -1394,6 +1502,7 @@ def switch_to(name: str, on: bool, title: str, shot: str):
     return shoot(shot)
 
 
+@says("Go back to the table and capture it once the cards stop moving")
 def back_to_table_shot(shot: str):
     """Leave Options for the table and capture it once the deal replay has stopped."""
     back()
@@ -1526,6 +1635,7 @@ def save_compare(frames, boxes, name: str):
     return out
 
 
+@says(lambda setter, title: f"Put {title} back ON (its default)")
 def restore_option(setter, title: str) -> bool:
     """Put an Options switch back ON (the default). Never raises — used from finally."""
     try:
@@ -1602,6 +1712,8 @@ def settle(timeout: float = 8.0, gap: float = 0.45) -> bool:
     return False
 
 
+@says(lambda down=True, max_swipes=15: "Scroll to the bottom of the page" if down
+      else "Scroll back to the top of the page")
 def scroll_to_end(down: bool = True, max_swipes: int = 15) -> bool:
     """Swipe until a swipe no longer moves the page."""
     prev = grey_now()
@@ -1615,6 +1727,8 @@ def scroll_to_end(down: bool = True, max_swipes: int = 15) -> bool:
     return False
 
 
+@says(lambda start, end, move_ms=1200, hold_ms=700: "Drag the page "
+      + ("up" if end[1] < start[1] else "down") + " slowly and hold before letting go")
 def drag_hold(start, end, move_ms: int = 1200, hold_ms: int = 700) -> None:
     """Drag and hold still before lifting, so the page does not fling."""
     import requests
@@ -1661,6 +1775,7 @@ def wait_daily_tip(timeout: float) -> bool:
         time.sleep(0.4)
 
 
+@says("Turn QA off: enter the QA code on About once more")
 def qa_off() -> bool:
     """Enter the QA code once more — it toggles — and confirm the watermark left."""
     if not is_on("qa_watermark"):
@@ -1672,6 +1787,7 @@ def qa_off() -> bool:
     return on_menu(6.0) and not seen("qa_watermark", timeout=2.0)
 
 
+@says("Close the table menu (menu button again)")
 def close_drawer() -> None:
     """Tap "menu" once more and wait for the drawer to slide away."""
     if not tap("table_menu", settle=1.4):

@@ -24,11 +24,13 @@ def run() -> None:
     fc.menu()
     with caselog.case("PL-01") as c:
         ui.expect(ui.tap("menu_play", settle=2.0), "Play control not found on the menu")
+        caselog.step("Check the level picker opened, not a game")
         ui.expect(ui.expect_screen("play"), "Play did not open the difficulty picker")
         ui.expect(not ui.at_table(timeout=1.0), "Play started a game instead of asking")
         c.shot(ui.shoot("PlayPicker"))
         c.note("difficulty picker opened")
     with caselog.case("PL-02") as c:
+        caselog.step("Check the picker lists Easy, Medium, Hard, Expert and Master")
         missing = [level for level in ui.DIFFICULTIES if not ui.is_on(f"difficulty_{level}")]
         ui.expect(not missing, f"the picker does not list {missing}")
         c.note("Easy, Medium, Hard, Expert, Master listed")
@@ -37,6 +39,7 @@ def run() -> None:
         ui.answer_prompt("abandon", "Yes")
         ui.expect(ui.expect_screen("table", timeout=12.0), "Easy did not reach the game table")
         ui.await_rules_prompt()
+        caselog.step("Check the game table shows its Back and menu buttons")
         ui.expect(ui.is_on("back_game") and ui.is_on("table_menu"),
                   "the table's top bar (back, menu) is not showing")
         c.shot(ui.shoot("PlayEasy"))

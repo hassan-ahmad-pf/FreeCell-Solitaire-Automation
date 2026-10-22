@@ -309,6 +309,22 @@ def _stop_rows(plan: list[tuple], current: tuple[str, float] | None, tests: list
         cases.extend(rows)
 
 
+def _list_cases(ids: list[str], dev: bool, offline: bool) -> None:
+    """The test's cases in the order it runs them, before it starts; then
+    the ones it leaves out, with why."""
+    left_out = {cid: catalog.LATER[cid] for cid in ids if cid in catalog.LATER}
+    left_out.update({cid: catalog.DEV_CASES[cid] for cid in ids
+                     if not dev and cid in catalog.DEV_CASES})
+    left_out.update({cid: "online pass; keeps its last result" for cid in ids
+                     if offline and cid in catalog.ONLINE_CASES})
+    runs = [cid for cid in ids if cid not in left_out]
+    for n, cid in enumerate(runs, 1):
+        print(f"    [LIST] {n}/{len(runs)} {cid} {catalog.TITLES[cid]}", flush=True)
+    for cid, why in left_out.items():
+        print(f"    [LIST] -/{len(runs)} {cid} {catalog.TITLES[cid]} (not run here: {why})",
+              flush=True)
+
+
 def _last_seconds() -> dict[str, float]:
     try:
         old = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
@@ -322,6 +338,7 @@ def _run_one(i: int, total: int, name: str, module: str, ids: list[str], dev: bo
              offline: bool, word: str = "START") -> tuple[dict, list[dict]]:
     """Run one test; its test row and case rows."""
     print(f"\n>>> [{i}/{total}] {word:6} {name}", flush=True)
+    _list_cases(ids, dev, offline)
     caselog.begin(name)
     os.environ["TEST_NAME"] = name
     t0 = time.time()

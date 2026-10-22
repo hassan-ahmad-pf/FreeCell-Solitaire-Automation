@@ -43,6 +43,7 @@ def run() -> None:
     fc.menu()
     with caselog.case("ST-01") as c:
         _open_stats(c)
+        caselog.step("Check Statistics opened")
         ui.expect(not ui.on_menu(1.0), "the main menu is still showing")
         c.shot(ui.shoot("Stats"))
         c.note("Statistics opened")
@@ -54,6 +55,7 @@ def run() -> None:
         c.note("Reset Solo Statistics reached at the bottom")
     with caselog.case("ST-04") as c:
         ui.expect(ui.leave_stats(), "Statistics back could not be tapped")
+        caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(6.0), "Statistics back did not return to the main menu")
         c.note("back on the main menu")
     print("PASS: Statistics opened, scrolled to Reset Solo Statistics, and returned")

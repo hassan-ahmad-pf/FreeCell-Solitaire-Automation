@@ -17,6 +17,7 @@ from pathlib import Path
 import requests
 
 import config
+from caselog import says
 
 
 _SESSION_ID: str | None = None
@@ -351,6 +352,7 @@ def in_app() -> bool:
     return active_app() == config.BUNDLE_ID
 
 
+@says("Press the phone's Home button")
 def home(settle: float = 2.0) -> bool:
     """Press Home so the app can write state before a kill. True if it left."""
     try:
@@ -465,6 +467,7 @@ def device_now():
     return datetime.datetime.fromtimestamp(time.time() + skew, zone)
 
 
+@says("Force-quit FreeCell")
 def terminate() -> None:
     """Kill the FreeCell process. It must not stay resident in the background."""
     paths = ["/wda/apps/terminate"]
@@ -500,6 +503,7 @@ def _attach_settings() -> str | None:
         return None
 
 
+@says("Force-quit FreeCell and wait until it has fully stopped")
 def kill_app() -> bool:
     """Terminate FreeCell and wait until it is not running (not just backgrounded).
 
@@ -550,6 +554,7 @@ def alert_text() -> str:
         return ""
 
 
+@says("Accept the system alert", done=True)
 def accept_alert() -> bool:
     """Accept a native confirmation if WDA currently exposes one."""
     if not alert_text():
@@ -577,6 +582,7 @@ def alert_buttons() -> list[str]:
     return [str(b) for b in value] if isinstance(value, list) else []
 
 
+@says(lambda name, settle=1.2: f"Tap {name} on the alert", done=True)
 def answer_alert(name: str, settle: float = 1.2) -> bool:
     """Press the alert button labelled *name* ("No", "OK", "Show Me"...)."""
     if not alert_text():
@@ -598,6 +604,7 @@ def answer_alert(name: str, settle: float = 1.2) -> bool:
 ATT_TEXT = "track your activity"
 
 
+@says("Allow on the App Tracking prompt", done=True)
 def allow_tracking(sid: str | None = None) -> bool:
     """Press Allow on FreeCell's tracking (ATT) prompt if WDA can read it.
 

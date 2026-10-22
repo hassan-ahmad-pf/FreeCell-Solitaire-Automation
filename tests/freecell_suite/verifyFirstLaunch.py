@@ -49,7 +49,6 @@ def _freecell_first_launch():
 def _allow_tracking() -> bool:
     if ui.answer_tracking():
         _ATT_SEEN.append(time.time())
-        print("  tracking prompt shown — Allowed", flush=True)
         return True
     return False
 
@@ -105,9 +104,11 @@ def run() -> None:
             while ui.is_on("tc_continue") and time.time() < deadline:
                 _allow_tracking()
                 time.sleep(0.5)
+            caselog.step("Check the Terms card is gone")
             ui.expect(not ui.is_on("tc_continue"), "the Terms card stayed up after Continue")
             c.note("Continue cleared the Terms card")
         with caselog.case("FL-03") as c:
+            caselog.step("Check the App Tracking prompt showed and was Allowed")
             deadline = time.time() + ATT_WAIT
             while not _ATT_SEEN and time.time() < deadline:
                 _allow_tracking() or time.sleep(0.5)
@@ -129,10 +130,12 @@ def run() -> None:
     print("  offline for the offline tests", flush=True)
 
     with caselog.case("FL-01") as c:
+        caselog.step("Force-quit FreeCell and open it again")
         helpers.launch_app(force=True)
         ui.app_launched()
         ui.clear_overlays()
         ui.settle_prompts()
+        caselog.step("Check FreeCell reopened on the main menu with no Terms card")
         ui.expect(ui.on_menu(15.0), "force-quit and reopen did not reach the main menu")
         ui.expect(not ui.is_on("tc_continue"), "the Terms card came back after reopening")
         c.shot(ui.shoot("FirstLaunch"))

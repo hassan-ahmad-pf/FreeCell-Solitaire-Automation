@@ -36,6 +36,7 @@ import caselog  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
+from caselog import says  # noqa: E402
 
 TAPS = 4
 TAP_DELAY = 2.0
@@ -60,13 +61,16 @@ def _period_box(arrow) -> tuple[int, int, int, int]:
 
 def _open_last_score() -> None:
     if not ui.tap("menu_play", settle=2.0):
+        caselog.step("Tap Play on the main menu")
         helpers.wda_tap(ui.MENU_PLAY, settle=2.0)
     ui.expect(ui.expect_screen("play", timeout=6.0), "Play did not open the picker")
+    caselog.step("Tap LAST SCORE in the level picker")
     helpers.wda_tap(ui.LAST_SCORE, settle=3.0)
     if not ui.seen("screen_last_score", timeout=6.0) and fc.ad_up():
         fc.close_or_wait("LAST SCORE")
 
 
+@says("Tap OK on the first-time Game Center notice", done=True)
 def _notice() -> bool:
     """OK FreeCell's first-time Game Center card if it came up."""
     if not fc.named("StaticText", "Game Center", timeout=1.5):
@@ -74,10 +78,10 @@ def _notice() -> bool:
     shot = ui.shoot("game_center_notice")
     ui.expect(fc.tap_named("Button", "OK", settle=5.0),
               f"the Game Center notice has no OK button to press — {shot}")
-    print("  OK'd the first-time Game Center notice", flush=True)
     return True
 
 
+@says("Close Game Center: its back arrow, then a tap below the dashboard")
 def _close_sheet(link: str) -> None:
     """Back to the dashboard, then a tap below it, back on Last Score."""
     back = _ink("gc_back", timeout=4.0)
@@ -99,13 +103,16 @@ def _game_center(link: str, control: str, heading: str, title: str, c) -> None:
               f"'{link}' covered Last Score, but not with Game Center's sheet")
     if not ui.find_ink(heading):
         c.shot(ui.shoot(f"game_center_{link}_board"))
+        caselog.step("Tap Game Center's back arrow to reach its main page")
         helpers.tap(ui.find_ink("gc_back"), settle=3.0)
+    caselog.step(f"Check Game Center shows its {title} page")
     ui.expect(_ink(heading, timeout=6.0),
               f"Game Center opened from '{link}' but never showed its {title} page")
     c.shot(ui.shoot(f"game_center_{link}"))
     _close_sheet(link)
 
 
+@says("Win an Easy game with Synthetic Win first, so there is a last score to show")
 def _win_once() -> None:
     """Setup: a Synthetic Win on Easy, for when Statistics were reset since the last win."""
     fc.ensure_qa()
@@ -131,6 +138,7 @@ def run() -> None:
             ui.expect(ui.to_menu(), "could not leave the picker for the setup win")
             _win_once()
             _open_last_score()
+        caselog.step("Check the screen is headed 'Last Won Game Score'")
         ui.expect(ui.seen("screen_last_score", timeout=4.0),
                   "LAST SCORE did not open a screen headed 'Last Won Game Score' — "
                   "a won game is needed first")
@@ -143,6 +151,8 @@ def run() -> None:
         box = _period_box(arrow)
         first = prev = ui.shoot("last_score_tap0")
         for i in range(1, TAPS + 1):
+            caselog.step(f"Tap the forward arrow beside 'ranking for' ({i} of {TAPS}) and "
+                         "check the period changes")
             helpers.tap(arrow, settle=TAP_DELAY)
             now = c.shot(ui.shoot(f"last_score_tap{i}"))
             moved = fc.diff_frac(prev, now, box)
@@ -150,6 +160,7 @@ def run() -> None:
             ui.expect(moved > PERIOD_CHANGED, f"tap {i} on the forward arrow did not "
                                               "change the ranking period")
             prev = now
+        caselog.step(f"Check {TAPS} taps brought the period back to where it started")
         ui.expect(fc.diff_frac(first, prev, box) < PERIOD_SAME,
                   f"{TAPS} taps did not bring the ranking period back to where it "
                   "started (week → month → overall → day → week)")
@@ -171,6 +182,7 @@ def run() -> None:
         ui.back(settle=2.0)
         if not ui.on_menu(3.0):
             ui.expect(ui.to_menu(), "back from Last Score did not lead to the main menu")
+        caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(4.0), "back from Last Score did not reach the main menu")
         c.shot(ui.shoot("last_score_back"))
         c.note("back on the main menu")

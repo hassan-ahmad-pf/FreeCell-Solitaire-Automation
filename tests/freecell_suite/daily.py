@@ -15,6 +15,7 @@ import fc
 import freecell_ui as ui
 import helpers
 import ocr
+from caselog import says
 
 LEVEL_BUTTON = (1000, 310)
 LEVEL_TEXT = (850, 240, 1200, 380)
@@ -87,12 +88,14 @@ def on_calendar(timeout: float = 8.0) -> bool:
         time.sleep(0.25)
 
 
+@says("Open Daily from the main menu (the calendar)")
 def open_calendar() -> None:
     ui.expect(ui.tap("menu_daily", settle=1.0), "Daily control not found on the menu")
     fc.clear_ad("Daily open", wait=2.0 if fc.is_online() else 0.0)
     ui.expect(on_calendar(10.0), "tapping Daily did not open the calendar")
 
 
+@says("Leave the calendar for the main menu (back)")
 def leave_calendar() -> None:
     ui.expect(ui.tap("daily_back", settle=1.6), "the calendar's back control was not found")
     fc.clear_ad("Daily back", wait=3.0 if fc.is_online() else 0.0)
@@ -126,6 +129,7 @@ def cell(day: int, when: datetime.date | None = None) -> tuple[int, int]:
     return ui.DAILY_COLUMNS[i % 7], ui.DAILY_FIRST_ROW + ROW_STEP * (i // 7)
 
 
+@says(lambda day, settle=0.6: f"Tap the {nth(day)} on the calendar")
 def tap_date(day: int, settle: float = 0.6) -> None:
     helpers.wda_tap(cell(day), settle=settle)
 
@@ -175,6 +179,7 @@ def outline(img, box) -> int:
 
 # ── level button ───────────────────────────────────────────────────
 
+@says("Read the level on the level button")
 def level_shown(shot: str) -> tuple[str, str] | None:
     """(rules, level) the level button reads, e.g. ("standard", "medium");
     Relaxed levels carry an R badge after the word."""
@@ -186,11 +191,13 @@ def level_shown(shot: str) -> tuple[str, str] | None:
     return ("relaxed" if any(w in ("R", "®") for w in words) else "standard"), level
 
 
+@says("Open the level list (level button, top right)")
 def open_levels() -> bool:
     helpers.wda_tap(LEVEL_BUTTON, settle=1.6)
     return ui.seen("daily_levels", timeout=4.0)
 
 
+@says("Close the level list (tap beside it)")
 def close_levels() -> bool:
     helpers.wda_tap(LEVELS_ASIDE, settle=1.4)
     return not ui.is_on("daily_levels")
@@ -216,6 +223,7 @@ def on_daily_table(timeout: float = 10.0) -> tuple[bool, bool]:
         time.sleep(0.5)
 
 
+@says("Win the Daily game with the QA Synthetic Win card (90% - 99%, then WIN)")
 def synthetic_win(started: bool = False) -> bool:
     """Synthetic Win on a Daily table. Its QA card keeps WIN grey until a
     range is picked, and sits a little higher than Solo's."""
@@ -228,6 +236,7 @@ def synthetic_win(started: bool = False) -> bool:
     return True
 
 
+@says("Read the score on the Victory screen")
 def victory_score(timeout: float = 8.0) -> int | None:
     """The score Victory shows, once two reads a moment apart agree: just
     after the win the digits are still settling, and one read then came back
@@ -245,6 +254,7 @@ def victory_score(timeout: float = 8.0) -> int | None:
         time.sleep(0.8)
 
 
+@says("Win the Daily game with Synthetic Win, then read the score on the Victory screen")
 def win_to_victory(where: str, started: bool = False) -> int:
     """Win the Daily table on screen; return the score Victory shows."""
     ui.expect(synthetic_win(started), f"Synthetic Win could not be fired on the {where} "
@@ -257,6 +267,7 @@ def win_to_victory(where: str, started: bool = False) -> int:
     return score
 
 
+@says("Go back from the Victory screen to the calendar")
 def back_to_calendar(where: str) -> bool:
     """Daily Victory's back returns to the calendar (Solo's goes to the menu).
     True when FreeCell's monthly-score tip ("Tap on the monthly score to see
@@ -276,6 +287,7 @@ def back_to_calendar(where: str) -> bool:
 
 # ── score popup ────────────────────────────────────────────────────
 
+@says("Tap the monthly score to open its day-by-day breakdown")
 def open_popup() -> int | None:
     """Tap the monthly score; the y (px) of the popup's first row, or None."""
     helpers.wda_tap(SCORE_BOX, settle=1.6)
@@ -298,6 +310,7 @@ def _popup_top(img) -> int | None:
     return int(top_left[1]) if score >= ui.THRESHOLD else None
 
 
+@says("Read each day's score in the breakdown")
 def popup_scores(shot: str, top: int) -> dict[int, list[int]]:
     """Numbers on each date's row of the score popup in *shot*, left to right:
     [score, total] for a past date, [score, 2, total] for today's (x2)."""
@@ -318,6 +331,7 @@ def popup_scores(shot: str, top: int) -> dict[int, list[int]]:
             for day, lines in rows.items()}
 
 
+@says("Read the monthly score on the calendar")
 def monthly_score(shot: str) -> int | None:
     """The monthly score box on the calendar in *shot*. Vision now and then
     reads this font's "2" as "8", so a grey and a black-on-white copy are
@@ -359,12 +373,14 @@ def format_row(row: list[int]) -> str:
     return f"{row[0]:,}"
 
 
+@says("Close the score breakdown")
 def close_popup() -> None:
     helpers.wda_tap((645, 1500), settle=1.4)
 
 
 # ── statistics ─────────────────────────────────────────────────────
 
+@says("Open Statistics on its Daily tab")
 def open_daily_stats() -> None:
     ui.expect(ui.open_stats(), "Statistics did not open from the menu")
     fc.clear_ad("Statistics", wait=2.0 if fc.is_online() else 0.0)
@@ -415,6 +431,8 @@ def stats_sections(shot: str) -> list[dict]:
     return sections
 
 
+@says(lambda name, tab="daily": f"Open Statistics, read the {tab.title()} tab, then go back "
+                                "to the main menu")
 def read_stats(name: str, tab: str = "daily") -> tuple[list[dict], str]:
     """Open Statistics from the menu on *tab*, read it, and go back to the menu."""
     if tab == "daily":
@@ -445,6 +463,7 @@ def stats_summary(sections: list[dict]) -> str:
             f"games won {fmt(t.get('won'))}")
 
 
+@says("Tap Reset Daily Statistics at the bottom of the Daily tab")
 def tap_reset() -> str:
     """From the menu: Statistics → Daily → Reset Daily Statistics; the first alert."""
     open_daily_stats()
@@ -458,6 +477,7 @@ def tap_reset() -> str:
     return text
 
 
+@says("Reset the Daily statistics: Reset Daily Statistics, then Yes on both alerts")
 def reset_stats() -> None:
     """Reset Daily Statistics from the menu, Yes to both alerts; back on the menu."""
     tap_reset()

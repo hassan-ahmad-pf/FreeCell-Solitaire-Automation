@@ -2,6 +2,8 @@
 
 The suite's case IDs, titles and sections are in docs/testrail/suite_cases.py.
 RUN_ORDER is the main suite, then the six standalone tests (STANDALONE).
+Each test's case ids are in the order it runs them: the console lists them
+that way before the test starts.
 
 The Daily cases come from FreeCell's TestRail list (docs/testrail/cases.py)
 as written there, plus EXTRA_CASES for the steps that list has no case for.
@@ -63,7 +65,7 @@ RUN_ORDER = [
     ("installFromTestFlight", None, "skip", ["FL-06"],
      "the dev build was installed by hand, not from TestFlight"),
     ("verifyFirstLaunch", "verifyFirstLaunch", "run",
-     ["FL-01", "FL-02", "FL-03", "FL-04", "FL-05"], ""),
+     ["FL-04", "FL-05", "FL-02", "FL-03", "FL-01"], ""),
     ("verifyMainMenu", "verifyMainMenu", "run", ["MM-01"], ""),
     ("verifyStatsPage", "verifyStatsPage", "run", ["ST-01", "ST-03", "ST-04"], ""),
     ("verifyOptions", "verifyOptions", "run",
@@ -103,14 +105,14 @@ RUN_ORDER = [
      "needs the dev build (QA page → Max: Adapters pins AppLovin)"),
     ("triggerAdPoints", "triggerAdPoints", "dev",
      ["TA-01", "TA-02", "TA-03", "TA-04", "TA-05",
-      "TA-06", "TA-07", "TA-08", "TA-09", "TA-10"],
+      "TA-06", "TA-07", "TA-08", "TA-10", "TA-09"],
      "needs the dev build (prod serves live ads; some playables have no "
      "close control, so the run cannot stay unattended)"),
     ("visitLastScore", "visitLastScore", "dev",
      ["LS-01", "LS-02", "LS-03", "LS-04", "LS-05"],
      "needs the dev build (Last Score needs a win; prod has no Synthetic Win)"),
     ("verifyAdFreeVersion", "verifyAdFreeVersion", "run",
-     ["AF-01", "AF-02", "AF-03", "AF-04"], ""),
+     ["AF-02", "AF-01", "AF-03", "AF-04"], ""),
     ("submitFeedback", "submitFeedback", "run",
      ["FB-02", "FB-03", "FB-04", "FB-05", "FB-06"], ""),
 ]

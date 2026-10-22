@@ -56,6 +56,7 @@ def _pick(tab: str, n: int):
     before = ui.screen_rgb(before_path)
     default, picked = _swatch(before, tab, 1), _swatch(before, tab, n)
     ui.look_pick(tab, n)
+    caselog.step(f"Check the white frame moved to {tab.title()} {n}")
     after_path = ui.shoot(f"ChooseLook_{tab}_{n}")
     gained = fc.diff_frac(before_path, after_path, _box(tab, n, FRAME[tab]))
     lost = fc.diff_frac(before_path, after_path, _box(tab, 1, FRAME[tab]))
@@ -83,6 +84,7 @@ def run() -> None:
         ui.expect(ui.open_choose_look(), "Choose Look did not open")
         ui.open_look_tab("surface")
         c.shot(ui.shoot("ChooseLookSurface"))
+        caselog.step("Check Choose Look shows the Surface tab")
         ui.expect(ui.expect_screen("choose_look", timeout=5.0),
                   "Choose Look did not show the Surface tab")
         c.note("opened on Surface")
@@ -90,9 +92,11 @@ def run() -> None:
     with caselog.case("CL-03") as c:
         ui.open_look_tab("cards")
         c.shot(ui.shoot("ChooseLookCards"))
+        caselog.step("Check the Cards tab shows")
         ui.expect(ui.seen("screen_choose_look_cards", timeout=4.0),
                   "tapping Cards did not show the Cards tab")
         ui.open_look_tab("surface")
+        caselog.step("Check the Surface tab is back")
         ui.expect(ui.expect_screen("choose_look", timeout=4.0),
                   "tapping Surface did not bring the Surface tab back")
         c.note("Cards and Surface switched")
@@ -107,6 +111,7 @@ def run() -> None:
             ui.expect(ui.close_choose_look(), "Choose Look would not close")
             fc.enter_game("easy")
             table = c.shot(ui.settled_shot("ChooseLookTable"))
+            caselog.step(f"Check the table's felt is the Surface {SURFACE_N} colour")
             felt = _felt(ui.screen_rgb(table))
             ui.expect(felt is not None, f"no clear patch of felt on the table (see {table})")
             change = ui.colour_dist(old_felt, felt)
@@ -120,6 +125,7 @@ def run() -> None:
 
         with caselog.case("CL-05") as c:
             c.shot(table)
+            caselog.step(f"Check the card backs are the Cards {CARDS_N} colour")
             backs = ui.back_colour(ui.screen_rgb(table))
             ui.expect(backs is not None, f"could not read the card backs (see {table})")
             change = ui.colour_dist(old_backs, backs)

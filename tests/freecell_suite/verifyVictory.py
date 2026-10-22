@@ -52,18 +52,22 @@ def run() -> None:
         c.shot(ui.shoot("VictoryTable"))
         ui.expect(ui.complete_game(),
                   "Synthetic Win (90% - 99%, WIN) did not reach the Victory screen")
+        caselog.step("Check the Victory screen shows with the QA card closed")
         ui.expect(not ui.is_on("qa_panel"), "the Synthetic Win card is still open "
                                             "over the Victory screen")
         c.shot(ui.shoot("VictoryScreen"))
         c.note(f"{LEVEL.title()} won through Synthetic Win; Victory showing")
 
     with caselog.case("VI-02") as c:
+        caselog.step("Check the Victory screen shows its ranking header, score columns, "
+                     "leaderboards and achievements links, and help, new and stats buttons")
         missing = [f"{d} ({n})" for n, d in PARTS.items() if not ui.is_on(n)]
         ui.expect(not missing, f"the Victory screen is missing {len(missing)} "
                                f"element(s): {'; '.join(missing)}")
         c.note(f"all {len(PARTS)} parts drawn")
 
     with caselog.case("VI-03") as c:
+        caselog.step(f"Check the footer says '{LEVEL} level', the game just played")
         ui.expect(ui.is_on(f"victory_level_{LEVEL}"),
                   f"the Victory footer does not say '{LEVEL} level', so it does not "
                   "reflect the game just played")
@@ -72,6 +76,7 @@ def run() -> None:
     with caselog.case("VI-04") as c:
         ui.expect(ui.leave_victory(),
                   "Victory's back did not return to the main menu")
+        caselog.step("Check the main menu is showing, not a game table")
         ui.expect(not ui.at_table(timeout=1.0), "Victory's back landed on a table")
         c.shot(ui.shoot("VictoryBack"))
         c.note("back to the main menu")

@@ -101,7 +101,7 @@ def _kill_and_reopen(wait: float, tag: str):
     ui.expect(before is not None and len(before) == 52, "could not read the board")
     ui.expect(helpers.home(), "Home did not leave the table — the save happens on background")
     killed = _kill()
-    print(f"  killed — waiting {wait:.1f}s", flush=True)
+    caselog.step(f"Wait {wait:.1f} s with FreeCell closed")
     time.sleep(wait)
     gap = time.monotonic() - killed
     ui.expect(ui.relaunch_after_kill(), "could not launch FreeCell again")
@@ -109,6 +109,7 @@ def _kill_and_reopen(wait: float, tag: str):
                                 f"{helpers.active_app() or 'WDA would not say which app'} is")
     how, reopened = _back_to_game(tag)
     print(f"  {how}", flush=True)
+    caselog.step("Check every card is exactly where it was before FreeCell was closed")
     after = fc.settled_board()
     shot = ui.shoot(f"Relaunch{tag}")
     ui.expect(after is not None and after == before,

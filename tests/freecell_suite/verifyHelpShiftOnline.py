@@ -33,12 +33,14 @@ def run() -> None:
     with caselog.case("HS-01") as c:
         title = fc.support_title(timeout=24.0)
         shot = c.shot(ui.shoot("HelpShiftOnline"))
+        caselog.step("Check Contact Us left Options and PeopleFun Support loaded")
         ui.expect(not ui.is_on("screen_options"),
                   f"Contact Us did not leave Options (see {shot})")
         ui.expect(title, f"Contact Us left Options but PeopleFun Support did not load "
                          f"(see {shot})")
         c.note(f"opened {title}")
 
+    caselog.step("Tap the X at the top left of the support page")
     fc.tap_point(*SUPPORT_X, settle=2.5)
     ui.expect(ui.expect_screen("options", timeout=8.0),
               "the PeopleFun Support X did not return to Options")

@@ -36,15 +36,19 @@ def run() -> None:
     fc.menu()
     with caselog.case("AB-01") as c:
         ui.expect(ui.tap("menu_about", settle=2.5), "About control not found on the menu")
+        caselog.step("Check the About page opened")
         ui.expect(ui.expect_screen("about"), "tapping About did not open About")
         c.shot(ui.shoot("About"))
         c.note("About opened from the menu item")
     with caselog.case("AB-03") as c:
+        caselog.step("Check About shows the version line and its five links (Help, Ad-Free, "
+                     "FAQ, More Games, Feedback)")
         missing = [name for name in LINKS if not ui.is_on(name)]
         ui.expect(not missing, f"About is missing {missing}")
         c.note("version line and all five links present")
     with caselog.case("AB-04") as c:
         ui.expect(ui.tap("about_faq", settle=2.5), "frequently asked questions could not be tapped")
+        caselog.step("Check the FAQ opened inside FreeCell")
         ui.expect(helpers.in_app(), f"FAQ left FreeCell for {helpers.active_app()}")
         ui.expect(ui.seen("screen_faq", timeout=8.0), "FAQ did not open")
         c.shot(ui.shoot("AboutFaq"))
@@ -53,6 +57,7 @@ def run() -> None:
         top = ui.shoot("_faq_top")
         ui.expect(scroll_until("faq_feedback"), "submit feedback never came into view on FAQ")
         end = c.shot(ui.shoot("AboutFaqBottom"))
+        caselog.step("Check the FAQ text moved and the page is still the FAQ")
         moved = fc.diff_frac(top, end, FAQ_BAND)
         ui.expect(moved >= MOVED, f"the FAQ did not scroll — only {moved:.1%} of its text "
                                   "changed")
@@ -64,6 +69,7 @@ def run() -> None:
     ui.expect(ui.on_menu(6.0), "About back did not return to the main menu")
     with caselog.case("AB-06") as c:
         ui.expect(ui.tap("menu_logo", settle=2.5), "the crown logo could not be tapped")
+        caselog.step("Check the logo opened the About page")
         ui.expect(ui.expect_screen("about"), "the crown logo did not open About")
         c.shot(ui.shoot("AboutFromLogo"))
         c.note("the crown logo opened About")

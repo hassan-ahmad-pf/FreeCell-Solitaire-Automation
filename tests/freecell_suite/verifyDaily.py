@@ -74,21 +74,28 @@ def _tips() -> None:
         caselog.skip("DY-03", FIRST_VISIT)
         return
     with caselog.case("DY-02") as c:
+        caselog.step("Check the first tip 'Tap on the Level Button…' shows, with the level "
+                     "button outlined in red")
         ui.expect(ui.seen("daily_tip1", timeout=3.0),
                   "the first tip is not 'Tap on the Level Button to select your favorite level'")
         ring = daily.outline(ui.screen_rgb(), daily.TIP1_OUTLINE)
         ui.expect(ring >= daily.OUTLINE_MIN, f"the level button is not outlined ({ring} red px)")
         c.shot(ui.shoot("DailyTip1"))
+        caselog.step("Tap the tip card to dismiss it")
         helpers.wda_tap(ui.DAILY_TIP, settle=1.6)
         c.note("first visit: 'Tap on the Level Button to select your favorite level', "
                "the level button outlined; a tap dismissed it")
     with caselog.case("DY-03") as c:
+        caselog.step("Check the second tip 'Tap on any available date…' shows, with the dates "
+                     "outlined in red")
         ui.expect(ui.seen("daily_tip2", timeout=4.0),
                   "the second tip is not 'Tap on any available date to play a game'")
         ring = daily.outline(ui.screen_rgb(), daily.TIP2_OUTLINE)
         ui.expect(ring >= daily.OUTLINE_MIN, f"the dates are not outlined ({ring} red px)")
         c.shot(ui.shoot("DailyTip2"))
+        caselog.step("Tap the tip card to dismiss it")
         helpers.wda_tap(ui.DAILY_TIP, settle=1.6)
+        caselog.step("Check the calendar shows with no tip left over it")
         ui.expect(not ui.wait_daily_tip(2.0), "a tip still covers the calendar after the second")
         ui.expect(daily.on_calendar(4.0), "the calendar is not showing after the tips")
         c.shot(ui.shoot("DailyAfterTips"))
@@ -102,10 +109,13 @@ def _levels() -> tuple[str, str]:
         ui.expect(level, "could not read the level on the level button")
         ui.expect(daily.open_levels(), "the level button did not open the level list "
                                        "(Standard and Relaxed, Easy to Master)")
+        caselog.step("Check the list shows Standard and Relaxed, Easy to Master, with the "
+                     "relaxed-rules note")
         ui.expect(ui.is_on("daily_relaxed_note"), "the relaxed-rules note is not beside the list")
         c.shot(ui.shoot("DailyLevels"))
         ui.expect(daily.close_levels(), "a tap beside the level list did not close it")
         after = daily.level_shown(c.shot(ui.shoot("DailyLevelsClosed")))
+        caselog.step("Check the level did not change")
         ui.expect(after == level, f"closing the list changed the level from "
                                   f"{' '.join(level).title()} to {' '.join(after or ()).title()}")
         c.note(f"the level button ({' '.join(level).title()}) opened Standard and Relaxed "
@@ -121,6 +131,7 @@ def _future() -> None:
     with caselog.case("DY-07") as c:
         before = ui.shoot("DailyBeforeFutureTap")
         daily.tap_date(now.day + 1, settle=2.5)
+        caselog.step("Check nothing happens: no alert, and the calendar is unchanged")
         ui.expect(not helpers.alert_text(), "tapping a later date raised an alert")
         ui.expect(daily.on_calendar(3.0), "tapping a later date left the calendar")
         after = c.shot(ui.shoot("DailyFutureTapped"))
@@ -133,11 +144,14 @@ def _future() -> None:
 def _faq() -> None:
     with caselog.case("DY-11") as c:
         if not ui.tap("daily_faq_link", settle=2.0):
+            caselog.step("Tap the FAQ link on the calendar")
             helpers.wda_tap(daily.FAQ_LINK, settle=2.0)
+        caselog.step("Check the FAQ opened on its Daily page")
         ui.expect(ui.seen("faq_daily_heading", timeout=6.0),
                   "the FAQ link did not open the FAQ on its Daily page")
         c.shot(ui.shoot("DailyFAQ"))
         ui.back()
+        caselog.step("Check the calendar is showing again")
         ui.expect(daily.on_calendar(6.0), "FAQ back did not return to the calendar")
         c.note("the FAQ opened on 'What are Daily games?'; back returned to the calendar")
 
@@ -150,6 +164,8 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> tuple[s
     abandoned = ui.wait_prompt("abandon", timeout=2.0) and ui.answer_prompt("abandon")
     if abandoned:
         c.note("an unfinished Daily game from an earlier run was abandoned first")
+    caselog.step(f"Check a Daily game is dealt, with a {'gold' if gold else 'plain'} star in "
+                 "the table's header")
     up, is_gold = daily.on_daily_table(12.0)
     ui.expect(up, f"tapping the {daily.nth(day)} did not deal a Daily game")
     ui.expect(is_gold == gold, f"the {daily.nth(day)}'s table has a "
@@ -157,13 +173,16 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> tuple[s
                                f"{'gold' if gold else 'plain'}")
     fresh = c.shot(ui.shoot(f"Daily{name}Table"))
     footer = (fc.table_footer(fresh) or [""])[0]
+    caselog.step(f"Check the line under the cards names the {level[1].title()} level")
     ui.expect(level[1] in footer.lower(), f"the table reads {footer!r}, not the "
                                           f"{level[1]} level on the button (see {fresh})")
     timer0, score0 = fc.hud(fresh)
     _before, _after, card = fc.play_to_foundation()
+    caselog.step(f"Wait {TIMER_RUN:.0f} s for the timer to run")
     time.sleep(TIMER_RUN)
     moved, timer1, score1 = fc.hud_after_move(f"Daily{name}CardUp")
     c.shot(moved)
+    caselog.step("Check the timer started and the score went up")
     ui.expect(timer1 is not None and timer1 > (timer0 or 0),
               f"the timer did not start: {fc.mmss(timer0)} before the move, "
               f"{fc.mmss(timer1)} after (see {moved})")
@@ -194,6 +213,8 @@ def _popup(c, played: list[tuple[int, int, bool]], calendar_shot: str) -> str:
     ui.expect(top is not None, "tapping the monthly score did not open the score popup")
     shot = c.shot(ui.shoot("DailyScorePopup"))
     rows = daily.popup_scores(shot, top)
+    caselog.step("Check each won date shows its Victory score, today's counts twice, and the "
+                 "rows add up to the monthly score")
     for day, score, replay in played:
         row = rows.get(day)
         ui.expect(row, f"the popup lists no score for the {daily.nth(day)} (see {shot})")
@@ -226,6 +247,7 @@ def _play(level: tuple[str, str]) -> tuple[list[tuple[int, int, bool]], int]:
         c.note(f"today ({' '.join(level).title()}) dealt a Daily table: {dealt}")
     with caselog.case("DY-13") as c:
         score = _win(now.day, "Today", c)
+        caselog.step("Check today has a gold star on the calendar")
         star, gold = daily.star_on(ui.screen_rgb(), now.day)
         shot = c.shot(ui.shoot("DailyTodayStar"))
         ui.expect(star and gold, f"today has no gold star after the win (see {shot})")
@@ -243,6 +265,7 @@ def _play(level: tuple[str, str]) -> tuple[list[tuple[int, int, bool]], int]:
             dealt, gave_up = _deal(past, "Past", False, level, c)
             abandoned += gave_up
             score = _win(past, "Past", c)
+            caselog.step(f"Check the {daily.nth(past)} has a star on the calendar")
             star, _gold = daily.star_on(ui.screen_rgb(), past)
             shot = c.shot(ui.shoot("DailyPastStar"))
             ui.expect(star, f"the {daily.nth(past)} has no star after the win (see {shot})")
@@ -280,6 +303,8 @@ def _stats(start: str, played: list[tuple[int, int, bool]], level: tuple[str, st
         c.note(start)
         after, shot = daily.read_stats("DailyStatsAfter")
         c.shot(shot)
+        caselog.step("Check the Daily totals and the level played count exactly this run's "
+                     "games, and every other level reads none")
         wins = len(played)
         want = {"best": max(score for _d, score, _r in played), "played": wins + abandoned,
                 "won": wins}
@@ -313,6 +338,7 @@ def run() -> None:
         start = _clean_stats()
     with caselog.case("DY-01") as c:
         ui.expect(ui.tap("menu_daily", settle=0.4), "Daily control not found on the menu")
+        caselog.step("Check the Daily calendar opened")
         ui.expect(_opened(), "tapping Daily did not open the calendar")
         c.shot(ui.shoot("DailyCalendar"))
         c.note("Daily opened the calendar")

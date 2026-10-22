@@ -38,10 +38,12 @@ def run() -> None:
         before = c.shot(ui.shoot("StatsResetCancelledBefore"))
         ui.expect(ui.tap("reset_solo_stats", settle=1.5),
                   "Reset Solo Statistics could not be tapped")
+        caselog.step("Check FreeCell asks to confirm resetting the local scores")
         text = fc.wait_alert("reset local scores", timeout=6.0)
         ui.expect(text, "Reset Solo Statistics did not ask to confirm "
                         f"(alert on screen: {helpers.alert_text()!r})")
         ui.expect(helpers.answer_alert("No", settle=1.5), "could not press No")
+        caselog.step("Check the question closed and Statistics did not change")
         ui.expect(not helpers.alert_text(), "the reset question stayed up after No")
         ui.expect(ui.is_on("reset_solo_stats"), "No did not leave Statistics on screen")
         ui.settle(4.0)

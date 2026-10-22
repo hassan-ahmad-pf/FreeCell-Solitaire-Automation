@@ -31,6 +31,7 @@ def run() -> None:
     fc.menu()
     with caselog.case("MG-01") as c:
         ui.expect(ui.tap("more_games", settle=2.5), "More Games control not found on the menu")
+        caselog.step("Check More Games opened inside FreeCell")
         ui.expect(helpers.in_app(), f"More Games left FreeCell for {helpers.active_app()}")
         ui.expect(ui.expect_screen("more_games"), "More Games did not open its page")
         c.shot(ui.shoot("MoreGames"))
@@ -40,6 +41,7 @@ def run() -> None:
         ui.scroll(True)
         ui.settle(4.0)
         bottom = c.shot(ui.shoot("MoreGamesScrolled"))
+        caselog.step("Check the list moved and Card Games and Spiderette are in view")
         moved = fc.diff_frac(top, bottom, BAND)
         ui.expect(moved >= MOVED, f"the More Games page did not scroll — one swipe changed "
                                   f"only {moved:.1%} of the list")
@@ -49,6 +51,7 @@ def run() -> None:
         c.note(f"one swipe moved {moved:.0%} of the list — Card Games and Spiderette in view")
     with caselog.case("MG-03") as c:
         ui.back()
+        caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(6.0), "More Games back did not return to the main menu")
         c.note("back on the main menu")
     print("PASS: More Games opened in the app, swiped to Card Games and Spiderette, "
