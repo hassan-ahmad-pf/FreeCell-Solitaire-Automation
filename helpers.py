@@ -420,9 +420,8 @@ def os_version() -> str:
         return ""
 
 
-def device_model() -> str:
-    """The model IDENTIFIER, e.g. "iPhone16,2" (not the marketing name)."""
-    cmd = ["ideviceinfo", "-k", "ProductType"]
+def _device_info(key: str) -> str:
+    cmd = ["ideviceinfo", "-k", key]
     if config.DEVICE_UDID:
         cmd[1:1] = ["-u", config.DEVICE_UDID]
     try:
@@ -430,6 +429,40 @@ def device_model() -> str:
                               timeout=20).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+def device_model() -> str:
+    """The model IDENTIFIER, e.g. "iPhone16,2" (not the marketing name)."""
+    return _device_info("ProductType")
+
+
+_CLOCK: tuple[float, object] | None = None  # (phone clock − Mac clock in s, phone tz)
+
+
+def device_now():
+    """The phone's own date and time. Its clock and time zone can differ from
+    the Mac's (a date set by hand), and FreeCell's Daily follows the phone.
+    Falls back to the Mac's clock when the phone cannot be read."""
+    import datetime
+
+    global _CLOCK
+    if _CLOCK is None:
+        try:
+            skew = float(_device_info("TimeIntervalSince1970")) - time.time()
+        except ValueError:
+            return datetime.datetime.now()
+        try:
+            from zoneinfo import ZoneInfo
+
+            zone = ZoneInfo(_device_info("TimeZone"))
+        except Exception:  # noqa: BLE001
+            zone = None
+        _CLOCK = (skew, zone)
+        if abs(skew) > 60:
+            print(f"  the phone's clock is {skew / 3600:+.1f} h off the Mac's — "
+                  "dates follow the phone", flush=True)
+    skew, zone = _CLOCK
+    return datetime.datetime.fromtimestamp(time.time() + skew, zone)
 
 
 def terminate() -> None:

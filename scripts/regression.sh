@@ -94,6 +94,15 @@ for arg in "$@"; do
   esac
 done
 
+# Before WDA: a re-sign would restart it under a run already going.
+busy="$(pgrep -if "python[^ ]* .*(tests/freecell_suite/[A-Za-z_]+|scripts/present_regression)\.py" \
+  | tr '\n' ' ' || true)"
+if [[ -n "${busy// }" ]]; then
+  echo ">>> a FreeCell test is already running on the phone (pid ${busy% }); two runs would" >&2
+  echo "    fail each other. Wait for it to finish, or stop it: ./scripts/regression.sh stop" >&2
+  exit 1
+fi
+
 echo ">>> starting the test driver (WDA) on the iPhone..."
 ./scripts/wda.sh "$DEVICE_UDID"
 echo

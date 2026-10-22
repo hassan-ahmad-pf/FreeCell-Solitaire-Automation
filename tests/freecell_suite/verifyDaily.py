@@ -62,7 +62,7 @@ def _opened(timeout: float = 10.0) -> bool:
     """The calendar is up — or the first-visit tip card already covers it."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if ui.is_on("daily_weekdays") or ui.daily_tip_up():
+        if daily.weekdays_on() or ui.daily_tip_up():
             return ui.is_on("daily_back") or ui.daily_tip_up()
         time.sleep(0.3)
     return False
@@ -127,7 +127,7 @@ def _future() -> None:
         changed = fc.diff_frac(before, after, box=daily.CALENDAR_BOX)
         ui.expect(changed < 0.01, f"the calendar changed after tapping a later date "
                                   f"({changed:.1%}, see {after})")
-        c.note(f"tapping the {now.day + 1}th did nothing")
+        c.note(f"tapping the {daily.nth(now.day + 1)} did nothing")
 
 
 def _faq() -> None:
@@ -151,9 +151,10 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> tuple[s
     if abandoned:
         c.note("an unfinished Daily game from an earlier run was abandoned first")
     up, is_gold = daily.on_daily_table(12.0)
-    ui.expect(up, f"tapping the {day}th did not deal a Daily game")
-    ui.expect(is_gold == gold, f"the {day}th's table has a {'gold' if is_gold else 'plain'} "
-                               f"header star, expected {'gold' if gold else 'plain'}")
+    ui.expect(up, f"tapping the {daily.nth(day)} did not deal a Daily game")
+    ui.expect(is_gold == gold, f"the {daily.nth(day)}'s table has a "
+                               f"{'gold' if is_gold else 'plain'} header star, expected "
+                               f"{'gold' if gold else 'plain'}")
     fresh = c.shot(ui.shoot(f"Daily{name}Table"))
     footer = (fc.table_footer(fresh) or [""])[0]
     ui.expect(level[1] in footer.lower(), f"the table reads {footer!r}, not the "
@@ -177,7 +178,7 @@ def _deal(day: int, name: str, gold: bool, level: tuple[str, str], c) -> tuple[s
 def _win(day: int, name: str, c) -> int:
     score = daily.win_to_victory(f"{name.lower()} {day}", started=True)
     c.shot(ui.shoot(f"Daily{name}Victory"))
-    if daily.back_to_calendar(f"the {day}th"):
+    if daily.back_to_calendar(f"the {daily.nth(day)}"):
         c.note("back on the calendar, FreeCell's one-time tip 'Tap on the monthly score to "
                "see its breakdown' came up; a tap dismissed it")
     return score
@@ -195,16 +196,17 @@ def _popup(c, played: list[tuple[int, int, bool]], calendar_shot: str) -> str:
     rows = daily.popup_scores(shot, top)
     for day, score, replay in played:
         row = rows.get(day)
-        ui.expect(row, f"the popup lists no score for the {day}th (see {shot})")
+        ui.expect(row, f"the popup lists no score for the {daily.nth(day)} (see {shot})")
         ui.expect(row[0] >= score if replay else row[0] == score,
-                  f"the popup lists {row[0]:,} for the {day}th, Victory showed {score:,} "
+                  f"the popup lists {row[0]:,} for the {daily.nth(day)}, Victory showed {score:,} "
                   f"(see {shot})")
         if day == now.day:
             ui.expect(2 * row[0] in row[1:], f"today's {row[0]:,} is not counted twice in the "
                                              f"popup (row reads {row}, see {shot})")
     if now.day < calendar.monthrange(now.year, now.month)[1]:
         ui.expect(now.day + 1 not in rows,
-                  f"the popup lists a score for the {now.day + 1}th, a date not yet playable")
+                  f"the popup lists a score for the {daily.nth(now.day + 1)}, a date not yet "
+                  "playable")
     summary = daily.check_popup(rows, monthly, shot)
     daily.close_popup()
     ui.expect(daily.on_calendar(4.0), "the score popup did not close back to the calendar")
@@ -243,10 +245,10 @@ def _play(level: tuple[str, str]) -> tuple[list[tuple[int, int, bool]], int]:
             score = _win(past, "Past", c)
             star, _gold = daily.star_on(ui.screen_rgb(), past)
             shot = c.shot(ui.shoot("DailyPastStar"))
-            ui.expect(star, f"the {past}th has no star after the win (see {shot})")
+            ui.expect(star, f"the {daily.nth(past)} has no star after the win (see {shot})")
             played.append((past, score, replay))
-            c.note(f"the {past}th dealt a Daily table: {dealt}")
-            c.note(f"Synthetic Win ({score:,}); the {past}th has a star"
+            c.note(f"the {daily.nth(past)} dealt a Daily table: {dealt}")
+            c.note(f"Synthetic Win ({score:,}); the {daily.nth(past)} has a star"
                    + (" (already won on this level earlier)" if replay else ""))
     with caselog.case("DY-16") as c:
         c.note("score popup: " + _popup(c, played, ui.shoot("DailyCalendarAfterWins")))

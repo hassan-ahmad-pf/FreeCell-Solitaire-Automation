@@ -65,6 +65,7 @@ CROPS = {
     "daily_tip1": ("daily_tip1", (232, 683, 1066, 833)),
     "daily_tip2": ("daily_tip2", (205, 465, 1080, 607)),
     "daily_weekdays": ("daily_won", (82, 1180, 1203, 1245)),
+    "daily_weekdays_mon": ("daily_won_mon", (82, 1180, 1203, 1245)),  # UK region: Monday first
     "daily_faq_link": ("daily_won", (585, 2148, 705, 2207)),
     "daily_gold_star": ("daily_won", (755, 1548, 843, 1631)),
     "daily_levels": ("daily_levels", (645, 402, 1252, 1867)),

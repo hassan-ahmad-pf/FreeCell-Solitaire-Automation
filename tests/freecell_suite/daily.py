@@ -58,11 +58,33 @@ QA_DAILY_WIN = (686, 1746)
 VICTORY_BACK = (140, 347)
 MONTHLY_TIP_TAP = (645, 1050)  # on the monthly-score tip, over the month's name, not a date
 
+# The weekday header follows the phone's region: Sunday first (e.g. US) or
+# Monday first (e.g. UK). Value: the weekday the grid's first column holds.
+WEEKDAY_HEADERS = {"daily_weekdays": 0, "daily_weekdays_mon": 1}
+_week_start: int | None = None
+
 
 # ── calendar ───────────────────────────────────────────────────────
 
+def weekdays_on(img=None) -> bool:
+    """The calendar's weekday header is showing, in either order."""
+    global _week_start
+    img = ui.screen_rgb() if img is None else img
+    for name, start in WEEKDAY_HEADERS.items():
+        if ui._locate_in(name, img):
+            _week_start = start
+            return True
+    return False
+
+
 def on_calendar(timeout: float = 8.0) -> bool:
-    return ui.seen("daily_weekdays", timeout=timeout) and ui.is_on("daily_back")
+    deadline = time.time() + timeout
+    while True:
+        if weekdays_on() and ui.is_on("daily_back"):
+            return True
+        if time.time() > deadline:
+            return False
+        time.sleep(0.25)
 
 
 def open_calendar() -> None:
@@ -78,13 +100,28 @@ def leave_calendar() -> None:
 
 
 def today() -> datetime.date:
-    return datetime.date.today()
+    """Today on the phone, which is the day FreeCell's calendar marks."""
+    return helpers.device_now().date()
+
+
+def nth(day: int) -> str:
+    """1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st, 22nd, 23rd …"""
+    suffix = "th" if 10 <= day % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def week_start() -> int:
+    if _week_start is None:
+        ui.expect(weekdays_on(), "the calendar's weekday header is not showing, so its "
+                                 "dates cannot be placed")
+    return _week_start
 
 
 def cell(day: int, when: datetime.date | None = None) -> tuple[int, int]:
-    """Centre (px) of *day* in the current month's grid (Sunday first)."""
+    """Centre (px) of *day* in the current month's grid; its first column is
+    Sunday or Monday, as the weekday header shows."""
     when = when or today()
-    first = (when.replace(day=1).weekday() + 1) % 7
+    first = (when.replace(day=1).weekday() + 1 - week_start()) % 7
     i = first + day - 1
     return ui.DAILY_COLUMNS[i % 7], ui.DAILY_FIRST_ROW + ROW_STEP * (i // 7)
 
@@ -191,9 +228,21 @@ def synthetic_win(started: bool = False) -> bool:
     return True
 
 
-def victory_score() -> int | None:
-    found = [n for line in ocr.read(ui.victory_score_crop()) for n in ocr.numbers(line.text)]
-    return found[0] if found else None
+def victory_score(timeout: float = 8.0) -> int | None:
+    """The score Victory shows, once two reads a moment apart agree: just
+    after the win the digits are still settling, and one read then came back
+    a digit off (73,699 for 72,699)."""
+    deadline = time.time() + timeout
+    last = None
+    while True:
+        found = [n for line in ocr.read(ui.victory_score_crop()) for n in ocr.numbers(line.text)]
+        now = found[0] if found else None
+        if now is not None and now == last:
+            return now
+        if time.time() > deadline:
+            return now
+        last = now
+        time.sleep(0.8)
 
 
 def win_to_victory(where: str, started: bool = False) -> int:
@@ -300,7 +349,7 @@ def check_popup(rows: dict[int, list[int]], monthly: int | None, shot: str) -> s
     ui.expect(monthly == total or (every_date and monthly > total),
               f"the monthly score {monthly:,} is not the popup's dates added up ({total:,}, "
               f"see {shot})")
-    return "; ".join(f"{day}th {format_row(rows[day])}" for day in sorted(rows)) + \
+    return "; ".join(f"{nth(day)} {format_row(rows[day])}" for day in sorted(rows)) + \
         f" — monthly score {monthly:,}"
 
 

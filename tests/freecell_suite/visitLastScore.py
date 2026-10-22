@@ -121,6 +121,7 @@ def _win_once() -> None:
 def run() -> None:
     fc.go_online()
     fc.menu()
+    fc.game_center_on()
 
     with caselog.case("LS-01") as c:
         _open_last_score()

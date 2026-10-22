@@ -98,7 +98,8 @@ REQUIRED = [
     "screen_last_score", "last_score_next", "gc_back", "gc_leaderboards", "gc_achievements",
     "qa_page_adapters", "qa_page_back",
     # Daily (FreeCell's own DY cases)
-    "daily_back", "daily_tip1", "daily_tip2", "daily_weekdays", "daily_faq_link",
+    "daily_back", "daily_tip1", "daily_tip2", "daily_weekdays", "daily_weekdays_mon",
+    "daily_faq_link",
     "daily_gold_star", "daily_levels", "daily_relaxed_note", "daily_table_star",
     "daily_popup_days", "faq_daily_heading", "reset_daily_stats",
 ]
@@ -383,6 +384,7 @@ def main() -> int:
     total = len(plan)
     started = time.time()
 
+    fc.hold_phone()
     problems = preflight()
     if problems:
         print("preflight failed:", flush=True)

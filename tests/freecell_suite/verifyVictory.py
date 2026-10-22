@@ -12,6 +12,8 @@ VI-03  the footer says "easy level"
 VI-04  Victory's own back returns to the main menu
 
 Needs QA on (openDebugTools leaves it on); turns it on itself when it is off.
+The leaderboards and achievements links need Options' Game Center switch on,
+which the test also makes sure of first.
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyVictory.py
 """
@@ -42,6 +44,7 @@ PARTS = {
 
 def run() -> None:
     fc.menu()
+    fc.game_center_on()
     fc.ensure_qa()
 
     with caselog.case("VI-01") as c:

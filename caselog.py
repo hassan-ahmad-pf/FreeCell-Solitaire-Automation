@@ -24,6 +24,7 @@ _TEST = ""
 _RESULTS: list[dict] = []
 _STANDALONE = True
 _TITLES: dict[str, str] = {}
+_ON_FAIL = None
 
 
 class _Case:
@@ -50,6 +51,25 @@ def begin(test: str) -> None:
 def titles(mapping: dict[str, str]) -> None:
     """Print each case's title after its id."""
     _TITLES.update(mapping)
+
+
+def on_fail(capture) -> None:
+    """*capture(case_id)* saves the screen as a failed case leaves it and
+    returns the path; it becomes the case's last screenshot."""
+    global _ON_FAIL
+    _ON_FAIL = capture
+
+
+def _failure_shot(rec: _Case) -> None:
+    if _ON_FAIL is None:
+        return
+    try:
+        path = _ON_FAIL(rec.cid)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (no failure screenshot for {rec.cid}: {exc})", flush=True)
+        return
+    if path:
+        rec.shot(path)
 
 
 def results() -> list[dict]:
@@ -87,7 +107,9 @@ def case(cid: str, soft: bool = False):
     try:
         yield rec
     except Exception as exc:  # noqa: BLE001
-        _record(cid, "fail", str(exc) or type(exc).__name__, rec, time.time() - start)
+        elapsed = time.time() - start
+        _failure_shot(rec)
+        _record(cid, "fail", str(exc) or type(exc).__name__, rec, elapsed)
         if not soft:
             raise
     else:

@@ -15,6 +15,7 @@ Coordinates from the tree are WDA points; taps convert them to pixels.
 """
 from __future__ import annotations
 
+import fcntl
 import os
 import re
 import sys
@@ -33,10 +34,39 @@ APP_STORE = "com.apple.AppStore"
 MAIL = "com.apple.mobilemail"
 
 caselog.titles(catalog.TITLES)
+caselog.on_fail(lambda cid: ui.shoot(f"FAIL_{cid}"))
+
+
+_PHONE_LOCK = None
+
+
+def hold_phone() -> None:
+    """One test process drives the phone at a time: a second one closes the
+    app and toggles the radios under the first, and both fail. Exits with 2
+    while another process holds the phone; the lock goes with the process."""
+    global _PHONE_LOCK
+    if _PHONE_LOCK is not None:
+        return
+    config.LOG.mkdir(parents=True, exist_ok=True)
+    lock = open(config.LOG / "phone.lock", "a+")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock.seek(0)
+        holder = lock.read().strip() or "another process"
+        print(f"FAIL: a FreeCell test is already driving the phone ({holder}) — wait for it "
+              "to finish, or stop it (./scripts/regression.sh stop ends a regression)",
+              flush=True)
+        sys.exit(2)
+    lock.truncate(0)
+    lock.write(f"pid {os.getpid()}, {os.path.basename(sys.argv[0])}\n")
+    lock.flush()
+    _PHONE_LOCK = lock
 
 
 def main(run) -> None:
     """The ``__main__`` block every port shares: run, print FAIL, exit 1."""
+    hold_phone()
     try:
         run()
     except Exception as exc:  # noqa: BLE001
@@ -398,19 +428,23 @@ def tap_back_to_app(settle: float = 3.0, timeout: float = 10.0) -> bool:
 
 
 _STORE_MARK = "▻"
+_STORE_LOADING = ("loading…", "loading...", "loading")
 
 
-def store_title(timeout: float = 15.0) -> str:
+def store_title(timeout: float = 30.0) -> str:
     """App name on the App Store product page in front, or "".
 
     The store injects '▻' inside the title and draws the previous page while
-    it loads, so the glyph is stripped and two equal reads are required.
+    it loads, so the glyph is stripped and two equal reads are required. Its
+    "Loading…" spinner text is not a title; on a slow connection it can stay
+    up for well over ten seconds.
     """
     def once() -> str:
         for eid in find_elements("type == 'XCUIElementTypeStaticText'", timeout=10):
             value = attr(eid, "value") or attr(eid, "label")
-            if value and str(value).strip():
-                return " ".join(str(value).replace(_STORE_MARK, " ").split())
+            text = " ".join(str(value or "").replace(_STORE_MARK, " ").split())
+            if text and text.lower() not in _STORE_LOADING:
+                return text
         return ""
 
     deadline = time.time() + timeout
@@ -714,6 +748,7 @@ SWITCHES = {
     "Auto Mute Sounds": "p.table._tit4",
     "Maintain Card Spacing": "p.table._tit9",
     "Card Bouncing": "p.table._tit10",
+    "Game Center": "p.table._tit30",
 }
 _KNOB = 15.5   # UISlider thumb half-width in points
 
@@ -834,6 +869,31 @@ def switch_set(human: str, on: bool) -> bool | None:
 
 def options_top() -> None:
     ui.scroll_to_end(False, max_swipes=6)
+
+
+def game_center_on() -> None:
+    """From the main menu: Options' Game Center switch on, then back to the menu.
+
+    FreeCell turns the switch off when its first Game Center sign-in does not
+    finish, e.g. when the phone goes offline straight after the first launch.
+    While it is off, Victory and Last Score draw suit symbols where their
+    leaderboards and achievements links belong.
+    """
+    ui.expect(ui.open_options(), "Options did not open from the menu")
+    clear_ad("Options", wait=2.0 if is_online() else 0.0)
+    found = control_rect("Switch", SWITCHES["Game Center"], max_swipes=8)
+    ui.expect(found, "Options' Game Center switch was not found at the bottom of the page")
+    if switch_state("Game Center") is not True:
+        r = found[1]
+        # The last row sits under the test banner's button: tap the switch's lower edge.
+        tap_point(r["x"] + r["width"] * 0.3, r["y"] + r["height"] * 0.85, settle=1.5)
+        if not helpers.in_app():
+            tap_back_to_app() or resume()
+        ui.expect(switch_state("Game Center") is True, "Options' Game Center switch would "
+                  f"not turn on (see {ui.shoot('GameCenterOff')})")
+        print("  Options' Game Center switch was off — turned it on", flush=True)
+    ui.back()
+    ui.expect(ui.on_menu(6.0) or ui.to_menu(), "Options back did not return to the main menu")
 
 
 # ── interstitials ──────────────────────────────────────────────────

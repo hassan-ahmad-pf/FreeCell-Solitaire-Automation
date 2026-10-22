@@ -8,8 +8,10 @@ FL-03  the tracking prompt shows; Allow clears it (it may come before the card)
 FL-01  force-quit and reopen reaches the main menu
 
 FL-02..05 need FreeCell deleted, reinstalled and NOT opened before the run;
-without the card they are skipped. The policy pages load online; the phone
-then goes offline for the offline tests.
+without the card they are skipped. The policy pages load online; while
+still online, Options' Game Center switch is made sure of (FreeCell turns it
+off when its first sign-in does not finish); then the phone goes offline for
+the offline tests.
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyFirstLaunch.py
 """
@@ -67,6 +69,19 @@ def _reveal_card(timeout: float = 16.0) -> bool:
     return False
 
 
+def _game_center_while_online() -> None:
+    """Not a case of its own: a miss here is left to verifyVictory, which
+    makes sure of the switch again before its win."""
+    try:
+        if helpers.in_app() and fc.ad_up():
+            fc.close_ad("first launch")
+        ui.expect(ui.on_menu(15.0), "the main menu is not showing")
+        fc.game_center_on()
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Game Center switch not checked here ({exc}); verifyVictory checks it",
+              flush=True)
+
+
 def run() -> None:
     first = _freecell_first_launch()
     first._reveal_terms_card = _reveal_card
@@ -105,6 +120,9 @@ def run() -> None:
         for cid in FRESH_INSTALL:
             caselog.skip(cid, "no Terms & Conditions card — FreeCell was already "
                               "opened on this install")
+
+    if ui.known_online():
+        _game_center_while_online()
 
     ui.expect(ui.offline(restore=False), "could not enable Airplane Mode / turn Wi-Fi off "
                                          "— the offline tests would be ad-interrupted")
