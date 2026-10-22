@@ -391,7 +391,7 @@ def main() -> int:
         return 2
 
     build = helpers.installed_build() or ("", "")
-    heading = ("Spider regression suite on FreeCell "
+    heading = ("FreeCell regression suite "
                f"({'dev' if dev else 'prod'} build {build[0]} ({build[1]}))")
     print(f"device: {config.DEVICE_UDID}", flush=True)
     print(f"wda:    {config.WDA_URL}", flush=True)
@@ -417,7 +417,7 @@ def main() -> int:
         print(f"  {i:2}/{total}  {spider:24} {'' if runs else 'SKIP — ' + reason}", flush=True)
 
     payload = {
-        "schema": 1, "suite": "Spider regression suite on FreeCell",
+        "schema": 1, "suite": "FreeCell regression suite",
         "build_kind": "dev" if dev else "prod", "started": _iso(started),
         "device": {"model": helpers.device_model(), "ios": helpers.os_version(),
                    "udid": config.DEVICE_UDID, "screen": "1290x2796"},
@@ -433,8 +433,7 @@ def main() -> int:
         _network_first(plan, offline)
         for i, (spider, module, runs, ids, reason) in enumerate(plan, 1):
             if spider == catalog.ONLINE_FROM and not offline:
-                print("\n  bringing the phone online here, as Spider's promo-strip step does",
-                      flush=True)
+                print("\n  bringing the phone online here for the online tests", flush=True)
                 fc.go_online()
             if not runs:
                 print(f"\n>>> [{i}/{total}] SKIP   {spider} — {reason}", flush=True)

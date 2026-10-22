@@ -74,7 +74,7 @@ RUN_ORDER = [
      ["OP-01", "OP-03", "OP-04", "OP-05", "OP-06", "OP-07"], ""),
     ("verifyHelpShift", "verifyHelpShift", "run", ["HS-02"], ""),
     ("verifyHelpPage", "verifyHelpPage", "run", ["HP-01", "HP-02", "HP-03"], ""),
-    ("verifySpiderLogo", "verifyFreeCellLogo", "run",
+    ("verifyFreeCellLogo", "verifyFreeCellLogo", "run",
      ["AB-01", "AB-03", "AB-04", "AB-05", "AB-06"], ""),
     ("verifyMoreGamesBtn", "verifyMoreGamesBtn", "run", ["MG-01", "MG-02", "MG-03"], ""),
     ("verifyPlay", "verifyPlay", "run", ["PL-01", "PL-02", "PL-03"], ""),
