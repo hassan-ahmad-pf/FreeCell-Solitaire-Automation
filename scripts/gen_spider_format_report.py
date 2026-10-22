@@ -183,8 +183,44 @@ footer { color:var(--muted); font-size:12px; text-align:center; margin-top:36px;
 @keyframes deal { from { opacity:0; transform:translateY(-60px) rotate(-25deg) scale(.7); } }
 @keyframes bob { from { transform:translateY(-7px) rotate(-5deg); }
   to { transform:translateY(7px) rotate(5deg); } }
-@media (prefers-reduced-motion: reduce) { .pc > i, .pc b { animation:none; } }
-@media print { .deck { display:none; } }
+.crown { position:fixed; z-index:0; pointer-events:none; will-change:transform;
+  --m:calc((100vw - 1040px) / 2); --w:min(340px, calc(var(--m) - 48px));
+  width:var(--w); right:calc(var(--m) / 2 - var(--w) / 2); top:calc(50vh - var(--w) * .45); }
+.crown::before { content:""; position:absolute; inset:-24%; border-radius:50%;
+  background:radial-gradient(closest-side, var(--page) 50%, rgba(243,247,254,.75) 72%,
+    rgba(243,247,254,0)); }
+.crown-in { position:relative; animation:crown-in 1.4s cubic-bezier(.2,.7,.2,1) .3s both; }
+.crown-bob { animation:crown-bob 8s ease-in-out infinite alternate; }
+.crown svg { display:block; width:100%; height:auto; overflow:visible; }
+.crown .ghost { fill:none; stroke:#c9daf6; stroke-width:4.5;
+  stroke-linecap:round; stroke-linejoin:round; }
+.crown .ghost .s { fill:#e4eefc; }
+.crown .ink { fill:none; stroke:url(#crown-ink); stroke-width:4.5; stroke-linecap:round;
+  stroke-linejoin:round; stroke-dasharray:1 2; }
+.crown .ink > * { stroke-dashoffset:1.02; transition:stroke-dashoffset .35s ease-out; }
+.crown .fine { stroke-width:2.2; }
+.crown .gild { fill:url(#crown-ink); stroke:none; opacity:0; transition:opacity .9s ease; }
+.crown .gild > :not(.s) { display:none; }
+.crown.crowned .gild { opacity:1; }
+.crown.crowned svg { animation:crown-glow 1.6s ease-out both; }
+.crown .star-spin, .crown .star { transform-box:fill-box; transform-origin:center; }
+.crown .star { fill:url(#crown-ink); filter:drop-shadow(0 0 6px rgba(84,164,246,.55));
+  animation:twinkle 2.6s ease-in-out infinite alternate; }
+.crown .star circle { fill:#fff; }
+@keyframes crown-in { from { opacity:0; transform:translateY(40px) scale(.85); } }
+@keyframes crown-bob { from { transform:translateY(-8px) rotate(-2deg); }
+  to { transform:translateY(8px) rotate(2deg); } }
+@keyframes crown-glow { 0% { filter:drop-shadow(0 0 0 rgba(84,164,246,0)); }
+  35% { filter:drop-shadow(0 0 26px rgba(84,164,246,.75)); }
+  100% { filter:drop-shadow(0 0 10px rgba(84,164,246,.35)); } }
+@keyframes twinkle { from { transform:scale(.72) rotate(-8deg); opacity:.6; }
+  to { transform:scale(1.08) rotate(8deg); opacity:1; } }
+@media (max-width:1320px) { .crown { display:none; } }
+@media (prefers-reduced-motion: reduce) {
+  .pc > i, .pc b, .crown-in, .crown-bob, .crown .star, .crown.crowned svg { animation:none; }
+  .crown.crowned svg { filter:drop-shadow(0 0 10px rgba(84,164,246,.35)); }
+}
+@media print { .deck, .crown { display:none; } }
 @media (max-width:760px) {
   .hero-meta { text-align:left; }
   .score { grid-template-columns:1fr; justify-items:center; margin:-72px 0 24px; padding:24px; }
@@ -291,6 +327,74 @@ DECK_JS = """
     resizing = setTimeout(function () { innerWidth !== width ? build() : place(); }, 150);
   });
   build();
+})();
+"""
+
+# The FreeCell crown in line art. data-span is the slice of the page's scroll
+# over which each stroke draws: band, rim, arches, spike, spade, then jewels.
+CROWN_ART = """
+<path class="s" data-span="0 .3" d="M28 160 Q120 184 212 160 L209 173 Q120 198 31 173 Z"/>
+<path data-span=".15 .45" d="M30 160 L66 138 L93 170 L120 132 L147 170 L174 138 L210 160"/>
+<path data-span=".3 .65" d="M34 158 C14 122 16 82 46 66 C70 53 98 54 114 62"/>
+<path data-span=".3 .65" d="M206 158 C226 122 224 82 194 66 C170 53 142 54 126 62"/>
+<path data-span=".42 .74" d="M66 138 C58 110 66 84 90 72 C100 67 108 66 115 70"/>
+<path data-span=".42 .74" d="M174 138 C182 110 174 84 150 72 C140 67 132 66 125 70"/>
+<path class="s" data-span=".55 .86" d="M120 44 C132 74 133 108 120 132 C107 108 108 74 120 44 Z"/>
+<path class="s fine" data-span=".76 .94" d="M120 8 C113 17 103 22 103 30 C103 37 110 40 116 35
+  L113 43 L127 43 L124 35 C130 40 137 37 137 30 C137 22 127 17 120 8 Z"/>
+<path class="s fine" data-span=".84 1" d="M63 146 L69 154 L63 162 L57 154 Z"/>
+<circle class="s fine" data-span=".84 1" cx="120" cy="148.5" r="3.4"/>
+<circle class="s fine" data-span=".84 1" cx="115.2" cy="155" r="3.4"/>
+<circle class="s fine" data-span=".84 1" cx="124.8" cy="155" r="3.4"/>
+<path class="s fine" data-span=".84 1" d="M120 154 L117 162 L123 162 Z"/>
+<path class="s fine" data-span=".84 1" d="M177 161 C170 156 169.5 151 172 148.5 C174 146.5 176.5
+  147.5 177 149.5 C177.5 147.5 180 146.5 182 148.5 C184.5 151 184 156 177 161 Z"/>
+""".replace("/>", ' pathLength="1"/>')
+
+CROWN_SVG = f"""<svg viewBox="0 0 240 204" role="presentation">
+<defs><linearGradient id="crown-ink" x1="0" y1="0" x2="240" y2="204" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#54a4f6"/><stop offset=".55" stop-color="#316edc"/>
+<stop offset="1" stop-color="#1e4cc5"/></linearGradient></defs>
+<g class="ghost">{CROWN_ART}</g><g class="gild">{CROWN_ART}</g><g class="ink">{CROWN_ART}</g>
+<g class="star-spin"><g class="star">
+<path d="M36 2 L39.5 30.5 L68 34 L39.5 37.5 L36 64 L32.5 37.5 L4 34 L32.5 30.5 Z"/>
+<path transform="rotate(45 36 34)" d="M36 20 L38 32 L50 34 L38 36 L36 48 L34 36 L22 34 L34 32 Z"/>
+<circle cx="36" cy="34" r="3.5"/></g></g>
+</svg>"""
+
+# The crown traces itself as the report is scrolled, completing (gilded, with
+# a glow) at the bottom; it drifts against the scroll and its star turns.
+CROWN_JS = """
+(function () {
+  var crown = document.querySelector(".crown");
+  if (!crown) return;
+  var still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var spin = crown.querySelector(".star-spin");
+  var strokes = Array.prototype.map.call(crown.querySelectorAll(".ink [data-span]"), function (el) {
+    var span = el.getAttribute("data-span").split(" ");
+    return {el: el, from: +span[0], to: +span[1]};
+  });
+  function draw() {
+    var room = document.documentElement.scrollHeight - innerHeight;
+    var p = still || room <= 0 ? 1 : Math.min(1, Math.max(0, window.scrollY / room));
+    strokes.forEach(function (s) {
+      var t = Math.min(1, Math.max(0, (p - s.from) / (s.to - s.from)));
+      s.el.style.strokeDashoffset = ((1 - t) * 1.02).toFixed(4);
+    });
+    crown.classList.toggle("crowned", p > 0.985);
+    if (still) return;
+    crown.style.transform = "translate3d(0," + ((0.5 - p) * 60).toFixed(1) + "px,0) scale("
+      + (0.94 + p * 0.06).toFixed(3) + ")";
+    if (spin) spin.style.transform = "rotate(" + (window.scrollY * 0.12).toFixed(1) + "deg)";
+  }
+  var queued = false;
+  addEventListener("scroll", function () {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; draw(); });
+  }, {passive: true});
+  addEventListener("resize", draw);
+  draw();
 })();
 """
 
@@ -537,6 +641,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FreeCell Solitaire — Regression Report</title>
 <style>{_font_face()}{CSS}</style></head><body><div class="deck" aria-hidden="true"></div>
+<div class="crown" aria-hidden="true"><div class="crown-in"><div class="crown-bob">{CROWN_SVG}</div></div></div>
 <div class="wrap">
 <div class="hero">
 <div class="brand">{mark}<div><h1>FreeCell Solitaire</h1>
@@ -559,7 +664,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <footer>Generated by scripts/gen_spider_format_report.py · cases and titles from the
 Spider TestRail suite, plus FreeCell's own cases (Daily, the gameplay timer and score) ·
 screenshots are compressed JPEG evidence from log/</footer>
-</div><script>{FILTER_JS}{DECK_JS}</script></body></html>
+</div><script>{FILTER_JS}{DECK_JS}{CROWN_JS}</script></body></html>
 """
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as fh:
