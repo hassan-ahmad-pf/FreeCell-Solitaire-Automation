@@ -296,11 +296,16 @@ def header_line(con: Console, line: str) -> None:
         con.emit("")
         con.emit(paint(BOLD, "   tests in order (time on the last run):"))
         return
-    for key, label in (("device:", "device"), ("wda:", "driver"), ("build:", "build")):
+    for key, label in (("device:", "device"), ("wda:", "driver"), ("build:", "build"),
+                       ("network:", "network")):
         if line.startswith(key):
+            if key == "network:" and "checking" in line:
+                con.emit("")
             con.emit(paint(BOLD, f"   {label:8} {line[len(key):].strip()}"))
             return
-    if line.strip():
+    if line.startswith("WARNING"):
+        con.emit(paint(YELLOW, "   " + line))
+    elif line.strip():
         con.emit(paint(RED if ERROR.match(line) or "fail" in line.lower() else DIM, "   " + line))
 
 

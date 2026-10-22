@@ -153,6 +153,43 @@ def _plan(picked: list[str], dev: bool, offline: bool, everything: bool = False)
     return out
 
 
+def _network_first(plan: list[tuple], offline: bool) -> None:
+    """Set the radios in Settings before FreeCell first opens, so every run
+    starts the same way: Settings, then the game, never the game sent to the
+    background for Settings. verifyFirstLaunch starts online (a fresh
+    install's Terms card loads its policy pages); so do the tests from
+    ONLINE_FROM on. The rest start offline."""
+    first = next((spider for spider, _m, runs, _ids, _w in plan if runs), None)
+    if first is None:
+        return
+    order = [spider for spider, *_rest in catalog.RUN_ORDER]
+    want_online = not offline and (first == "verifyFirstLaunch" or fc.is_online()
+                                   or order.index(first) >= order.index(catalog.ONLINE_FROM))
+    print("\nnetwork: checking the internet connection in Settings before FreeCell opens",
+          flush=True)
+    try:
+        if not want_online:
+            ok = ui.offline(restore=False)
+        elif first == "verifyFirstLaunch" or fc.is_online():
+            ok = ui.online()
+        else:
+            fc.go_online()
+            ok = True
+    except Exception as exc:  # noqa: BLE001
+        print(f"  {exc}", flush=True)
+        ok = False
+    if not ok:
+        print("WARNING: Settings did not take the network change; each test sets it itself",
+              flush=True)
+    elif not want_online:
+        print("network: offline — Airplane Mode on, Wi-Fi off", flush=True)
+    elif ui.wifi_name():
+        print(f"network: online — Airplane Mode off, Wi-Fi joined {ui.wifi_name()}", flush=True)
+    else:
+        print("WARNING: Wi-Fi is on but joined no network — the online cases need one",
+              flush=True)
+
+
 def _case_row(cid: str, test: str, status: str, detail: str = "", rec: dict | None = None):
     rec = rec or {}
     return {
@@ -393,6 +430,7 @@ def main() -> int:
     kept = _previous({p[0] for p in plan}, scope)
 
     try:
+        _network_first(plan, offline)
         for i, (spider, module, runs, ids, reason) in enumerate(plan, 1):
             if spider == catalog.ONLINE_FROM and not offline:
                 print("\n  bringing the phone online here, as Spider's promo-strip step does",

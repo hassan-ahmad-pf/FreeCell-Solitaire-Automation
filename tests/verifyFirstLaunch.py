@@ -108,9 +108,15 @@ def _finish_on_menu() -> str:
 def _online_for_links() -> None:
     """Only a fresh install needs the network: its policy links load pages.
 
-    online() closes FreeCell first; relaunch onto the card, which returns
-    because Continue has not been pressed yet.
+    The suite runner goes online in Settings before FreeCell first opens, so
+    the card is already on a connected phone. Otherwise online() closes
+    FreeCell first; relaunch onto the card, which returns because Continue
+    has not been pressed yet.
     """
+    if ui.known_online():
+        print("  Terms card is up — the phone is already online for the policy links",
+              flush=True)
+        return
     print("  Terms card is up — closing FreeCell and going online for the "
           "policy links", flush=True)
     if not ui.online():

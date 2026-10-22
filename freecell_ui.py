@@ -57,6 +57,7 @@ QA_SELECT_90_99 = (1080, 1760)
 QA_WIN = (685, 1770)
 
 _OFFLINE: bool | None = None
+_WIFI = ""
 # The rules prompt comes ~6 s after the first deal of each FreeCell process.
 RULES_WAIT = 9.0
 _RULES_PENDING = True
@@ -515,12 +516,22 @@ def online() -> bool:
     up: an ad it loads then shows during the next offline run. It stays
     closed afterwards; a case that needs it online launches it itself.
     """
-    global _OFFLINE
+    global _OFFLINE, _WIFI
     close_app()
-    ok = helpers.set_network(True, restore=False)[0]
+    ok, _WIFI = helpers.set_network(True, restore=False)
     if ok:
         _OFFLINE = False
     return ok
+
+
+def known_online() -> bool:
+    """True when online() set the radios up and nothing has taken them down."""
+    return _OFFLINE is False
+
+
+def wifi_name() -> str:
+    """The Wi-Fi network Settings showed after the last online(); "" if none joined."""
+    return _WIFI
 
 
 def ensure_online() -> bool:
