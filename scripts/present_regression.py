@@ -9,7 +9,8 @@ clock, progress, passes and failures, and the time left (estimated from the
 last run). A rerun of failed tests (the runner's default) shows as its own
 section, and a case that passes there moves from failed to passed. The
 plain output is saved to log/regression_<time>.log, and the HTML report
-opens at the end (--no-open keeps it closed).
+opens at the end (--no-open keeps it closed). Stopped midway, the report
+of the cases run so far is written and opened at once.
 
 Run:  ./scripts/regression.sh   (starts WDA and keeps the Mac awake first)
 """
@@ -30,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "tests" / "freecell_suite" / "run_all.py"
 RESULTS = ROOT / "log" / "freecell_suite_results.json"
+REPORT = ROOT / "scripts" / "gen_suite_report.py"
 TTY = sys.stdout.isatty()
 
 GREEN, RED, YELLOW, CYAN, DIM, BOLD, BAR = "1;32", "1;31", "1;33", "1;36", "2", "1", "7"
@@ -43,7 +45,7 @@ TEST_END = re.compile(r"^<<< \[(\d+)/(\d+)\] (PASS|FAIL|SKIP)\s+(\S+)(?:\s+\(\s*
 CASE_RUN = re.compile(r"^\s+\[RUN \] (\S+) ?(.*)$")
 CASE_END = re.compile(r"^\s+\[(PASS|FAIL|SKIP|LATER|BLOCKED|ONLINE)\] (\S+) (.+?)"
                       r"(?: \((\d+(?:\.\d+)?)s\))?(?: — (.*))?$")
-SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP)  (\S+)\s+\(\s*([\d.]+)s\)"
+SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP|STOP)  (\S+)\s+\((?:\s*([\d.]+)s|not started)\)"
                           r"(?:\s+\+ rerun ([\d.]+)s)?$")
 RERUN_HEAD = re.compile(r"^  RERUN — (.*)$")
 RERUN_ITEM = re.compile(r"^    (\S+) (.*)  \((\S+)\)$")
@@ -97,6 +99,10 @@ class Console:
         self.rescued: list[str] = []
         self.took: dict[str, float] = {}
         self.report = ""
+        self.stopping = False
+        self.stop_report = False
+        self.open_report = True
+        self.opened = False
 
     def emit(self, text: str = "") -> None:
         with self.lock:
@@ -170,7 +176,8 @@ def last_durations() -> dict[str, float]:
         tests = json.loads(RESULTS.read_text(encoding="utf-8")).get("tests", [])
     except (OSError, ValueError):
         return {}
-    return {t["name"]: float(t.get("seconds") or 0.0) for t in tests if t.get("name")}
+    return {t["name"]: float(t.get("estimate") or t.get("seconds") or 0.0)
+            for t in tests if t.get("name")}
 
 
 def handle(con: Console, raw: str) -> None:
@@ -234,7 +241,8 @@ def handle(con: Console, raw: str) -> None:
         con.summary = True
         con.summaries += 1
         con.pause()
-        heading = "FINAL SUMMARY (after the rerun)" if con.rerun else "SUMMARY"
+        heading = ("SUMMARY SO FAR (stopped midway)" if con.stopping
+                   else "FINAL SUMMARY (after the rerun)" if con.rerun else "SUMMARY")
         con.emit("")
         con.emit(paint(CYAN, "━" * min(width() - 1, 78)))
         con.emit(paint(CYAN, f"  {heading}"))
@@ -358,14 +366,19 @@ def summary_line(con: Console, line: str) -> None:
     if m:
         verdict, name, secs, again = m.groups()
         code = {"PASS": GREEN, "FAIL": RED}.get(verdict, YELLOW)
-        text = paint(code, f"   {verdict}  {name:26} {took(float(secs)):>9}")
+        spent = took(float(secs)) if secs else "not run"
+        text = paint(code, f"   {verdict}  {name:26} {spent:>9}")
         if again:
             text += paint(YELLOW, f"   + rerun {took(float(again))}")
         con.emit(text)
         return
     if line.startswith("  report: "):
         con.report = line.split(": ", 1)[1].strip()
-        if not con.rerun:
+        if con.stopping:
+            con.stop_report = True
+            con.emit(paint(YELLOW, f"   report of the cases run so far: {con.report}"))
+            show_report(con)
+        elif not con.rerun:
             con.emit(paint(DIM, f"   report written: {con.report}"))
         return
     if line.strip().startswith("passed on the rerun:"):
@@ -378,6 +391,30 @@ def summary_line(con: Console, line: str) -> None:
         con.emit(paint(DIM if "network" in line else BOLD, line))
 
 
+def show_report(con: Console) -> None:
+    if con.report and con.open_report and not con.opened and sys.platform == "darwin":
+        subprocess.run(["open", con.report], check=False)
+        con.opened = True
+
+
+def report_now(con: Console) -> None:
+    """The runner was killed before it wrote its report: write one from the
+    results it saved after each finished test."""
+    out = ROOT / "log" / "freecell_suite_report.html"
+    con.emit(paint(YELLOW, "   writing the report of the tests finished so far…"))
+    try:
+        proc = subprocess.run([sys.executable, str(REPORT), "--results", str(RESULTS),
+                               "--out", str(out), "--stopped"],
+                              capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.SubprocessError, KeyboardInterrupt) as exc:
+        con.emit(paint(RED, f"   no report: {exc or 'interrupted'}"))
+        return
+    if proc.returncode:
+        con.emit(paint(RED, f"   no report: {proc.stderr.strip()[-300:]}"))
+        return
+    con.report = str(out)
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if a != "--no-open"]
     open_report = "--no-open" not in sys.argv[1:]
@@ -386,6 +423,7 @@ def main() -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     con = Console()
+    con.open_report = open_report
     con.estimate = last_durations()
     rule = "═" * min(width() - 1, 78)
     con.emit(paint(CYAN, rule))
@@ -410,13 +448,17 @@ def main() -> int:
         try:
             pump()
         except KeyboardInterrupt:
-            stopped = True
-            con.emit(paint(YELLOW, "   stopping — the runner is putting the network back on…"))
+            stopped = con.stopping = True
+            con.emit(paint(YELLOW, "   stopping — writing the report of the cases run so far, "
+                                   "then putting the network back on…"))
             try:
                 pump()
             except KeyboardInterrupt:
                 proc.kill()
     code = proc.wait()
+    if stopped and not con.stop_report:
+        report_now(con)
+        show_report(con)
     con.close()
 
     total = time.time() - con.t0
@@ -445,8 +487,7 @@ def main() -> int:
         print(f"   report  {con.report}")
     print(f"   log     {log_path}")
     print(paint(CYAN, rule))
-    if con.report and open_report and sys.platform == "darwin":
-        subprocess.run(["open", con.report], check=False)
+    show_report(con)
     return code
 
 

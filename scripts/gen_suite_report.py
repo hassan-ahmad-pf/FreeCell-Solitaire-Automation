@@ -229,10 +229,11 @@ footer { color:var(--muted); font-size:12px; text-align:center; margin-top:36px;
 """
 
 STATUS = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "skipped",
-          "dev": "skipped", "later": "skipped"}
+          "dev": "skipped", "later": "skipped", "stop": "skipped"}
 STATUS_PILL = {"passed": "var(--pass)", "failed": "var(--fail)", "skipped": "var(--skip)"}
 PILL_TEXT = {"pass": "passed", "fail": "failed", "skip": "skipped", "block": "blocked",
-             "dev": "dev build", "later": "later"}
+             "dev": "dev build", "later": "later", "stop": "not run"}
+NOT_RUN = "not run — the regression was stopped before this case"
 
 FILTER_JS = """
 (function () {
@@ -521,9 +522,10 @@ def _ring(counts: dict, executed: int) -> str:
             f'{counts["passed"]} passed, {counts["failed"]} failed">{"".join(shapes)}</svg>')
 
 
-def _score(counts: dict, executed: int) -> str:
+def _score(counts: dict, executed: int, not_run: int | None = None) -> str:
     """The result card under the header: the pass-rate ring, a verdict and
-    a tile per status. The rate is never rounded up to 100% past a failure."""
+    a tile per status. The rate is never rounded up to 100% past a failure.
+    *not_run* is set for a run stopped midway: how many cases it never reached."""
     passed, failed, skipped = counts["passed"], counts["failed"], counts["skipped"]
 
     def share(n: int) -> str:
@@ -541,10 +543,14 @@ def _score(counts: dict, executed: int) -> str:
         mood = "bad"
     else:
         verdict, mood = f"All {executed} executed cases passed", "good"
+    skip_note = "not run on this build"
+    if not_run is not None:
+        verdict = "Stopped midway · " + verdict[0].lower() + verdict[1:]
+        skip_note = f"{not_run} not run after the stop"
     tiles = [("pass", passed, "Passed", share(passed)),
              ("fail" if failed else "fail none", failed, "Failed",
               share(failed) if failed else "nothing failed"),
-             ("skip", skipped, "Skipped", "not run on this build")]
+             ("skip", skipped, "Skipped", skip_note)]
     tile_html = "".join(f'<div class="tile {cls}"><div class="tile-n">{n}</div>'
                         f'<div class="tile-k">{label}</div><div class="tile-s">{note}</div></div>'
                         for cls, n, label, note in tiles)
@@ -570,13 +576,19 @@ def _filters(counts: dict) -> str:
     return f'<div class="filters" role="group" aria-label="Filter cases">{"".join(buttons)}</div>'
 
 
-def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> str:
+def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
+          stopped: bool = False) -> str:
+    """*stopped*: the run was stopped midway, even if its results do not say
+    so (the runner was killed before it could)."""
     try:
         with open(results_path, encoding="utf-8") as fh:
             payload = json.load(fh)
     except (OSError, ValueError):
         payload = {}
     recorded = {row["id"]: row for row in payload.get("cases", [])}
+    stopped = stopped or bool(payload.get("stopped"))
+    planned = set(payload.get("plan", []))
+    dev_build = payload.get("build_kind") == "dev"
 
     rows = []
     for case in catalog.CASES:
@@ -587,6 +599,9 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
             reason = (catalog.LATER.get(cid) or catalog.DEV_CASES.get(cid)
                       or (catalog.entry(owner) or [None] * 5)[4] or "not run in this invocation")
             status = "later" if cid in catalog.LATER else "dev" if reason.startswith("needs") else "skip"
+            if (stopped and owner in planned and cid not in catalog.LATER
+                    and (dev_build or cid not in catalog.DEV_CASES)):
+                status, reason = "stop", NOT_RUN
             row = {"id": cid, "title": catalog.TITLES[cid], "section": catalog.SECTIONS[cid],
                    "test": owner, "status": status, "detail": reason, "shots": [], "seconds": 0}
         rows.append(row)
@@ -630,6 +645,12 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
              f"{kinds.get('dev', 0)} dev build · "
              f"{kinds.get('skip', 0) + kinds.get('block', 0)} skipped · "
              f"{kinds.get('later', 0)} later")
+    if kinds.get("stop"):
+        scope += f" · {kinds['stop']} not run (stopped)"
+    subtitle = (f"Regression report · stopped midway — the cases run so far on the "
+                f"{html.escape(payload.get('build_kind', 'prod'))} build" if stopped else
+                f"Regression report · the full FreeCell suite on the "
+                f"{html.escape(payload.get('build_kind', 'prod'))} build")
     logo = _image_uri(HEADER_LOGO, box=(256, 256))
     mark = (f'<img class="mark" src="{logo}" alt="FreeCell Solitaire logo">'
             if logo else '<div class="mark">F</div>')
@@ -645,11 +666,11 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT) -> s
 <div class="wrap">
 <div class="hero">
 <div class="brand">{mark}<div><h1>FreeCell Solitaire</h1>
-<div class="sub">Regression report · the full FreeCell suite on the {html.escape(build_kind)} build</div></div></div>
+<div class="sub">{subtitle}</div></div></div>
 <div class="hero-meta"><span class="badge">{html.escape(build_kind)} build</span><br>
 {html.escape(run_time)}<br>{html.escape(app_value)}</div>
 </div>
-{_score(counts, executed)}
+{_score(counts, executed, kinds.get("stop", 0) if stopped else None)}
 <div class="chips">
 {_chip("Device", device.get("model"))}
 {_chip("Platform", "iOS " + device.get("ios", "") if device.get("ios") else "")}
@@ -667,8 +688,11 @@ screenshots are compressed JPEG evidence from log/</footer>
 </div><script>{FILTER_JS}{DECK_JS}{CROWN_JS}</script></body></html>
 """
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as fh:
+    # Never a half-written report, even with two writers or the report open.
+    tmp = f"{out_path}.{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(document)
+    os.replace(tmp, out_path)
     return out_path
 
 
@@ -676,8 +700,10 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--results", default=DEFAULT_RESULTS)
     parser.add_argument("--out", default=DEFAULT_OUT)
+    parser.add_argument("--stopped", action="store_true",
+                        help="the run was stopped midway: its unreached cases read not run")
     args = parser.parse_args(argv)
-    print(f"wrote {build(args.results, args.out)}")
+    print(f"wrote {build(args.results, args.out, args.stopped)}")
 
 
 if __name__ == "__main__":

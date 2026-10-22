@@ -47,12 +47,17 @@ When a test fails, the report is written, each failed test runs once more
 A failed case that passes on the rerun is a plain pass in the report; the
 results JSON keeps its first failure (first_failure). --no-rerun turns
 this off.
+
+Stopped midway (Ctrl+C, or ./scripts/regression.sh stop), the runner writes
+the results and the report at once: the cases run so far keep their
+results, the rest read "not run". Then it puts the network back on.
 """
 from __future__ import annotations
 
 import importlib.util
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -229,7 +234,88 @@ def _write(payload: dict, kept: tuple[list, list, str]) -> None:
         out["duration_seconds"] = round(sum(t.get("seconds", 0) + t.get("rerun_seconds", 0)
                                             for t in out["tests"]), 1)
     config.LOG.mkdir(parents=True, exist_ok=True)
-    RESULTS_PATH.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
+    tmp = RESULTS_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, RESULTS_PATH)
+
+
+NOT_RUN = "not run — the regression was stopped before this case"
+
+
+def _quiet(*_args, **_kwargs) -> None:
+    pass
+
+
+def _case_rows(name: str, ids: list[str], dev: bool, offline: bool, error: str = "",
+               stopped: bool = False, recorded: dict | None = None,
+               say: bool = True) -> tuple[list[dict], bool]:
+    """A test's case rows from what caselog recorded, and whether one failed.
+    A case left unrecorded was not reached after a failure, or, *stopped*,
+    not run because the regression was stopped first."""
+    log = print if say else _quiet
+    if recorded is None:
+        recorded = {r["id"]: r for r in caselog.results()}
+    runnable = [cid for cid in ids if cid not in catalog.LATER
+                and (dev or cid not in catalog.DEV_CASES)]
+    rows, bad = [], False
+    for cid in ids:
+        if offline and cid in catalog.ONLINE_CASES:
+            log(f"    [ONLINE] {cid} {catalog.TITLES[cid]} — online pass; "
+                "keeps its last result", flush=True)
+            continue
+        if cid in catalog.LATER:
+            log(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}", flush=True)
+            rows.append(_case_row(cid, name, "later", catalog.LATER[cid]))
+            continue
+        if cid not in runnable:
+            why = catalog.DEV_CASES[cid]
+            log(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {why}", flush=True)
+            rows.append(_case_row(cid, name, "dev", why))
+            continue
+        rec = recorded.get(cid)
+        if rec is None and stopped:
+            rows.append(_case_row(cid, name, "stop", NOT_RUN))
+            continue
+        if rec is None:
+            detail = ("not reached — the test stopped first: " + error if error
+                      else "the test did not record this case")
+            log(f"    [FAIL] {cid} {catalog.TITLES[cid]} — {detail}", flush=True)
+            rows.append(_case_row(cid, name, "fail", detail))
+            bad = True
+            continue
+        rows.append(_case_row(cid, name, rec["status"], rec["detail"], rec))
+        bad = bad or rec["status"] == "fail"
+    return rows, bad
+
+
+def _stop_rows(plan: list[tuple], current: tuple[str, float] | None, tests: list[dict],
+               cases: list[dict], dev: bool, offline: bool, last: dict[str, float]) -> None:
+    """At a stop: the test that was running keeps the cases it finished; its
+    other cases, and every case of the tests not started, read not run.
+    *estimate* keeps the last run's time for the console's next estimate."""
+    done = {t["name"] for t in tests}
+    for name, module, runs, ids, _reason in plan:
+        if name in done or not runs:
+            continue
+        ran = current is not None and current[0] == name
+        rows, _bad = _case_rows(name, ids, dev, offline, stopped=True,
+                                recorded=None if ran else {}, say=False)
+        seconds = round(time.time() - current[1], 1) if ran else 0.0
+        tests.append({"name": name, "module": module, "status": "stop",
+                      "started": _iso(current[1]) if ran else "", "seconds": seconds,
+                      "estimate": max(last.get(name, 0.0), seconds),
+                      "error": "stopped while it ran" if ran
+                      else "not started — the regression was stopped first"})
+        cases.extend(rows)
+
+
+def _last_seconds() -> dict[str, float]:
+    try:
+        old = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {t["name"]: float(t.get("estimate") or t.get("seconds") or 0.0)
+            for t in old.get("tests", []) if t.get("name")}
 
 
 def _run_one(i: int, total: int, name: str, module: str, ids: list[str], dev: bool,
@@ -247,36 +333,7 @@ def _run_one(i: int, total: int, name: str, module: str, ids: list[str], dev: bo
         print(f"FAIL: {error}", flush=True)
     dt = time.time() - t0
 
-    rows = []
-    recorded = {r["id"]: r for r in caselog.results()}
-    runnable = [cid for cid in ids if cid not in catalog.LATER
-                and (dev or cid not in catalog.DEV_CASES)]
-    bad = False
-    for cid in ids:
-        if offline and cid in catalog.ONLINE_CASES:
-            print(f"    [ONLINE] {cid} {catalog.TITLES[cid]} — online pass; "
-                  "keeps its last result", flush=True)
-            continue
-        if cid in catalog.LATER:
-            print(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}",
-                  flush=True)
-            rows.append(_case_row(cid, name, "later", catalog.LATER[cid]))
-            continue
-        if cid not in runnable:
-            why = catalog.DEV_CASES[cid]
-            print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {why}", flush=True)
-            rows.append(_case_row(cid, name, "dev", why))
-            continue
-        rec = recorded.get(cid)
-        if rec is None:
-            detail = ("not reached — the test stopped first: " + error if error
-                      else "the test did not record this case")
-            print(f"    [FAIL] {cid} {catalog.TITLES[cid]} — {detail}", flush=True)
-            rows.append(_case_row(cid, name, "fail", detail))
-            bad = True
-            continue
-        rows.append(_case_row(cid, name, rec["status"], rec["detail"], rec))
-        bad = bad or rec["status"] == "fail"
+    rows, bad = _case_rows(name, ids, dev, offline, error)
     ok = not error and not bad
     print(f"<<< [{i}/{total}] {'PASS' if ok else 'FAIL'}  {name}  ({dt:.1f}s)", flush=True)
     return ({"name": name, "module": module, "status": "pass" if ok else "fail",
@@ -338,16 +395,19 @@ def _summary(tests: list[dict], cases: list[dict], heading: str) -> list[dict]:
     print("\n" + "=" * 64, flush=True)
     print(f"  {heading}", flush=True)
     for t in tests:
-        mark = {"pass": "PASS", "fail": "FAIL", "skip": "SKIP"}[t["status"]]
+        mark = {"pass": "PASS", "fail": "FAIL", "skip": "SKIP", "stop": "STOP"}[t["status"]]
         again = f"  + rerun {t['rerun_seconds']:.1f}s" if t.get("rerun_status") else ""
-        print(f"  {mark}  {t['name']:24} ({t['seconds']:6.1f}s){again}", flush=True)
+        took = ("(not started)" if t["status"] == "stop" and not t["started"]
+                else f"({t['seconds']:6.1f}s)")
+        print(f"  {mark}  {t['name']:24} {took}{again}", flush=True)
     by = {}
     for c in cases:
         by[c["status"]] = by.get(c["status"], 0) + 1
     executed = by.get("pass", 0) + by.get("fail", 0)
+    stop = f", {by['stop']} not run (stopped)" if by.get("stop") else ""
     print(f"\n  cases: {by.get('pass', 0)}/{executed} executed passed, "
           f"{by.get('fail', 0)} failed, {by.get('skip', 0)} skipped, "
-          f"{by.get('dev', 0)} dev build, {by.get('later', 0)} later", flush=True)
+          f"{by.get('dev', 0)} dev build, {by.get('later', 0)} later{stop}", flush=True)
     rescued = [c["id"] for c in cases if c.get("rerun") == "pass"]
     if rescued:
         print(f"  passed on the rerun: {', '.join(rescued)}", flush=True)
@@ -383,6 +443,7 @@ def main() -> int:
     plan = _plan(picked, dev, offline, everything)
     total = len(plan)
     started = time.time()
+    last = _last_seconds()
 
     fc.hold_phone()
     problems = preflight()
@@ -424,6 +485,7 @@ def main() -> int:
         "device": {"model": helpers.device_model(), "ios": helpers.os_version(),
                    "udid": config.DEVICE_UDID, "screen": "1290x2796"},
         "app": {"name": "FreeCell", "version": build[0], "build": build[1]},
+        "plan": [name for name, _m, runs, _ids, _w in plan if runs],
         "tests": [], "cases": [],
     }
     tests, cases = payload["tests"], payload["cases"]
@@ -431,42 +493,60 @@ def main() -> int:
              if not (offline and cid in catalog.ONLINE_CASES)}
     kept = _previous({p[0] for p in plan}, scope)
 
+    current: tuple[str, float] | None = None  # the test running, and since when
+    stopped = False
     try:
-        _network_first(plan, offline)
-        for i, (name, module, runs, ids, reason) in enumerate(plan, 1):
-            if name == catalog.ONLINE_FROM and not offline:
-                print("\n  bringing the phone online here for the online tests", flush=True)
-                fc.go_online()
-            if not runs:
-                print(f"\n>>> [{i}/{total}] SKIP   {name} — {reason}", flush=True)
-                status = "skip" if catalog.entry(name)[2] == "skip" else "dev"
-                for cid in ids:
-                    if cid in catalog.LATER:
-                        print(f"    [LATER] {cid} {catalog.TITLES[cid]} — {catalog.LATER[cid]}",
-                              flush=True)
-                        cases.append(_case_row(cid, name, "later", catalog.LATER[cid]))
-                    else:
-                        print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {reason}", flush=True)
-                        cases.append(_case_row(cid, name, status, reason))
-                tests.append({"name": name, "module": module, "status": "skip",
-                              "started": _iso(), "seconds": 0.0, "error": reason})
-                print(f"<<< [{i}/{total}] SKIP   {name}", flush=True)
-                continue
+        try:
+            _network_first(plan, offline)
+            for i, (name, module, runs, ids, reason) in enumerate(plan, 1):
+                if name == catalog.ONLINE_FROM and not offline:
+                    print("\n  bringing the phone online here for the online tests", flush=True)
+                    fc.go_online()
+                if not runs:
+                    print(f"\n>>> [{i}/{total}] SKIP   {name} — {reason}", flush=True)
+                    status = "skip" if catalog.entry(name)[2] == "skip" else "dev"
+                    for cid in ids:
+                        if cid in catalog.LATER:
+                            print(f"    [LATER] {cid} {catalog.TITLES[cid]} — "
+                                  f"{catalog.LATER[cid]}", flush=True)
+                            cases.append(_case_row(cid, name, "later", catalog.LATER[cid]))
+                        else:
+                            print(f"    [SKIP] {cid} {catalog.TITLES[cid]} — {reason}",
+                                  flush=True)
+                            cases.append(_case_row(cid, name, status, reason))
+                    tests.append({"name": name, "module": module, "status": "skip",
+                                  "started": _iso(), "seconds": 0.0, "error": reason})
+                    print(f"<<< [{i}/{total}] SKIP   {name}", flush=True)
+                    continue
 
-            row, rows = _run_one(i, total, name, module, ids, dev, offline)
-            tests.append(row)
-            cases.extend(rows)
-            payload["finished"] = _iso()
+                current = (name, time.time())
+                row, rows = _run_one(i, total, name, module, ids, dev, offline)
+                tests.append(row)
+                cases.extend(rows)
+                current = None
+                payload["finished"] = _iso()
+                payload["duration_seconds"] = round(time.time() - started, 1)
+                _write(payload, kept)
+
+            if rerun and any(t["status"] == "fail" for t in tests):
+                _summary(tests, cases, f"{heading} — first run")
+                _report()
+                try:
+                    _rerun(plan, tests, cases, dev, offline)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"WARNING: the rerun stopped: {exc}", flush=True)
+        except KeyboardInterrupt:
+            # A second stop must not cut the report short; stop --now kills outright.
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            stopped = True
+            print("\n  stopped — writing the results and the report of the cases run so far",
+                  flush=True)
+            _stop_rows(plan, current, tests, cases, dev, offline, last)
+            payload["stopped"] = payload["finished"] = _iso()
             payload["duration_seconds"] = round(time.time() - started, 1)
             _write(payload, kept)
-
-        if rerun and any(t["status"] == "fail" for t in tests):
-            _summary(tests, cases, f"{heading} — first run")
+            _summary(tests, cases, f"{heading} — stopped midway")
             _report()
-            try:
-                _rerun(plan, tests, cases, dev, offline)
-            except Exception as exc:  # noqa: BLE001
-                print(f"WARNING: the rerun stopped: {exc}", flush=True)
     finally:
         if os.environ.get("FREECELL_SUITE_ONLINE") != "1":
             print("\n  putting the network back on", flush=True)
@@ -474,6 +554,8 @@ def main() -> int:
                 ui.ensure_online()
             except Exception as exc:  # noqa: BLE001
                 print(f"  WARNING: could not turn the network back on: {exc}", flush=True)
+    if stopped:
+        return 130
 
     payload["finished"] = _iso()
     payload["duration_seconds"] = round(time.time() - started, 1)

@@ -10,6 +10,9 @@
 #   ./scripts/regression.sh stop               # from any terminal: stop a run cleanly
 #   ./scripts/regression.sh stop --now         # stop at once, network left as it is
 #
+# A stopped run writes and opens the report of the cases run so far at once
+# (with --now, of the tests finished so far); the rest read "not run".
+#
 # Checks the phone, starts WDA (re-signing it when its profile is due),
 # keeps the Mac awake, and shows each test and case live with its result
 # and time (scripts/present_regression.py). Failed tests run once more and
@@ -50,17 +53,19 @@ stop_run() {
     [[ -z "${console// }" ]] || kill -INT $console 2>/dev/null || true
     # shellcheck disable=SC2086
     [[ -z "${runner// }" ]] || kill -KILL $runner 2>/dev/null || true
-    echo ">>> regression stopped at once. The phone's network was left as it was; if it is"
-    echo "    offline, turn Airplane Mode off and Wi-Fi on before the next run."
+    echo ">>> regression stopped at once; its window writes the report of the tests finished"
+    echo "    so far (log/freecell_suite_report.html). The phone's network was left as it was;"
+    echo "    if it is offline, turn Airplane Mode off and Wi-Fi on before the next run."
     return 0
   fi
-  echo ">>> stopping the regression; it turns the phone's network back on first (up to ~2 min)..."
+  echo ">>> stopping the regression: it writes the report of the cases run so far, then turns"
+  echo "    the phone's network back on (up to ~2 min)..."
   # shellcheck disable=SC2086
   kill -INT $console $runner 2>/dev/null || true
   for _ in $(seq 1 240); do
     if ! pgrep -if "python[^ ]* .*tests/freecell_suite/run_all\.py" >/dev/null; then
-      echo ">>> regression stopped; its window shows the summary. WDA is still up"
-      echo "    (./scripts/wda.sh stop ends it)."
+      echo ">>> regression stopped; its window shows the summary, and the report so far is"
+      echo "    log/freecell_suite_report.html. WDA is still up (./scripts/wda.sh stop ends it)."
       return 0
     fi
     sleep 1
@@ -88,7 +93,7 @@ for arg in "$@"; do
     --main) scope="" ;;
     --all) scope="--all" ;;
     --no-open|--no-rerun) extra+=("$arg") ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
     *) extra+=("$arg"); scope="" ;;
   esac
