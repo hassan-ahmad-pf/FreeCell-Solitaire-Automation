@@ -1319,7 +1319,7 @@ def restore_default_look() -> bool:
         return False
 
 
-# ── Options switches: Rich Features, Rank Strip ────────────────────
+# ── Options switches: Rich Features, Rank Strip, Show Status Bar ───
 # Rich Features draws the table HUD: the score, then the timer and the
 # multiplier just above the wooden bar, and the move counter left of
 # "menu". RICH_HUD is the bottom band while the "tap to undo / lower /
@@ -1328,6 +1328,9 @@ def restore_default_look() -> bool:
 # header moves ~100 px with the status bar, so the counter is read
 # relative to the "menu" label instead.
 # Rank Strip draws one A…K band just above the "tap to undo" labels.
+# Show Status Bar draws the iOS status bar on the table: the clock, signal
+# and battery in white at y 67-109, above the header (y 330+). Off, that
+# band is bare felt (0 white px; 3,300-4,200 when shown).
 OPTION_SWITCH_X = 1058
 # The red "Test Banner" debug button covers x 936-1283, y 2370-2489 on
 # Options — right over the switch column — so a row is tapped only here.
@@ -1347,6 +1350,9 @@ HUD_INK = 170
 HUD_SEEN = 150
 HUD_GONE = 25
 TABLE_MENU = (1140, 350)
+STATUS_BAND = (0, 25, 1290, 140)
+STATUS_SEEN = 1500
+STATUS_GONE = 150
 
 
 def _locate_in(name: str, img):
@@ -1526,6 +1532,16 @@ def set_rank_strip(on: bool) -> bool:
     return set_option("opt_rank_strip", on, "Rank Strip")
 
 
+def set_status_bar(on: bool) -> bool:
+    return set_option("opt_status_bar", on, "Show Status Bar")
+
+
+def status_bar_ink(path=None) -> int:
+    """White pixels where the iOS status bar sits: its clock, signal and battery."""
+    x0, y0, x1, y1 = STATUS_BAND
+    return int((screen_rgb(path)[y0:y1, x0:x1].min(axis=2) > 225).sum())
+
+
 def _rich_hud(img) -> dict:
     """RICH_HUD moved to where the hint deck puts the bottom bar on *img*."""
     deck = _locate_in("hint_deck", img)
@@ -1666,6 +1682,10 @@ def restore_rich_features() -> bool:
 
 def restore_rank_strip() -> bool:
     return restore_option(set_rank_strip, "Rank Strip")
+
+
+def restore_status_bar() -> bool:
+    return restore_option(set_status_bar, "Show Status Bar")
 
 
 # ── Pages: settle, scroll to the end, drag ─────────────────────────

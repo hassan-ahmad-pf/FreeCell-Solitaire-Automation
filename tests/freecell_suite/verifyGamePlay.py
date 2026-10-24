@@ -12,6 +12,9 @@ GP-06  tap for hints shows a hint ("tap for more")
 GP-07  the in-game menu shows replay, abandon, options, new, help and FAQ
 GP-10  Rich Features OFF hides the timer, score and multiplier
 GP-11  Rich Features ON brings them back
+OP-10  Show Status Bar is ON by default and the iOS status bar shows on the
+       table; OFF hides it and the table moves up; ON brings it back with the
+       table where it started (switched from the table's Options)
 GP-14  New deals a different board
 
 Board checks read the exact layout from the accessibility tree; the
@@ -46,6 +49,8 @@ DRAWER = ("drawer_replay", "drawer_abandon", "drawer_options", "drawer_new",
           "drawer_help", "drawer_faq")
 RICH = "opt_rich_features"
 RICH_TITLE = "Rich Features"
+STATUS = "opt_status_bar"
+STATUS_TITLE = "Show Status Bar"
 NEW_DEAL = 10
 IDLE = 10.0
 TIMER_RUN = 2.0
@@ -210,6 +215,49 @@ def run() -> None:
         if touched:
             ui.restore_rich_features()
 
+    bar_maybe_off = True
+    try:
+        with caselog.case("OP-10") as c:
+            caselog.step("Check the iOS status bar (clock, battery) shows above the table")
+            on_shot = c.shot(ui.settled_shot("StatusBarOn"))
+            on_ink = ui.status_bar_ink(on_shot)
+            ui.expect(on_ink >= ui.STATUS_SEEN,
+                      f"no status bar above the table with Show Status Bar at its default "
+                      f"({on_ink} white px, see {on_shot})")
+            top_on = _top_y()
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(STATUS, True, STATUS_TITLE, "opened from the table — its default")
+            c.shot(ui.switch_to(STATUS, False, STATUS_TITLE, "StatusBarOptionOff"))
+            off_shot = c.shot(ui.back_to_table_shot("StatusBarOff"))
+            caselog.step("Check the status bar is gone and the table moved up")
+            off_ink = ui.status_bar_ink(off_shot)
+            top_off = _top_y()
+            ui.expect(off_ink <= ui.STATUS_GONE,
+                      f"Show Status Bar OFF still shows the status bar ({off_ink} white px, "
+                      f"see {off_shot})")
+            ui.expect(top_off < top_on - SHIFT,
+                      f"the table did not move up with the status bar hidden "
+                      f"(top {top_on:.0f} -> {top_off:.0f} pt)")
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(STATUS, False, STATUS_TITLE, "opened from the table")
+            ui.switch_to(STATUS, True, STATUS_TITLE, "StatusBarOptionBackOn")
+            bar_maybe_off = False
+            again_shot = c.shot(ui.back_to_table_shot("StatusBarBackOn"))
+            caselog.step("Check the status bar is back and the table is where it started")
+            again_ink = ui.status_bar_ink(again_shot)
+            top_again = _top_y()
+            ui.expect(again_ink >= ui.STATUS_SEEN,
+                      f"Show Status Bar ON did not bring the status bar back ({again_ink} white "
+                      f"px, see {again_shot})")
+            ui.expect(abs(top_again - top_on) <= SHIFT / 3,
+                      f"the table did not return to where it started "
+                      f"(top {top_on:.0f} -> {top_off:.0f} -> {top_again:.0f} pt)")
+            c.note(f"shown by default; OFF hid it and moved the table up {top_on - top_off:.0f} "
+                   f"pt; ON brought it back with the table where it started")
+    finally:
+        if bar_maybe_off:
+            ui.restore_status_bar()
+
     with caselog.case("GP-14") as c:
         before = fc.settled_board()
         ui.expect(ui.open_table_drawer(), "the in-game menu did not open for New")
@@ -228,7 +276,7 @@ def run() -> None:
 
     ui.expect(ui.to_menu(), "could not return to the menu after the table")
     print("PASS: the table plays — controls, timer and score, undo, lower / raise, hints, "
-          "drawer, Rich Features both ways, and New")
+          "drawer, Rich Features and Show Status Bar both ways, and New")
 
 
 if __name__ == "__main__":

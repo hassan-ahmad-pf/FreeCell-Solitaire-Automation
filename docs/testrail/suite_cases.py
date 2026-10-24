@@ -1,7 +1,7 @@
 """The FreeCell suite's case list: ID, title, section, type and priority.
 
-Read by tests/freecell_suite/catalog.py, which slots FreeCell's Daily, timer
-and score cases from cases.py in beside them.
+Read by tests/freecell_suite/catalog.py, which slots FreeCell's Daily, timer,
+score and Show Status Bar cases from cases.py in beside them.
 """
 
 CASES = [
