@@ -22,6 +22,10 @@ pass in the HTML (no rerun note — the user wants it that way), with its
 first failure kept in the results JSON as `first_failure`. Tell the user
 in chat which cases needed the rerun.
 
+Started from an agent shell (not a terminal), the console is plain white
+unless `FORCE_COLOR=1` is set: `FORCE_COLOR=1 ./scripts/regression.sh ...`
+keeps the user's colours (the status bar still needs a real terminal).
+
 ## WDA first
 
 If `http://127.0.0.1:8100/status` is down, start the in-repo signed build.

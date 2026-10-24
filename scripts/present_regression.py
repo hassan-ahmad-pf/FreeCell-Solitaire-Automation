@@ -13,6 +13,10 @@ plain output is saved to log/regression_<time>.log, and the HTML report
 opens at the end (--no-open keeps it closed). Stopped midway, the report
 of the cases run so far is written and opened at once.
 
+Colours and the status bar need a terminal. Output to a pipe or an agent's
+shell is plain unless FORCE_COLOR=1, which brings the colours back (the
+status bar stays off there).
+
 Run:  ./scripts/regression.sh   (starts WDA and keeps the Mac awake first)
 """
 from __future__ import annotations
@@ -34,6 +38,7 @@ RUNNER = ROOT / "tests" / "freecell_suite" / "run_all.py"
 RESULTS = ROOT / "log" / "freecell_suite_results.json"
 REPORT = ROOT / "scripts" / "gen_suite_report.py"
 TTY = sys.stdout.isatty()
+COLOR = TTY or os.environ.get("FORCE_COLOR", "") not in ("", "0")
 
 GREEN, RED, YELLOW, CYAN, DIM, BOLD, BAR = "1;32", "1;31", "1;33", "1;36", "2", "1", "7"
 MARKS = {"PASS": ("✓ PASS ", GREEN), "FAIL": ("✗ FAIL ", RED), "SKIP": ("– SKIP ", YELLOW),
@@ -59,7 +64,7 @@ DEV_SKIP = "needs the dev build"
 
 
 def paint(code: str, text: str) -> str:
-    return f"\033[{code}m{text}\033[0m" if TTY else text
+    return f"\033[{code}m{text}\033[0m" if COLOR else text
 
 
 def clock(seconds: float) -> str:
