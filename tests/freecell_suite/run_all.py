@@ -5,8 +5,8 @@ The suite's tests in order, one line per case with its ID and title, then
 the report. The order visits each screen once where the network and the
 data allow (catalog.py says why). The Daily cases (from FreeCell's TestRail
 list) run in verifyDaily, their statistics reset in verifyStatistics; the
-timer, score and Show Status Bar cases (GP-12, GP-25, OP-10) run in
-verifyGamePlay.
+timer, score, Show Status Bar and Show Card Messages cases (GP-12, GP-25,
+OP-10, OP-11, OP-12) run in verifyGamePlay.
 tests/freecell_suite/catalog.py says where every test stands:
 
   run    a test in tests/freecell_suite/<module>.py runs and records its

@@ -1319,7 +1319,8 @@ def restore_default_look() -> bool:
         return False
 
 
-# ── Options switches: Rich Features, Rank Strip, Show Status Bar ───
+# ── Options switches: Rich Features, Rank Strip, Show Status Bar,
+#    Show Card Messages ──────────────────────────────────────────────
 # Rich Features draws the table HUD: the score, then the timer and the
 # multiplier just above the wooden bar, and the move counter left of
 # "menu". RICH_HUD is the bottom band while the "tap to undo / lower /
@@ -1536,6 +1537,10 @@ def set_status_bar(on: bool) -> bool:
     return set_option("opt_status_bar", on, "Show Status Bar")
 
 
+def set_card_messages(on: bool) -> bool:
+    return set_option("opt_card_messages", on, "Show Card Messages")
+
+
 def status_bar_ink(path=None) -> int:
     """White pixels where the iOS status bar sits: its clock, signal and battery."""
     x0, y0, x1, y1 = STATUS_BAND
@@ -1686,6 +1691,10 @@ def restore_rank_strip() -> bool:
 
 def restore_status_bar() -> bool:
     return restore_option(set_status_bar, "Show Status Bar")
+
+
+def restore_card_messages() -> bool:
+    return restore_option(set_card_messages, "Show Card Messages")
 
 
 # ── Pages: settle, scroll to the end, drag ─────────────────────────

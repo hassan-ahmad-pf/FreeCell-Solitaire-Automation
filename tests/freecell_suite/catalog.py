@@ -16,10 +16,10 @@ carries on from it: Options → Contact Us, Play → abandon → relaunch.
 The Daily cases come from FreeCell's TestRail list (docs/testrail/cases.py)
 as written there, plus EXTRA_CASES for the steps that list has no case for.
 The Daily flow runs in verifyDaily, its statistics reset in verifyStatistics
-with the Solo one. The timer case (GP-12), the score case beside it (GP-25)
-and Show Status Bar (OP-10, switched from the table's Options next to Rich
-Features) run in verifyGamePlay. Each sits in its section after the cases
-with its prefix and lower IDs.
+with the Solo one. The timer case (GP-12), the score case beside it (GP-25),
+Show Status Bar (OP-10) and Show Card Messages (OP-11, OP-12), all switched
+from the table's Options next to Rich Features, run in verifyGamePlay. Each
+sits in its section after the cases with its prefix and lower IDs.
 
 Each test is one of:
   run  — a FreeCell port in tests/freecell_suite/<module>.py
@@ -41,7 +41,7 @@ SUITE_CASES = os.path.join(ROOT, "docs", "testrail", "suite_cases.py")
 FREECELL_CASES = os.path.join(ROOT, "docs", "testrail", "cases.py")
 
 # The cases taken from FreeCell's TestRail list rather than the suite's.
-FREECELL_ONLY = ("GP-12", "OP-10", "DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
+FREECELL_ONLY = ("GP-12", "OP-10", "OP-11", "OP-12", "DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
                  "DY-12", "DY-13", "DY-14", "RS-04", "RS-05", "RS-06")
 
 # Steps FreeCell's TestRail list has no case for.
@@ -90,7 +90,7 @@ RUN_ORDER = [
     ("verifyRelaunch", "verifyRelaunch", "run", ["RL-01", "RL-02"], ""),
     ("verifyGamePlay", "verifyGamePlay", "run",
      ["GP-01", "GP-12", "GP-25", "GP-03", "GP-04", "GP-05", "GP-06",
-      "GP-07", "GP-10", "GP-11", "OP-10", "GP-14"], ""),
+      "GP-07", "GP-10", "GP-11", "OP-10", "OP-11", "OP-12", "GP-14"], ""),
     ("verifyVictory", "verifyVictory", "dev", ["VI-01", "VI-02", "VI-03", "VI-04"],
      "needs the dev build (Complete Game / Synthetic Win)"),
     ("verifyDifficultyLevels", "verifyDifficultyLevels", "dev",

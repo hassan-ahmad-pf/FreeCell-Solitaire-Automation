@@ -15,7 +15,12 @@ GP-11  Rich Features ON brings them back
 OP-10  Show Status Bar is ON by default and the iOS status bar shows on the
        table; OFF hides it and the table moves up; ON brings it back with the
        table where it started (switched from the table's Options)
-GP-14  New deals a different board
+OP-11  with the four free cells full, tapping a card that has nowhere to go
+       flashes "this card cannot attach anywhere" (Show Card Messages is ON
+       by default)
+OP-12  with Show Card Messages OFF, tapping the same stuck card shows no
+       note; the switch is then turned back ON
+GP-14  New deals a different board (which also clears the full free cells)
 
 Board checks read the exact layout from the accessibility tree; the
 playfield's height is its foundation row's y.
@@ -51,6 +56,9 @@ RICH = "opt_rich_features"
 RICH_TITLE = "Rich Features"
 STATUS = "opt_status_bar"
 STATUS_TITLE = "Show Status Bar"
+MESSAGES = "opt_card_messages"
+MESSAGES_TITLE = "Show Card Messages"
+NOTE = "this card cannot attach anywhere"
 NEW_DEAL = 10
 IDLE = 10.0
 TIMER_RUN = 2.0
@@ -258,6 +266,60 @@ def run() -> None:
         if bar_maybe_off:
             ui.restore_status_bar()
 
+    messages_maybe_off = True
+    try:
+        with caselog.case("OP-11") as c:
+            b = fc.fill_free_cells()
+            c.shot(ui.shoot("CardMessagesCellsFull"))
+            stuck = next(iter(fc.homeless(b)), None)
+            ui.expect(stuck, f"with the free cells full, every bottom card still has a move "
+                             f"(board: {b.text()})")
+            frames = fc.tap_and_watch(b, stuck, "CardMessageOn")
+            caselog.step(f"Check {stuck} stayed put and '{NOTE}' showed")
+            after = fc.settled_board()
+            ui.expect(after == b, f"{stuck} moved, so it was not stuck "
+                                  f"({b.moved(after) if after else 'board unreadable'})")
+            seen = fc.card_message(frames)
+            ui.expect(seen, f"no '{NOTE}' note in {len(frames)} frames over "
+                            f"{frames[-1][0]:.1f} s after tapping {stuck} (first: {frames[0][1]})")
+            c.shot(seen[1])
+            c.note(f"free cells full; tapping {stuck} showed '{seen[2]}' {seen[0]:.1f} s "
+                   f"after the tap")
+
+        with caselog.case("OP-12") as c:
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(MESSAGES, True, MESSAGES_TITLE, "opened from the table — its default")
+            c.shot(ui.switch_to(MESSAGES, False, MESSAGES_TITLE, "CardMessagesOptionOff"))
+            ui.back_to_table_shot("CardMessagesOffTable")
+            b = fc.settled_board()
+            ui.expect(b is not None and fc.cells_used(b) >= 4,
+                      "the table with the full free cells did not come back after Options")
+            if stuck not in fc.homeless(b):
+                stuck = next(iter(fc.homeless(b)), None)
+                ui.expect(stuck, f"no stuck card left on the table (board: {b.text()})")
+            frames = fc.tap_and_watch(b, stuck, "CardMessageOff")
+            c.shot(frames[0][1])
+            caselog.step(f"Check {stuck} stayed put and no '{NOTE}' note showed")
+            after = fc.settled_board()
+            ui.expect(after == b, f"{stuck} moved, so it was not stuck "
+                                  f"({b.moved(after) if after else 'board unreadable'})")
+            seen = fc.card_message(frames)
+            if seen:
+                at, path, text = seen
+                ui.expect(False, f"Show Card Messages OFF still showed '{text}' {at:.1f} s after "
+                                 f"tapping {stuck} (see {path})")
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(MESSAGES, False, MESSAGES_TITLE, "opened from the table")
+            ui.switch_to(MESSAGES, True, MESSAGES_TITLE, "CardMessagesOptionBackOn")
+            messages_maybe_off = False
+            ui.back()
+            ui.expect(ui.at_table(), "back from Options did not return to the table")
+            c.note(f"OFF: tapping {stuck} showed no note in {len(frames)} frames over "
+                   f"{frames[-1][0]:.1f} s; switched back ON")
+    finally:
+        if messages_maybe_off:
+            ui.restore_card_messages()
+
     with caselog.case("GP-14") as c:
         before = fc.settled_board()
         ui.expect(ui.open_table_drawer(), "the in-game menu did not open for New")
@@ -276,7 +338,7 @@ def run() -> None:
 
     ui.expect(ui.to_menu(), "could not return to the menu after the table")
     print("PASS: the table plays — controls, timer and score, undo, lower / raise, hints, "
-          "drawer, Rich Features and Show Status Bar both ways, and New")
+          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, and New")
 
 
 if __name__ == "__main__":

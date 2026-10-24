@@ -708,6 +708,93 @@ def play_to_foundation(max_cover: int = 4) -> tuple[Board, Board, str]:
                          f"{max_cover} taps (board: {b.text()})")
 
 
+# ── stuck cards ────────────────────────────────────────────────────
+
+TABLEAU = 8
+CANNOT_ATTACH = re.compile(r"cannot\s+attach|attach\s+anywhere", re.I)
+
+
+def _red(card: str) -> bool:
+    return card.startswith(("heart", "diamond"))
+
+
+def _rank(card: str) -> int:
+    return int(card.rsplit("-", 1)[1])
+
+
+def _fits_column(b: Board, card: str) -> bool:
+    """True when *card* could go onto another column: an empty one, or one whose
+    bottom card is one rank higher in the other colour."""
+    own = b.cards[card][1]
+    for index in range(TABLEAU):
+        bottom = b.bottom(index)
+        if index != own and (bottom is None or (_red(bottom) != _red(card)
+                                                and _rank(bottom) == _rank(card) + 1)):
+            return True
+    return False
+
+
+def cells_used(b: Board) -> int:
+    return sum(1 for area, _i, _d in b.cards.values() if area == "C")
+
+
+def homeless(b: Board) -> list[str]:
+    """Bottom cards that can go neither up to a foundation nor onto a column:
+    a tap parks one in a free cell, or does nothing once the cells are full."""
+    up = set(_next_up(b))
+    return [card for card in (b.bottom(i) for i in range(TABLEAU))
+            if card and card not in up and not _fits_column(b, card)]
+
+
+@says("Fill all four free cells: tap bottom cards that have nowhere else to go")
+def fill_free_cells(max_taps: int = 12) -> Board:
+    """Tap homeless bottom cards until all four free cells hold a card; when
+    none is homeless, any legal move changes the board first."""
+    b = settled_board()
+    ui.expect(b is not None and len(b) == 52, "could not read the 52 cards off the table")
+    for _ in range(max_taps):
+        if cells_used(b) >= 4:
+            return b
+        spare = homeless(b)
+        if spare:
+            tap_card(b, spare[0], settle=1.6)
+            ui.answer_prompt("tip")
+            b = settled_board() or b
+        else:
+            b = play_one_move()[1]
+    ui.expect(cells_used(b) >= 4,
+              f"the free cells are not full after {max_taps} taps (board: {b.text()})")
+    return b
+
+
+@says(lambda b, card, name, seconds=2.0: f"Tap {card}, which has nowhere to go, and capture "
+                                         f"the screen as fast as possible for {seconds:.0f} s")
+def tap_and_watch(b: Board, card: str, name: str, seconds: float = 2.0) -> list[tuple[float, str]]:
+    """Tap *card* and grab frames back to back for *seconds* (a card message
+    shows for under a second). (seconds after the tap, path) per frame."""
+    tap_card(b, card, settle=0.0)
+    t0 = time.time()
+    grabbed = []
+    while time.time() - t0 < seconds:
+        grabbed.append((time.time() - t0, helpers.grab_png()))
+    frames = []
+    for n, (at, png) in enumerate(grabbed):
+        path = config.LOG / f"{name}{n}.png"
+        path.write_bytes(png)
+        frames.append((at, str(path)))
+    return frames
+
+
+@says("Read every captured frame for the 'this card cannot attach anywhere' note")
+def card_message(frames: list[tuple[float, str]]) -> tuple[float, str, str] | None:
+    """(seconds after the tap, path, text) of the first frame showing the note."""
+    for at, path in frames:
+        for line in ocr.read(path):
+            if CANNOT_ATTACH.search(line.text):
+                return at, path, line.text
+    return None
+
+
 # Under the board, Solo and Daily alike: the level line, then "tap a card to
 # start" until the first move. Lower down the score, then "0:00 X98" (timer
 # and multiplier); they sit lower once the tap-to captions go.
