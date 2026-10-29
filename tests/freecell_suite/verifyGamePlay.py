@@ -21,6 +21,11 @@ OP-11  with the four free cells full, tapping a card that has nowhere to go
 OP-12  with Show Card Messages OFF, tapping the same stuck card shows no
        note; the switch is then turned back ON
 GP-14  New deals a different board (which also clears the full free cells)
+GP-26  on that deal Rank Strip (ON by default) shows each rank still in play;
+       touching K lights the four kings, touching ♠ the next three spades
+GP-08  with Rank Strip OFF (switched from the table's Options) the strip is
+       gone and touching where the 7 was lights nothing
+GP-09  back ON the strip returns and touching 7 lights the four sevens
 OP-17  with Auto Hint at its default (OFF), nothing on the table moves in the
        15 s after a move
 OP-18  with Auto Hint ON (switched from the table's Options), the table stays
@@ -73,6 +78,11 @@ MESSAGES = "opt_card_messages"
 MESSAGES_TITLE = "Show Card Messages"
 NOTE = "this card cannot attach anywhere"
 AUTO_HINT = "opt_auto_hint"
+RANK = "opt_rank_strip"
+RANK_TITLE = "Rank Strip"
+STRIP_RANK = "K"
+STRIP_SUIT = "spade"
+OFF_RANK = "7"
 # Folds once the playfield is lowered (12 would; 15 raised).
 PILE = 13
 NEW_DEAL = 10
@@ -361,10 +371,94 @@ def run() -> None:
         ui.expect(moved >= NEW_DEAL, f"New left the same deal ({moved} cards moved)")
         c.note(f"a different deal ({moved} of 52 cards elsewhere)")
 
+    strip_maybe_off = False
+    try:
+        with caselog.case("GP-26") as c:
+            b = after
+            strip = fc.rank_strip()
+            on_shot = c.shot(ui.shoot("RankStripOn"))
+            caselog.step("Check the strip shows each rank still in play and leaves blank the "
+                         "ranks that are all up")
+            ui.expect(strip, f"no rank strip under the cards with {RANK_TITLE} at its default "
+                             f"(see {on_shot})")
+            in_play = fc.ranks_in_play(b)
+            ui.expect(strip.shown == in_play,
+                      f"the strip shows {' '.join(strip.shown)}, but the ranks still in play are "
+                      f"{' '.join(in_play)}")
+            shot = c.shot(fc.touch_strip(fc.strip_rank(strip, STRIP_RANK), f"the {STRIP_RANK}",
+                                         "RankStripRank"))
+            caselog.step(f"Check the four cards of rank {STRIP_RANK} light up, and no other card")
+            lit, want = fc.lit_cards(b, shot), fc.of_rank(b, STRIP_RANK)
+            ui.expect(lit == want, f"touching {STRIP_RANK} lit {lit or 'no card'}, not {want} "
+                                   f"(see {shot})")
+            symbol = fc.STRIP_SYMBOLS[STRIP_SUIT]
+            shot = c.shot(fc.touch_strip(fc.strip_suit(strip, STRIP_SUIT), f"the {symbol}",
+                                         "RankStripSuit"))
+            caselog.step(f"Check the next three {STRIP_SUIT}s to go up light up, and no other card")
+            lit, suited = fc.lit_cards(b, shot), fc.next_of_suit(b, STRIP_SUIT)
+            ui.expect(lit == suited, f"touching {symbol} lit {lit or 'no card'}, not {suited} "
+                                     f"(see {shot})")
+            c.note(f"strip shows {' '.join(strip.shown)}; touching {STRIP_RANK} lit "
+                   f"{', '.join(want)}; {symbol} lit {', '.join(suited)}")
+
+        with caselog.case("GP-08") as c:
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(RANK, True, RANK_TITLE, "opened from the table — its default")
+            strip_maybe_off = True
+            c.shot(ui.switch_to(RANK, False, RANK_TITLE, "RankStripOptionOff"))
+            off_shot = c.shot(ui.back_to_table_shot("RankStripOff"))
+            caselog.step("Check the strip is gone from under the cards")
+            off_ink = ui.rank_strip_ink(off_shot)
+            ui.expect(fc.rank_strip() is None and off_ink <= ui.RANK_GONE,
+                      f"{RANK_TITLE} OFF still draws the strip ({off_ink} px in its band, "
+                      f"see {off_shot})")
+            b = fc.settled_board()
+            ui.expect(b is not None, "could not read the board")
+            before = fc.lit_cards(b, off_shot)
+            shot = c.shot(fc.touch_strip(fc.strip_rank(strip, OFF_RANK),
+                                         f"where the {OFF_RANK} was", "RankStripOffTouch"))
+            caselog.step(f"Check no card of rank {OFF_RANK} lit up and nothing moved")
+            lit, moved = fc.lit_cards(b, shot), fc.settled_board()
+            ui.expect(lit == before, f"with {RANK_TITLE} OFF, touching where the {OFF_RANK} was "
+                                     f"changed the lit cards from {before} to {lit} (see {shot})")
+            ui.expect(moved == b, f"touching where the strip was moved "
+                                  f"{b.moved(moved) if moved else 'unreadable cards'}")
+            c.note(f"OFF: no strip ({off_ink} px in its band); touching where the {OFF_RANK} "
+                   f"was lit nothing")
+
+        with caselog.case("GP-09") as c:
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(RANK, False, RANK_TITLE, "opened from the table")
+            ui.switch_to(RANK, True, RANK_TITLE, "RankStripOptionBackOn")
+            strip_maybe_off = False
+            again_shot = c.shot(ui.back_to_table_shot("RankStripBackOn"))
+            c.shot(ui.save_compare([(on_shot, True), (off_shot, False), (again_shot, True)],
+                                   ui.rank_boxes, "RankStripCompare"))
+            caselog.step("Check the strip is back under the cards")
+            again = fc.rank_strip()
+            again_ink = ui.rank_strip_ink(again_shot)
+            ui.expect(again and again_ink >= ui.RANK_SEEN,
+                      f"{RANK_TITLE} back ON did not bring the strip back ({again_ink} px in its "
+                      f"band, see {again_shot})")
+            b = fc.settled_board()
+            ui.expect(b is not None, "could not read the board")
+            shot = c.shot(fc.touch_strip(fc.strip_rank(again, OFF_RANK), f"the {OFF_RANK}",
+                                         "RankStripBackOnRank"))
+            caselog.step(f"Check the four cards of rank {OFF_RANK} light up, and no other card")
+            lit, want = fc.lit_cards(b, shot), fc.of_rank(b, OFF_RANK)
+            ui.expect(lit == want, f"touching {OFF_RANK} lit {lit or 'no card'}, not {want} "
+                                   f"(see {shot})")
+            c.note(f"back ON: the strip returned and touching {OFF_RANK} lit {', '.join(want)}")
+    finally:
+        if strip_maybe_off:
+            ui.restore_rank_strip()
+
     hint_maybe_on = False
     try:
         with caselog.case("OP-17") as c:
-            card, frames = fc.idle_after_move(after)
+            b = fc.settled_board()
+            ui.expect(b is not None, "could not read the board")
+            card, frames = fc.idle_after_move(b)
             idle = fc.idle_pulse(frames)
             c.shot(fc.save_png(idle.still, "AutoHintOff"))
             caselog.step(f"Check nothing on the table moved from {fc.HINT_LANDED:.0f} s to "
@@ -494,8 +588,8 @@ def run() -> None:
 
     ui.expect(ui.to_menu(), "could not return to the menu after the table")
     print("PASS: the table plays — controls, timer and score, undo, lower / raise, hints, "
-          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, New, Auto "
-          "Hint both ways, and Maintain Card Spacing on a long pile both ways")
+          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, New, Rank "
+          "Strip and Auto Hint both ways, and Maintain Card Spacing on a long pile both ways")
 
 
 if __name__ == "__main__":

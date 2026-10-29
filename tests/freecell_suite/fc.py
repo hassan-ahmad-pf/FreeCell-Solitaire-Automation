@@ -1151,6 +1151,114 @@ def save_png(png: bytes, name: str) -> str:
     return str(path)
 
 
+# ── Rank Strip ─────────────────────────────────────────────────────
+# Rank Strip (ships ON) draws A…K under the cards, with ♠♣ and ♥♦ at its
+# ends. In the tree the ranks are an Other 279 x 54 pt cut into 13 slots, A
+# first, holding an element for each rank still in play: a rank whose four
+# cards are all up is left blank. The suits are two 49 pt Others. Touching a
+# rank lights its four cards gold; touching a suit lights the next three of
+# that suit to go up. The light stays until the strip is touched again. OFF,
+# the strip is not drawn and its elements sit below the screen (y 3312 pt).
+
+RANKS = ("A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
+STRIP_SUITS = ("spade", "club", "heart", "diamond")
+STRIP_SYMBOLS = {"spade": "♠", "club": "♣", "heart": "♥", "diamond": "♦"}
+STRIP_FROM_Y, STRIP_TO_Y = 500, 880
+LIT = 0.15   # gold share of a card's visible part: lit 0.20-0.27, unlit at most 0.08
+
+
+class Strip(NamedTuple):
+    row: dict          # the 13 rank slots
+    shown: list[str]   # ranks drawn on it
+    pairs: list[dict]  # ♠♣ then ♥♦
+
+
+def rank_strip(tree: dict | None = None) -> Strip | None:
+    """The rank strip as the tree has it, or None when it is not on screen."""
+    row, pairs, slots = None, [], []
+    for node in nodes(tree if tree is not None else source()):
+        r = node.get("rect") or {}
+        if node.get("type") not in ("Other", "XCUIElementTypeOther") or not r \
+                or not STRIP_FROM_Y <= r["y"] <= STRIP_TO_Y or not 50 <= r["height"] <= 60:
+            continue
+        if 250 <= r["width"] <= 300:
+            row = r
+        elif 44 <= r["width"] <= 54:
+            pairs.append(r)
+        elif 18 <= r["width"] <= 26:
+            slots.append(r)
+    if row is None or len(pairs) != 2:
+        return None
+    step = row["width"] / len(RANKS)
+    shown = sorted({round((s["x"] - row["x"]) / step) for s in slots
+                    if row["x"] - 2 <= s["x"] < row["x"] + row["width"]})
+    return Strip(row, [RANKS[i] for i in shown if 0 <= i < len(RANKS)],
+                 sorted(pairs, key=lambda r: r["x"]))
+
+
+def strip_rank(strip: Strip, rank: str) -> tuple[float, float]:
+    step = strip.row["width"] / len(RANKS)
+    return (strip.row["x"] + (RANKS.index(rank) + 0.5) * step,
+            strip.row["y"] + strip.row["height"] / 2)
+
+
+def strip_suit(strip: Strip, suit: str) -> tuple[float, float]:
+    k = STRIP_SUITS.index(suit)
+    pair = strip.pairs[k // 2]
+    return pair["x"] + (k % 2 + 0.5) * pair["width"] / 2, pair["y"] + pair["height"] / 2
+
+
+def ranks_in_play(b: Board) -> list[str]:
+    """Ranks with a card that is not up on its foundation, A first."""
+    return [RANKS[rank - 1] for rank in range(1, 14)
+            if any(b.cards.get(f"{suit}-{rank}", ("F",))[0] != "F" for suit in _SUITS)]
+
+
+def of_rank(b: Board, rank: str) -> list[str]:
+    return sorted(card for card, (area, _i, _d) in b.cards.items()
+                  if area != "F" and _rank(card) == RANKS.index(rank) + 1)
+
+
+def next_of_suit(b: Board, suit: str, count: int = 3) -> list[str]:
+    """The *count* lowest cards of *suit* not yet up."""
+    off = sorted((_rank(card), card) for card, (area, _i, _d) in b.cards.items()
+                 if area != "F" and card.startswith(f"{suit}-"))
+    return sorted(card for _, card in off[:count])
+
+
+def lit_cards(b: Board, path) -> list[str]:
+    """Cards off the foundations drawn with the gold light on *path*. Only
+    the part of a column card that the next card leaves showing is read."""
+    img = ui.screen_rgb(path).astype(int)
+    scale = helpers.pixel_scale()
+    lit = []
+    for card, (area, index, depth) in b.cards.items():
+        if area == "F":
+            continue
+        r = b.rects[card]
+        bottom = r["y"] + r["height"]
+        if area == "T":
+            col = b.column(index)
+            if depth + 1 < len(col):
+                bottom = b.rects[col[depth + 1]]["y"]
+        patch = img[int(r["y"] * scale) + 4:int(bottom * scale) - 4,
+                    int(r["x"] * scale) + 4:int((r["x"] + r["width"]) * scale) - 4]
+        if not patch.size:
+            continue
+        red, green, blue = patch[..., 0], patch[..., 1], patch[..., 2]
+        gold = (red > 200) & (green > 160) & (blue < 170) & (red - blue > 60)
+        if float(gold.mean()) >= LIT:
+            lit.append(card)
+    return sorted(lit)
+
+
+@says(lambda point, what, name: f"Touch {what} on the rank strip")
+def touch_strip(point: tuple[float, float], what: str, name: str) -> str:
+    """Tap *point* (WDA points) and capture the table once the light is drawn."""
+    tap_point(*point, settle=1.2)
+    return str(ui.shoot(name))
+
+
 # Under the board, Solo and Daily alike: the level line, then "tap a card to
 # start" until the first move. Lower down the score, then "0:00 X98" (timer
 # and multiplier); they sit lower once the tap-to captions go.

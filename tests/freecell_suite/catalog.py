@@ -17,10 +17,11 @@ The Daily cases come from FreeCell's TestRail list (docs/testrail/cases.py)
 as written there, plus EXTRA_CASES for the steps that list has no case for.
 The Daily flow runs in verifyDaily, its statistics reset in verifyStatistics
 with the Solo one. The timer case (GP-12), the score case beside it (GP-25),
-Show Status Bar (OP-10), Show Card Messages (OP-11, OP-12), Auto Hint (OP-17,
-OP-18) and Maintain Card Spacing on a long pile (OP-15, OP-16), all switched
-from the table's Options next to Rich Features, run in verifyGamePlay. Each
-sits in its section after the cases with its prefix and lower IDs.
+Show Status Bar (OP-10), Show Card Messages (OP-11, OP-12), Rank Strip (GP-26,
+GP-08, GP-09), Auto Hint (OP-17, OP-18) and Maintain Card Spacing on a long
+pile (OP-15, OP-16), all switched from the table's Options next to Rich
+Features, run in verifyGamePlay. Each sits in its section after the cases
+with its prefix and lower IDs.
 
 Each test is one of:
   run  — a FreeCell port in tests/freecell_suite/<module>.py
@@ -29,7 +30,8 @@ Each test is one of:
   skip — cannot run on this install at all; skipped with its reason
 
 OP-07, GP-02, GP-08 and GP-09 are not in the case list: FreeCell has no
-Use Hearts option and no stock pile to deal from.
+Use Hearts option and no stock pile to deal from. FreeCell's own GP-08 and
+GP-09 (Rank Strip) take those two IDs instead.
 """
 from __future__ import annotations
 
@@ -42,7 +44,7 @@ SUITE_CASES = os.path.join(ROOT, "docs", "testrail", "suite_cases.py")
 FREECELL_CASES = os.path.join(ROOT, "docs", "testrail", "cases.py")
 
 # The cases taken from FreeCell's TestRail list rather than the suite's.
-FREECELL_ONLY = ("GP-12", "OP-10", "OP-11", "OP-12", "DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
+FREECELL_ONLY = ("GP-08", "GP-09", "GP-12", "OP-10", "OP-11", "OP-12", "DY-01", "DY-02", "DY-03", "DY-05", "DY-07", "DY-10", "DY-11",
                  "DY-12", "DY-13", "DY-14", "RS-04", "RS-05", "RS-06")
 
 # Steps FreeCell's TestRail list has no case for.
@@ -52,6 +54,16 @@ EXTRA_CASES = [
      "priority": "Medium",
      "steps": [("On a new deal, tap a card that can go up to its foundation.",
                 "The card goes up and the score under the board rises from 0.")]},
+    {"id": "GP-26", "title": "Gameplay - Rank Strip lights the cards of a touched rank or suit",
+     "section": "FreeCell Solitaire Obj-C > Gameplay", "type": "Functional",
+     "priority": "Medium",
+     "steps": [("On a new deal, look at the strip under the cards (Rank Strip ships ON).",
+                "It shows each rank still in play; A, 2 and 3, all up on Easy, are blank, "
+                "with ♠♣ and ♥♦ at its ends."),
+               ("Touch K on the strip.",
+                "The four kings light up gold; no other card does."),
+               ("Touch ♠ at the end of the strip.",
+                "The next three spades to go up light up instead.")]},
     {"id": "OP-15", "title": "Options - Maintain Card Spacing ON folds a long pile under an arrow",
      "section": "FreeCell Solitaire Obj-C > Options", "type": "Functional",
      "priority": "Medium",
@@ -123,8 +135,8 @@ RUN_ORDER = [
     ("verifyRelaunch", "verifyRelaunch", "run", ["RL-01", "RL-02"], ""),
     ("verifyGamePlay", "verifyGamePlay", "run",
      ["GP-01", "GP-12", "GP-25", "GP-03", "GP-04", "GP-05", "GP-06",
-      "GP-07", "GP-10", "GP-11", "OP-10", "OP-11", "OP-12", "GP-14", "OP-17", "OP-18",
-      "OP-15", "OP-16"], ""),
+      "GP-07", "GP-10", "GP-11", "OP-10", "OP-11", "OP-12", "GP-14", "GP-26", "GP-08",
+      "GP-09", "OP-17", "OP-18", "OP-15", "OP-16"], ""),
     ("verifyVictory", "verifyVictory", "dev", ["VI-01", "VI-02", "VI-03", "VI-04"],
      "needs the dev build (Complete Game / Synthetic Win)"),
     ("verifyDifficultyLevels", "verifyDifficultyLevels", "dev",
