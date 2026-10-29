@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import time
+from contextlib import contextmanager
 
 import requests
 
@@ -712,6 +713,9 @@ def play_to_foundation(max_cover: int = 4) -> tuple[Board, Board, str]:
 
 TABLEAU = 8
 CANNOT_ATTACH = re.compile(r"cannot\s+attach|attach\s+anywhere", re.I)
+# WDA's defaults: after a synthesized tap it waits up to 2 s for the app's
+# animations to settle, and up to 10 s for the app to idle.
+_IDLE_WAITS = {"animationCoolOffTimeout": 2.0, "waitForIdleTimeout": 10.0}
 
 
 def _red(card: str) -> bool:
@@ -722,20 +726,28 @@ def _rank(card: str) -> int:
     return int(card.rsplit("-", 1)[1])
 
 
-def _fits_column(b: Board, card: str) -> bool:
-    """True when *card* could go onto another column: an empty one, or one whose
-    bottom card is one rank higher in the other colour."""
+def _fits_column(b: Board, card: str, empty: bool = True) -> bool:
+    """True when *card* could go onto another column: one whose bottom card is
+    one rank higher in the other colour, or (with *empty*) an empty one."""
     own = b.cards[card][1]
     for index in range(TABLEAU):
         bottom = b.bottom(index)
-        if index != own and (bottom is None or (_red(bottom) != _red(card)
-                                                and _rank(bottom) == _rank(card) + 1)):
+        if index == own:
+            continue
+        if bottom is None:
+            if empty:
+                return True
+        elif _red(bottom) != _red(card) and _rank(bottom) == _rank(card) + 1:
             return True
     return False
 
 
 def cells_used(b: Board) -> int:
     return sum(1 for area, _i, _d in b.cards.values() if area == "C")
+
+
+def empty_columns(b: Board) -> int:
+    return sum(1 for i in range(TABLEAU) if b.bottom(i) is None)
 
 
 def homeless(b: Board) -> list[str]:
@@ -746,37 +758,68 @@ def homeless(b: Board) -> list[str]:
             if card and card not in up and not _fits_column(b, card)]
 
 
-@says("Fill all four free cells: tap bottom cards that have nowhere else to go")
-def fill_free_cells(max_taps: int = 12) -> Board:
-    """Tap homeless bottom cards until all four free cells hold a card; when
-    none is homeless, any legal move changes the board first."""
+def _parkable(b: Board) -> list[str]:
+    """Bottom cards with nowhere to go but a free cell or an empty column, from
+    columns they would not leave empty."""
+    up = set(_next_up(b))
+    return [card for card in (b.bottom(i) for i in range(TABLEAU))
+            if card and card not in up and not _fits_column(b, card, empty=False)
+            and len(b.column(b.cards[card][1])) > 1]
+
+
+@says("Fill all four free cells and every column: tap bottom cards that have nowhere else to go")
+def fill_free_cells(max_taps: int = 16) -> Board:
+    """Tap bottom cards until all four free cells hold a card, no column is
+    empty (an empty column takes any card) and some bottom card is stuck.
+
+    Each tap parks a card that has nowhere else to go, which fills a free cell
+    or an empty column; when there is none, any legal move changes the board.
+    """
     b = settled_board()
     ui.expect(b is not None and len(b) == 52, "could not read the 52 cards off the table")
     for _ in range(max_taps):
-        if cells_used(b) >= 4:
+        if cells_used(b) >= 4 and not empty_columns(b) and homeless(b):
             return b
-        spare = homeless(b)
+        spare = _parkable(b)
         if spare:
             tap_card(b, spare[0], settle=1.6)
             ui.answer_prompt("tip")
             b = settled_board() or b
         else:
             b = play_one_move()[1]
-    ui.expect(cells_used(b) >= 4,
-              f"the free cells are not full after {max_taps} taps (board: {b.text()})")
+    ui.expect(cells_used(b) >= 4 and not empty_columns(b),
+              f"the free cells and columns are not all full after {max_taps} taps "
+              f"(board: {b.text()})")
     return b
+
+
+@contextmanager
+def no_idle_wait():
+    """WDA answers taps and screenshots without waiting for the app's
+    animations to settle; its idle waits are put back afterwards."""
+    path = f"/session/{helpers.current_session()}/appium/settings"
+    before = _get(path) or {}
+    _post(path, {"settings": {key: 0 for key in _IDLE_WAITS}})
+    try:
+        yield
+    finally:
+        _post(path, {"settings": {key: before.get(key, value)
+                                  for key, value in _IDLE_WAITS.items()}})
 
 
 @says(lambda b, card, name, seconds=2.0: f"Tap {card}, which has nowhere to go, and capture "
                                          f"the screen as fast as possible for {seconds:.0f} s")
 def tap_and_watch(b: Board, card: str, name: str, seconds: float = 2.0) -> list[tuple[float, str]]:
-    """Tap *card* and grab frames back to back for *seconds* (a card message
-    shows for under a second). (seconds after the tap, path) per frame."""
-    tap_card(b, card, settle=0.0)
-    t0 = time.time()
+    """Tap *card* and grab frames back to back for *seconds*. A card message
+    shows for under a second, and WDA's usual wait for the animations to
+    settle after a tap would outlast it. (seconds after the tap, path) per frame."""
     grabbed = []
-    while time.time() - t0 < seconds:
-        grabbed.append((time.time() - t0, helpers.grab_png()))
+    with no_idle_wait():
+        t0 = time.time()
+        tap_card(b, card, settle=0.0)
+        print(f"  the tap returned after {time.time() - t0:.2f} s", flush=True)
+        while time.time() - t0 < seconds:
+            grabbed.append((time.time() - t0, helpers.grab_png()))
     frames = []
     for n, (at, png) in enumerate(grabbed):
         path = config.LOG / f"{name}{n}.png"
