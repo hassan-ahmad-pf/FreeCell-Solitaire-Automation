@@ -23,6 +23,7 @@ import re
 import sys
 import time
 from contextlib import contextmanager
+from typing import NamedTuple
 
 import requests
 
@@ -1033,6 +1034,121 @@ def folded(b: Board, pile: list[str]) -> list[str]:
     Read by name: while a pile is folded its column's empty-slot image
     leaves the tree, so Board's columns are off by one there."""
     return [card for card, gap in zip(pile, pile_gaps(b, pile)) if gap < FOLDED_GAP]
+
+
+# ── Auto Hint ──────────────────────────────────────────────────────
+# Auto Hint (ships OFF) shows the next card to play once the table is left
+# alone: about 8.6 s after the last tap that card starts to pulse, growing
+# with a golden glow and shrinking back every ~1.2 s, so 1.5-3 % of the
+# playfield changes from one frame to the next. OFF, nothing on an idle
+# table changes a pixel once the tapped card has landed (~2 s). The pulse
+# is not in the tree: the cards keep their rects.
+
+AUTO_HINT = "Auto Hint"
+HINT_BAND = (0, 500, 1290, 1750)   # px: free cells, foundations, columns (raised)
+HINT_WATCH = 15.0
+HINT_LANDED = 3.0
+HINT_QUIET = 4.0
+HINT_PULSE = 0.01
+
+
+class IdleWatch(NamedTuple):
+    start: float | None        # seconds after the tap the pulse began
+    box: tuple | None          # pixel box the pulse covered
+    peak: float                # most of HINT_BAND changed between two frames
+    last: float                # seconds after the tap of the last frame
+    still: bytes               # the last frame before the pulse
+    popped: bytes | None       # the pulse frame furthest from ``still``
+
+
+def movable(b: Board) -> str | None:
+    """A bottom card a tap moves: up to its foundation, onto another column,
+    or into a free cell."""
+    bottoms = [card for card in (b.bottom(i) for i in range(TABLEAU)) if card]
+    up = set(_next_up(b))
+    return (next((card for card in bottoms if card in up), None)
+            or next((card for card in bottoms if _fits_column(b, card, empty=False)), None)
+            or (bottoms[0] if bottoms and cells_used(b) < 4 else None))
+
+
+@says(lambda b, card, seconds=HINT_WATCH: f"Tap {card}, then leave the table alone for "
+                                          f"{seconds:.0f} s, capturing it all along")
+def tap_and_idle(b: Board, card: str, seconds: float = HINT_WATCH) -> list[tuple[float, bytes]]:
+    """(seconds after the tap, PNG) per frame, back to back."""
+    frames = []
+    with no_idle_wait():
+        t0 = time.time()
+        tap_card(b, card, settle=0.0)
+        while time.time() - t0 < seconds:
+            frames.append((time.time() - t0, helpers.grab_png()))
+    return frames
+
+
+def idle_after_move(b: Board) -> tuple[str, list[tuple[float, bytes]]]:
+    """(card tapped, frames) for a move and the idle stretch after it. A tip
+    alert over the table spoils the frames, so the move is made again."""
+    for attempt in (1, 2):
+        card = movable(b)
+        ui.expect(card, f"no bottom card has a move (board: {b.text()})")
+        frames = tap_and_idle(b, card)
+        if not ui.settle_prompts() or attempt == 2:
+            break
+        print("  an alert came up while the table sat idle — moving again", flush=True)
+        b = settled_board() or b
+    return card, frames
+
+
+@says("Compare the frames from the card landing on: does a card pulse as the hint?")
+def idle_pulse(frames: list[tuple[float, bytes]]) -> IdleWatch:
+    import io
+
+    import numpy as np
+
+    x0, y0, x1, y1 = HINT_BAND
+
+    def band(png):
+        return ui.screen_rgb(io.BytesIO(png))[y0:y1, x0:x1].astype(np.int16)
+
+    after = [(at, png) for at, png in frames if at >= HINT_LANDED]
+    ui.expect(len(after) >= 2, f"only {len(after)} frames after {HINT_LANDED:.0f} s")
+    prev, still = band(after[0][1]), after[0][1]
+    start, union, peak, pulsing = None, None, 0.0, []
+    for at, png in after[1:]:
+        cur = band(png)
+        mask = np.abs(cur - prev).max(axis=2) > 32
+        frac = float(mask.mean())
+        peak = max(peak, frac)
+        if frac >= HINT_PULSE:
+            start = at if start is None else start
+            union = mask if union is None else union | mask
+        if start is None:
+            still = png
+        else:
+            pulsing.append(png)
+        prev = cur
+    box = popped = None
+    if union is not None:
+        ys, xs = np.nonzero(union)
+        box = (int(xs.min()) + x0, int(ys.min()) + y0, int(xs.max()) + x0, int(ys.max()) + y0)
+        base = band(still)
+        popped = max(pulsing, key=lambda png: int((np.abs(band(png) - base).max(axis=2) > 32).sum()))
+    return IdleWatch(start, box, peak, after[-1][0], still, popped)
+
+
+def card_at(b: Board, box: tuple) -> str | None:
+    """The card drawn on top at the centre of pixel *box*."""
+    scale = helpers.pixel_scale()
+    cx, cy = (box[0] + box[2]) / 2 / scale, (box[1] + box[3]) / 2 / scale
+    hits = [(depth, card) for card, (_area, _index, depth) in b.cards.items()
+            if b.rects[card]["x"] <= cx <= b.rects[card]["x"] + b.rects[card]["width"]
+            and b.rects[card]["y"] <= cy <= b.rects[card]["y"] + b.rects[card]["height"]]
+    return max(hits)[1] if hits else None
+
+
+def save_png(png: bytes, name: str) -> str:
+    path = config.LOG / f"{name}.png"
+    path.write_bytes(png)
+    return str(path)
 
 
 # Under the board, Solo and Daily alike: the level line, then "tap a card to

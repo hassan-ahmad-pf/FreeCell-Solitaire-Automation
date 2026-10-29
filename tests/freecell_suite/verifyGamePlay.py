@@ -21,6 +21,12 @@ OP-11  with the four free cells full, tapping a card that has nowhere to go
 OP-12  with Show Card Messages OFF, tapping the same stuck card shows no
        note; the switch is then turned back ON
 GP-14  New deals a different board (which also clears the full free cells)
+OP-17  with Auto Hint at its default (OFF), nothing on the table moves in the
+       15 s after a move
+OP-18  with Auto Hint ON (switched from the table's Options), the table stays
+       still for a few seconds after a move, then the next card to play
+       pulses as the hint; tapping that card plays it; the switch is then
+       turned back OFF
 OP-15  on that deal a 13-card pile is built with legal moves; with the
        playfield lowered it no longer fits, so Maintain Card Spacing (ON by
        default) tucks its top cards away under an arrow; tapping the arrow
@@ -66,6 +72,7 @@ STATUS_TITLE = "Show Status Bar"
 MESSAGES = "opt_card_messages"
 MESSAGES_TITLE = "Show Card Messages"
 NOTE = "this card cannot attach anywhere"
+AUTO_HINT = "opt_auto_hint"
 # Folds once the playfield is lowered (12 would; 15 raised).
 PILE = 13
 NEW_DEAL = 10
@@ -354,6 +361,65 @@ def run() -> None:
         ui.expect(moved >= NEW_DEAL, f"New left the same deal ({moved} cards moved)")
         c.note(f"a different deal ({moved} of 52 cards elsewhere)")
 
+    hint_maybe_on = False
+    try:
+        with caselog.case("OP-17") as c:
+            card, frames = fc.idle_after_move(after)
+            idle = fc.idle_pulse(frames)
+            c.shot(fc.save_png(idle.still, "AutoHintOff"))
+            caselog.step(f"Check nothing on the table moved from {fc.HINT_LANDED:.0f} s to "
+                         f"{idle.last:.0f} s after the tap")
+            ui.expect(idle.start is None,
+                      f"with {fc.AUTO_HINT} at its default (OFF) the table changed "
+                      f"{idle.start or 0:.1f} s after tapping {card} ({idle.peak:.1%} of the "
+                      f"playfield between two frames, at {idle.box})")
+            c.note(f"tapped {card}; with {fc.AUTO_HINT} OFF nothing on the table moved from "
+                   f"{fc.HINT_LANDED:.0f} to {idle.last:.0f} s after (at most {idle.peak:.2%} "
+                   f"between frames)")
+
+        with caselog.case("OP-18") as c:
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(AUTO_HINT, False, fc.AUTO_HINT, "opened from the table — its default")
+            hint_maybe_on = True
+            c.shot(ui.switch_to(AUTO_HINT, True, fc.AUTO_HINT, "AutoHintOptionOn"))
+            ui.back()
+            ui.expect(ui.at_table(), "back from Options did not return to the table")
+            b = fc.settled_board()
+            ui.expect(b is not None, "could not read the board")
+            card, frames = fc.idle_after_move(b)
+            idle = fc.idle_pulse(frames)
+            caselog.step(f"Check the table stayed still for at least {fc.HINT_QUIET:.0f} s, "
+                         "then a card pulsed as the hint")
+            ui.expect(idle.start is not None,
+                      f"with {fc.AUTO_HINT} ON no card pulsed in the {idle.last:.0f} s after "
+                      f"tapping {card} (at most {idle.peak:.2%} of the playfield changed "
+                      "between frames)")
+            c.shot(fc.save_png(idle.popped, "AutoHintOn"))
+            ui.expect(idle.start >= fc.HINT_QUIET,
+                      f"the hint pulsed {idle.start:.1f} s after tapping {card}, before the "
+                      f"table had been left alone for {fc.HINT_QUIET:.0f} s")
+            b = fc.read_board()
+            hinted = fc.card_at(b, idle.box) if b else None
+            ui.expect(hinted, f"the pulse at {idle.box} px is not over a card")
+            caselog.step(f"Tap the hinted card, {hinted}")
+            fc.tap_card(b, hinted, settle=1.6)
+            ui.answer_prompt("tip")
+            played = fc.settled_board()
+            c.shot(ui.shoot("AutoHintPlayed"))
+            ui.expect(played is not None and played.cards.get(hinted) != b.cards[hinted],
+                      f"tapping the hinted {hinted} did not move it")
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            ui.confirm_switch(AUTO_HINT, True, fc.AUTO_HINT, "opened from the table")
+            ui.switch_to(AUTO_HINT, False, fc.AUTO_HINT, "AutoHintOptionBackOff")
+            hint_maybe_on = False
+            ui.back()
+            ui.expect(ui.at_table(), "back from Options did not return to the table")
+            c.note(f"ON: still for {idle.start:.1f} s after tapping {card}, then {hinted} "
+                   f"pulsed as the hint; tapping it played it; switched back OFF")
+    finally:
+        if hint_maybe_on:
+            ui.restore_auto_hint()
+
     spacing_maybe_off = False
     raised = None
     try:
@@ -428,8 +494,8 @@ def run() -> None:
 
     ui.expect(ui.to_menu(), "could not return to the menu after the table")
     print("PASS: the table plays — controls, timer and score, undo, lower / raise, hints, "
-          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, New, and "
-          "Maintain Card Spacing on a long pile both ways")
+          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, New, Auto "
+          "Hint both ways, and Maintain Card Spacing on a long pile both ways")
 
 
 if __name__ == "__main__":

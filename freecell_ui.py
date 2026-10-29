@@ -1320,7 +1320,7 @@ def restore_default_look() -> bool:
 
 
 # ── Options switches: Rich Features, Rank Strip, Show Status Bar,
-#    Show Card Messages, Maintain Card Spacing ───────────────────────
+#    Show Card Messages, Maintain Card Spacing, Auto Hint ────────────
 # Rich Features draws the table HUD: the score, then the timer and the
 # multiplier just above the wooden bar, and the move counter left of
 # "menu". RICH_HUD is the bottom band while the "tap to undo / lower /
@@ -1545,6 +1545,10 @@ def set_card_messages(on: bool) -> bool:
     return set_option("opt_card_messages", on, "Show Card Messages")
 
 
+def set_auto_hint(on: bool) -> bool:
+    return set_option("opt_auto_hint", on, "Auto Hint")
+
+
 def status_bar_ink(path=None) -> int:
     """White pixels where the iOS status bar sits: its clock, signal and battery."""
     x0, y0, x1, y1 = STATUS_BAND
@@ -1671,26 +1675,27 @@ def save_compare(frames, boxes, name: str):
     return out
 
 
-@says(lambda setter, title: f"Put {title} back ON (its default)")
-def restore_option(setter, title: str) -> bool:
-    """Put an Options switch back ON (the default). Never raises — used from finally."""
+@says(lambda setter, title, on=True: f"Put {title} back {'ON' if on else 'OFF'} (its default)")
+def restore_option(setter, title: str, on: bool = True) -> bool:
+    """Put an Options switch back to its default, *on*. Never raises — used from finally."""
+    want = "ON" if on else "OFF"
     try:
         if not expect_screen("options", timeout=0.8):
             from_table = at_table(timeout=1.0)
             if not from_table and not on_menu(2.0):
                 to_menu()
             if not open_options(from_table=from_table):
-                print(f"  WARNING: could not reopen Options to turn {title} on")
+                print(f"  WARNING: could not reopen Options to turn {title} {want}")
                 return False
-        ok = setter(True)
+        ok = setter(on)
         back()
         if ok:
-            print(f"  put {title} back ON (the default)")
+            print(f"  put {title} back {want} (the default)")
         else:
-            print(f"  WARNING: {title} did not read ON after the tap")
+            print(f"  WARNING: {title} did not read {want} after the tap")
         return ok
     except Exception as exc:  # noqa: BLE001
-        print(f"  WARNING: could not put {title} back ON ({exc})")
+        print(f"  WARNING: could not put {title} back {want} ({exc})")
         return False
 
 
@@ -1708,6 +1713,10 @@ def restore_status_bar() -> bool:
 
 def restore_card_messages() -> bool:
     return restore_option(set_card_messages, "Show Card Messages")
+
+
+def restore_auto_hint() -> bool:
+    return restore_option(set_auto_hint, "Auto Hint", on=False)
 
 
 # ── Pages: settle, scroll to the end, drag ─────────────────────────

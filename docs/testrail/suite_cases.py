@@ -2,7 +2,7 @@
 
 Read by tests/freecell_suite/catalog.py, which slots FreeCell's Daily, timer,
 score, Show Status Bar and Show Card Messages cases from cases.py, and its
-own score and Maintain Card Spacing cases, in beside them.
+own score, Maintain Card Spacing and Auto Hint cases, in beside them.
 """
 
 CASES = [
