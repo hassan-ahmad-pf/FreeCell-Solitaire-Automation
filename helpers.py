@@ -251,6 +251,26 @@ def _wda_pointer(pixel: tuple[int, int]) -> tuple[int, int]:
     return int(pixel[0] / scale), int(pixel[1] / scale)
 
 
+# XCTest waits for FreeCell to go idle before it plays a gesture; on Options
+# that has taken up to 27 s, so gestures get a longer timeout than other calls.
+GESTURE_TIMEOUT = 60
+SLOW_GESTURE = 10.0
+
+
+def _post_gesture(actions: dict, what: str) -> requests.Response:
+    started = time.time()
+    response = requests.post(
+        f"{config.WDA_URL}/session/{current_session()}/actions",
+        data=json.dumps(actions),
+        headers={"Content-Type": "application/json"},
+        timeout=GESTURE_TIMEOUT,
+    )
+    took = time.time() - started
+    if took > SLOW_GESTURE:
+        print(f"  WDA took {took:.0f} s to play the {what}", flush=True)
+    return response
+
+
 def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
     """Tap screenshot-pixel coordinates through WDA (divides by pixel_scale)."""
     ensure_session()
@@ -270,12 +290,7 @@ def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
     }
     global _SESSION_ID
     for attempt in range(2):
-        response = requests.post(
-            f"{config.WDA_URL}/session/{current_session()}/actions",
-            data=json.dumps(actions),
-            headers={"Content-Type": "application/json"},
-            timeout=15,
-        )
+        response = _post_gesture(actions, "tap")
         # An app switch (an ad opening the App Store) can end the session
         # between the session check and the tap.
         if response.status_code != 404 or attempt:
@@ -318,12 +333,7 @@ def wda_swipe(start: tuple[int, int], end: tuple[int, int],
             ],
         }]
     }
-    response = requests.post(
-        f"{config.WDA_URL}/session/{current_session()}/actions",
-        data=json.dumps(actions),
-        headers={"Content-Type": "application/json"},
-        timeout=15,
-    )
+    response = _post_gesture(actions, "swipe")
     response.raise_for_status()
     if settle:
         time.sleep(settle)
