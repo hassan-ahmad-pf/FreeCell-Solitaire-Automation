@@ -17,9 +17,10 @@ The Daily cases come from FreeCell's TestRail list (docs/testrail/cases.py)
 as written there, plus EXTRA_CASES for the steps that list has no case for.
 The Daily flow runs in verifyDaily, its statistics reset in verifyStatistics
 with the Solo one. The timer case (GP-12), the score case beside it (GP-25),
-Show Status Bar (OP-10) and Show Card Messages (OP-11, OP-12), all switched
-from the table's Options next to Rich Features, run in verifyGamePlay. Each
-sits in its section after the cases with its prefix and lower IDs.
+Show Status Bar (OP-10), Show Card Messages (OP-11, OP-12) and Maintain Card
+Spacing on a long pile (OP-15, OP-16), all switched from the table's Options
+next to Rich Features, run in verifyGamePlay. Each sits in its section after
+the cases with its prefix and lower IDs.
 
 Each test is one of:
   run  — a FreeCell port in tests/freecell_suite/<module>.py
@@ -51,6 +52,23 @@ EXTRA_CASES = [
      "priority": "Medium",
      "steps": [("On a new deal, tap a card that can go up to its foundation.",
                 "The card goes up and the score under the board rises from 0.")]},
+    {"id": "OP-15", "title": "Options - Maintain Card Spacing ON folds a long pile under an arrow",
+     "section": "FreeCell Solitaire Obj-C > Options", "type": "Functional",
+     "priority": "Medium",
+     "steps": [("On a table, build one column up to 13 cards with legal moves, then tap "
+                "'tap to lower' so the pile no longer fits.",
+                "Maintain Card Spacing ships ON: the top cards of the pile tuck under the "
+                "next one and an arrow sits on top of it."),
+               ("Tap the arrow.",
+                "The pile spreads out: the arrow goes and every card shows its rank.")]},
+    {"id": "OP-16", "title": "Options - Maintain Card Spacing OFF shows every card of a long pile",
+     "section": "FreeCell Solitaire Obj-C > Options", "type": "Functional",
+     "priority": "Medium",
+     "steps": [("From the table's menu → options, turn Maintain Card Spacing off and go "
+                "back to the same pile.",
+                "No arrow; every card of the pile shows, squeezed closer together."),
+               ("Turn it back on and go back to the table.",
+                "The arrow is back on top of the pile.")]},
     {"id": "DY-15", "title": "Daily - A past date can be played and won",
      "section": "FreeCell Solitaire Obj-C > Daily", "type": "Functional",
      "priority": "Medium",
@@ -90,7 +108,7 @@ RUN_ORDER = [
     ("verifyRelaunch", "verifyRelaunch", "run", ["RL-01", "RL-02"], ""),
     ("verifyGamePlay", "verifyGamePlay", "run",
      ["GP-01", "GP-12", "GP-25", "GP-03", "GP-04", "GP-05", "GP-06",
-      "GP-07", "GP-10", "GP-11", "OP-10", "OP-11", "OP-12", "GP-14"], ""),
+      "GP-07", "GP-10", "GP-11", "OP-10", "OP-11", "OP-12", "GP-14", "OP-15", "OP-16"], ""),
     ("verifyVictory", "verifyVictory", "dev", ["VI-01", "VI-02", "VI-03", "VI-04"],
      "needs the dev build (Complete Game / Synthetic Win)"),
     ("verifyDifficultyLevels", "verifyDifficultyLevels", "dev",

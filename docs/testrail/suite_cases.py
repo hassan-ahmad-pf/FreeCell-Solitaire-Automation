@@ -1,8 +1,8 @@
 """The FreeCell suite's case list: ID, title, section, type and priority.
 
 Read by tests/freecell_suite/catalog.py, which slots FreeCell's Daily, timer,
-score, Show Status Bar and Show Card Messages cases from cases.py in beside
-them.
+score, Show Status Bar and Show Card Messages cases from cases.py, and its
+own score and Maintain Card Spacing cases, in beside them.
 """
 
 CASES = [

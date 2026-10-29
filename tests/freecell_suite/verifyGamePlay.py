@@ -21,6 +21,13 @@ OP-11  with the four free cells full, tapping a card that has nowhere to go
 OP-12  with Show Card Messages OFF, tapping the same stuck card shows no
        note; the switch is then turned back ON
 GP-14  New deals a different board (which also clears the full free cells)
+OP-15  on that deal a 13-card pile is built with legal moves; with the
+       playfield lowered it no longer fits, so Maintain Card Spacing (ON by
+       default) tucks its top cards away under an arrow; tapping the arrow
+       spreads the whole pile out
+OP-16  with Maintain Card Spacing OFF the same pile has no arrow and every
+       card shows, squeezed closer; back ON the arrow returns, and the
+       playfield is raised again
 
 Board checks read the exact layout from the accessibility tree; the
 playfield's height is its foundation row's y.
@@ -59,6 +66,8 @@ STATUS_TITLE = "Show Status Bar"
 MESSAGES = "opt_card_messages"
 MESSAGES_TITLE = "Show Card Messages"
 NOTE = "this card cannot attach anywhere"
+# Folds once the playfield is lowered (12 would; 15 raised).
+PILE = 13
 NEW_DEAL = 10
 IDLE = 10.0
 TIMER_RUN = 2.0
@@ -80,6 +89,15 @@ def _toggle_lower(start: float) -> float:
         if abs(now - start) > SHIFT:
             return now
     return start
+
+
+def _raise_back() -> None:
+    """Raise the lowered playfield. Never raises — used from finally."""
+    try:
+        if ui.at_table(timeout=2.0):
+            _toggle_lower(_top_y())
+    except Exception as exc:  # noqa: BLE001
+        print(f"  WARNING: could not raise the playfield back ({exc})", flush=True)
 
 
 def run() -> None:
@@ -336,9 +354,82 @@ def run() -> None:
         ui.expect(moved >= NEW_DEAL, f"New left the same deal ({moved} cards moved)")
         c.note(f"a different deal ({moved} of 52 cards elsewhere)")
 
+    spacing_maybe_off = False
+    raised = None
+    try:
+        with caselog.case("OP-15") as c:
+            b, pile = fc.build_long_pile(PILE)
+            c.shot(ui.shoot("CardSpacingPile"))
+            low = _toggle_lower(b.top_y)
+            ui.expect(low > b.top_y + SHIFT, f"tap to lower did not drop the playfield "
+                                             f"(top {b.top_y:.0f} -> {low:.0f} pt)")
+            raised = b.top_y
+            folded_shot = c.shot(ui.settled_shot("CardSpacingArrow"))
+            caselog.step(f"Check an arrow sits on top of the {len(pile)}-card pile and its top "
+                         "cards are tucked under the next")
+            arrow = ui.spacing_arrow(folded_shot)
+            lowered = fc.read_board()
+            tucked = fc.folded(lowered, pile)
+            ui.expect(arrow, f"no arrow over the {len(pile)}-card pile with {fc.SPACING} at its "
+                             f"default (see {folded_shot})")
+            ui.expect(tucked, f"the arrow shows but no card of the pile is tucked away "
+                              f"(gaps {fc.pile_gaps(lowered, pile)} pt)")
+            caselog.step("Tap the arrow on top of the pile")
+            helpers.wda_tap(arrow, settle=1.5)
+            opened_shot = c.shot(ui.settled_shot("CardSpacingExpanded"))
+            caselog.step("Check the arrow is gone and every card of the pile shows its rank")
+            opened = fc.read_board()
+            still = fc.folded(opened, pile)
+            ui.expect(not ui.spacing_arrow(opened_shot),
+                      f"the arrow is still over the pile after tapping it (see {opened_shot})")
+            ui.expect(not still, f"tapping the arrow left {still} tucked away "
+                                 f"(gaps {fc.pile_gaps(opened, pile)} pt)")
+            c.note(f"{len(pile)}-card pile, playfield lowered: {', '.join(tucked)} tucked under "
+                   f"an arrow; tapping it spread all {len(pile)} cards "
+                   f"{min(fc.pile_gaps(opened, pile)):.0f} pt apart")
+
+        with caselog.case("OP-16") as c:
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            fc.confirm_spacing(True, "opened from the table — its default")
+            ui.expect(fc.set_spacing(False), f"could not turn {fc.SPACING} OFF")
+            spacing_maybe_off = True
+            fc.confirm_spacing(False, "after setting it")
+            c.shot(ui.shoot("CardSpacingOptionOff"))
+            off_shot = c.shot(ui.back_to_table_shot("CardSpacingOff"))
+            caselog.step(f"Check there is no arrow and all {len(pile)} cards of the pile show")
+            off = fc.read_board()
+            hidden = fc.folded(off, pile)
+            ui.expect(not ui.spacing_arrow(off_shot),
+                      f"{fc.SPACING} OFF still draws the arrow over the pile (see {off_shot})")
+            ui.expect(not hidden, f"{fc.SPACING} OFF still tucks {hidden} away "
+                                  f"(gaps {fc.pile_gaps(off, pile)} pt)")
+            ui.expect(ui.open_options(from_table=True), "in-game menu → options did not open")
+            fc.confirm_spacing(False, "opened from the table")
+            ui.expect(fc.set_spacing(True), f"could not turn {fc.SPACING} back ON")
+            spacing_maybe_off = False
+            fc.confirm_spacing(True, "after setting it")
+            again_shot = c.shot(ui.back_to_table_shot("CardSpacingBackOn"))
+            caselog.step("Check the arrow is back on top of the pile")
+            ui.expect(ui.spacing_arrow(again_shot),
+                      f"{fc.SPACING} back ON did not fold the pile under its arrow "
+                      f"(see {again_shot})")
+            back = _toggle_lower(_top_y())
+            ui.expect(abs(back - raised) <= SHIFT / 3,
+                      f"tap to raise did not bring the playfield back (top {back:.0f}, "
+                      f"started at {raised:.0f} pt)")
+            raised = None
+            c.note(f"OFF: no arrow, all {len(pile)} cards shown "
+                   f"{min(fc.pile_gaps(off, pile)):.0f} pt apart; back ON the arrow returned")
+    finally:
+        if spacing_maybe_off:
+            fc.restore_spacing()
+        if raised is not None:
+            _raise_back()
+
     ui.expect(ui.to_menu(), "could not return to the menu after the table")
     print("PASS: the table plays — controls, timer and score, undo, lower / raise, hints, "
-          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, and New")
+          "drawer, Rich Features, Show Status Bar and Show Card Messages both ways, New, and "
+          "Maintain Card Spacing on a long pile both ways")
 
 
 if __name__ == "__main__":

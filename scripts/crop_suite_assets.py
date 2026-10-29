@@ -74,6 +74,8 @@ CROPS = {
     "daily_popup_days": ("daily_score_popup", (375, 590, 460, 760)),
     "faq_daily_heading": ("daily_faq", (265, 636, 1025, 722)),
     "reset_daily_stats": ("daily_stats_bottom", (315, 2648, 978, 2716)),
+    # Maintain Card Spacing: the arrow over a folded 13-card pile (playfield lowered)
+    "spacing_arrow": ("table_spacing_arrow", (546, 956, 586, 1006)),
 }
 
 

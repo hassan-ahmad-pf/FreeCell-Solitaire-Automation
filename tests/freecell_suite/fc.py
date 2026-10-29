@@ -16,6 +16,8 @@ Coordinates from the tree are WDA points; taps convert them to pixels.
 from __future__ import annotations
 
 import fcntl
+import heapq
+import itertools
 import os
 import re
 import sys
@@ -535,13 +537,15 @@ class Board:
     ``cards`` maps "heart-10" to (area, index, depth): area F (foundation),
     C (free cell) or T (tableau column), index from the left, depth from the
     top of a column (0 for F and C). ``top_y`` is the foundation row's y in
-    points, which moves when the playfield is lowered.
+    points, which moves when the playfield is lowered. ``places`` holds the
+    centres of the empty-slot images by area, left to right.
     """
 
-    def __init__(self, cards: dict, top_y: float, rects: dict):
+    def __init__(self, cards: dict, top_y: float, rects: dict, places: dict | None = None):
         self.cards = cards
         self.top_y = top_y
         self.rects = rects
+        self.places = places or {}
 
     def __eq__(self, other) -> bool:
         return isinstance(other, Board) and self.cards == other.cards
@@ -600,7 +604,7 @@ def board(tree: dict | None = None) -> Board | None:
     for index, stack in per_column.items():
         for depth, (_, key) in enumerate(sorted(stack)):
             cards[key] = ("T", index, depth)
-    return Board(cards, top_y, rects)
+    return Board(cards, top_y, rects, {"F": foundations, "C": cells, "T": columns})
 
 
 def read_board(timeout: float = 8.0) -> Board | None:
@@ -838,6 +842,199 @@ def card_message(frames: list[tuple[float, str]]) -> tuple[float, str, str] | No
     return None
 
 
+# ── long piles ─────────────────────────────────────────────────────
+# Maintain Card Spacing keeps at least 24 pt between a column's cards; a pile
+# that does not fit that way has its top cards tucked under the next one and
+# an arrow over it. That takes 15 cards with the playfield raised, 12 lowered.
+# A card less than FOLDED_GAP above the next has its rank hidden (OFF squeezes
+# a 13-card pile to 21 pt, tucked cards sit 0 or less apart).
+
+_SUITS = ("heart", "diamond", "club", "spade")
+FOLDED_GAP = 15.0
+_PLAN_NODES = 100_000
+_PLAN_COST = 1.5
+
+
+def _code(card: str) -> int:
+    suit, rank = card.rsplit("-", 1)
+    return _SUITS.index(suit) * 16 + int(rank)
+
+
+def _named(code: int) -> str:
+    return f"{_SUITS[code >> 4]}-{code & 15}"
+
+
+def _goes_on(card: int, onto: int) -> bool:
+    """One rank lower and the other colour (hearts and diamonds are 0-31)."""
+    return (card >> 5) != (onto >> 5) and (onto & 15) == (card & 15) + 1
+
+
+def _pile_moves(state):
+    """(card, from, to) for each single-card move; places are ("T", i),
+    ("C", None) and ("F", None)."""
+    cols, cells, up = state
+    empty = next((j for j, col in enumerate(cols) if not col), None)
+    sources = [(col[-1], ("T", i)) for i, col in enumerate(cols) if col]
+    sources += [(card, ("C", None)) for card in cells]
+    for card, src in sources:
+        if up[card >> 4] + 1 == card & 15:
+            yield card, src, ("F", None)
+        for j, col in enumerate(cols):
+            if col and src != ("T", j) and _goes_on(card, col[-1]):
+                yield card, src, ("T", j)
+        if empty is not None and (src[0] == "C" or len(cols[src[1]]) > 1):
+            yield card, src, ("T", empty)
+        if src[0] == "T" and len(cells) < 4:
+            yield card, src, ("C", None)
+
+
+def _pile_apply(state, move):
+    cols, cells, up = state
+    card, (src, i), (dst, j) = move
+    cols, cells, up = list(cols), list(cells), list(up)
+    if src == "T":
+        cols[i] = cols[i][:-1]
+    else:
+        cells.remove(card)
+    if dst == "T":
+        cols[j] = cols[j] + (card,)
+    elif dst == "C":
+        cells.append(card)
+    else:
+        up[card >> 4] += 1
+    return tuple(cols), tuple(sorted(cells)), tuple(up)
+
+
+def plan_pile(b: Board, target: int) -> list[tuple[str, tuple]] | None:
+    """The fewest single-card moves found that leave one column *target*
+    cards long: [(card, ("T", column) / ("C", None) / ("F", None))], or None.
+    A best-first search on how far the longest column is from *target* and
+    how many free cells are taken, plus the moves made so far."""
+    up = [0] * 4
+    for card, (area, _i, _d) in b.cards.items():
+        if area == "F":
+            up[_code(card) >> 4] = max(up[_code(card) >> 4], _code(card) & 15)
+    start = (tuple(tuple(_code(c) for c in b.column(i)) for i in range(TABLEAU)),
+             tuple(sorted(_code(c) for c, (a, _i, _d) in b.cards.items() if a == "C")),
+             tuple(up))
+
+    def short(state) -> float:
+        return 3 * max(0, target - max(len(col) for col in state[0])) + len(state[1])
+
+    came = {start: None}
+    order = itertools.count()
+    queue = [(short(start), next(order), 0, start)]
+    while queue and len(came) < _PLAN_NODES:
+        _f, _n, made, state = heapq.heappop(queue)
+        if max(len(col) for col in state[0]) >= target:
+            path = []
+            while came[state] is not None:
+                state, (card, _src, dst) = came[state]
+                path.append((_named(card), dst))
+            return path[::-1]
+        for move in _pile_moves(state):
+            nxt = _pile_apply(state, move)
+            if nxt not in came:
+                came[nxt] = (state, move)
+                heapq.heappush(queue, (short(nxt) + _PLAN_COST * (made + 1), next(order),
+                                       made + 1, nxt))
+    return None
+
+
+def move_card(b: Board, card: str, dest: tuple) -> None:
+    """Drag *card* onto a column or into a free cell; tap it up to its foundation."""
+    if dest[0] == "F":
+        tap_card(b, card, settle=0.8)
+        return
+    if dest[0] == "T":
+        bottom = b.bottom(dest[1])
+        end = _centre(b.rects[bottom]) if bottom else b.places["T"][dest[1]]
+    else:
+        used = {i for _c, (a, i, _d) in b.cards.items() if a == "C"}
+        end = b.places["C"][next(i for i in range(4) if i not in used)]
+    drag_points(_centre(b.rects[card]), end)
+
+
+def _landed(b: Board | None, card: str, dest: tuple) -> bool:
+    got = b.cards.get(card) if b else None
+    return bool(got) and got[0] == dest[0] and (dest[0] != "T" or got[1] == dest[1])
+
+
+@says("Deal a new game: menu, New, Yes")
+def new_deal() -> Board:
+    ui.expect(ui.open_table_drawer(), "the in-game menu did not open for New")
+    ui.expect(ui.tap("drawer_new", settle=2.0), "New could not be tapped")
+    if wait_alert("abandon", timeout=2.0):
+        helpers.answer_alert("Yes", settle=1.5)
+    ui.settle_prompts()
+    ui.expect(ui.at_table(timeout=8.0), "New did not leave a game table")
+    b = settled_board()
+    ui.expect(b is not None and len(b) == 52, "could not read the 52 cards off the new deal")
+    return b
+
+
+@says(lambda target=13, max_moves=24, deals=6: f"Build a {target}-card pile in one column: "
+      f"plan legal moves, then drag the cards one by one")
+def build_long_pile(target: int = 13, max_moves: int = 24, deals: int = 6) -> tuple[Board, list[str]]:
+    """Play this deal until one column holds *target* cards; a deal with no
+    plan of *max_moves* or fewer is swapped for a new one. Run with the
+    playfield raised, where the pile still fits. (board, the pile top first)."""
+    b = settled_board()
+    ui.expect(b is not None and len(b) == 52, "could not read the 52 cards off the table")
+    path = None
+    for deal in range(deals):
+        path = plan_pile(b, target)
+        if path and len(path) <= max_moves:
+            break
+        print(f"  this deal has no {target}-card pile within {max_moves} moves"
+              + (" — dealing another" if deal + 1 < deals else ""), flush=True)
+        path = None
+        if deal + 1 < deals:
+            b = new_deal()
+    ui.expect(path, f"none of {deals} deals had a {target}-card pile within {max_moves} moves")
+    print(f"  {len(path)} moves to a {target}-card pile", flush=True)
+    made = replans = 0
+    while path:
+        card, dest = path.pop(0)
+        move_card(b, card, dest)
+        ui.answer_prompt("tip")
+        made += 1
+        after = read_board()
+        if not _landed(after, card, dest):
+            after = settled_board()
+        if not _landed(after, card, dest) or len(b.moved(after)) != 1:
+            replans += 1
+            ui.expect(after is not None and replans <= 3,
+                      f"move {made} ({card} to {dest}) did not go as planned "
+                      f"(board: {after.text() if after else 'unreadable'})")
+            path = plan_pile(after, target)
+            ui.expect(path, f"no {target}-card pile left after move {made} went off plan "
+                            f"(board: {after.text()})")
+            print(f"  move {made} ({card}) went off plan — {len(path)} new moves", flush=True)
+        b = after
+    b = settled_board() or b
+    col = max(range(TABLEAU), key=lambda i: len(b.column(i)))
+    pile = b.column(col)
+    ui.expect(len(pile) >= target, f"the longest column has {len(pile)} cards after {made} "
+                                   f"moves, not {target} (board: {b.text()})")
+    print(f"  column {col + 1} holds {len(pile)} cards after {made} moves", flush=True)
+    return b, pile
+
+
+def pile_gaps(b: Board, pile: list[str]) -> list[float]:
+    """Points from each card's top to the next one's, top of the pile first."""
+    ys = [b.rects[card]["y"] for card in pile]
+    return [below - above for above, below in zip(ys, ys[1:])]
+
+
+def folded(b: Board, pile: list[str]) -> list[str]:
+    """The pile's cards drawn too close to the next one to show their rank.
+
+    Read by name: while a pile is folded its column's empty-slot image
+    leaves the tree, so Board's columns are off by one there."""
+    return [card for card, gap in zip(pile, pile_gaps(b, pile)) if gap < FOLDED_GAP]
+
+
 # Under the board, Solo and Daily alike: the level line, then "tap a card to
 # start" until the first move. Lower down the score, then "0:00 X98" (timer
 # and multiplier); they sit lower once the tap-to captions go.
@@ -1022,6 +1219,26 @@ def switch_set(human: str, on: bool) -> bool | None:
     if state is None or state == on:
         return state
     return switch_tap(human)
+
+
+SPACING = "Maintain Card Spacing"
+
+
+@says(lambda on, where: f"Check {SPACING} reads {'ON' if on else 'OFF'} on Options")
+def confirm_spacing(on: bool, where: str) -> None:
+    state = switch_state(SPACING) if control_rect("Switch", SWITCHES[SPACING]) else None
+    ui.expect(state is not None, f"{SPACING} switch not found on Options ({where})")
+    ui.expect(state is on, f"{SPACING} reads {'ON' if state else 'OFF'} on Options ({where}), "
+                           f"expected {'ON' if on else 'OFF'}")
+    print(f"  {SPACING} reads {'ON' if on else 'OFF'} on Options ({where})", flush=True)
+
+
+def set_spacing(on: bool) -> bool:
+    return switch_set(SPACING, on) is on
+
+
+def restore_spacing() -> bool:
+    return ui.restore_option(set_spacing, SPACING)
 
 
 @says("Scroll back to the top of Options")

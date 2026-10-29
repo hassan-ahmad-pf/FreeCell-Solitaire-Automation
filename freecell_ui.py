@@ -1320,7 +1320,7 @@ def restore_default_look() -> bool:
 
 
 # ── Options switches: Rich Features, Rank Strip, Show Status Bar,
-#    Show Card Messages ──────────────────────────────────────────────
+#    Show Card Messages, Maintain Card Spacing ───────────────────────
 # Rich Features draws the table HUD: the score, then the timer and the
 # multiplier just above the wooden bar, and the move counter left of
 # "menu". RICH_HUD is the bottom band while the "tap to undo / lower /
@@ -1332,6 +1332,9 @@ def restore_default_look() -> bool:
 # Show Status Bar draws the iOS status bar on the table: the clock, signal
 # and battery in white at y 67-109, above the header (y 330+). Off, that
 # band is bare felt (0 white px; 3,300-4,200 when shown).
+# Maintain Card Spacing draws a white arrow over a pile it has folded. It is
+# looked for over the columns only: the white "▼" under "tap to undo" and
+# "tap for hints" scores 0.65 against it, the columns at most 0.50.
 OPTION_SWITCH_X = 1058
 # The red "Test Banner" debug button covers x 936-1283, y 2370-2489 on
 # Options — right over the switch column — so a row is tapped only here.
@@ -1354,6 +1357,7 @@ TABLE_MENU = (1140, 350)
 STATUS_BAND = (0, 25, 1290, 140)
 STATUS_SEEN = 1500
 STATUS_GONE = 150
+SPACING_BAND = (0, 600, 1290, 1900)
 
 
 def _locate_in(name: str, img):
@@ -1545,6 +1549,15 @@ def status_bar_ink(path=None) -> int:
     """White pixels where the iOS status bar sits: its clock, signal and battery."""
     x0, y0, x1, y1 = STATUS_BAND
     return int((screen_rgb(path)[y0:y1, x0:x1].min(axis=2) > 225).sum())
+
+
+def spacing_arrow(path=None):
+    """Pixel centre of the arrow over a folded pile, or None."""
+    import numpy as np
+
+    x0, y0, x1, y1 = SPACING_BAND
+    hit = _locate_in("spacing_arrow", np.ascontiguousarray(screen_rgb(path)[y0:y1, x0:x1]))
+    return (hit[0] + x0, hit[1] + y0) if hit else None
 
 
 def _rich_hud(img) -> dict:
