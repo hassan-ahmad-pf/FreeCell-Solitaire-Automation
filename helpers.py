@@ -705,6 +705,7 @@ SETTINGS_BUNDLE = "com.apple.Preferences"
 AIRPLANE_SWITCH = "com.apple.settings.airplaneMode"
 WIFI_ROW = "com.apple.settings.wifi"
 WIFI_SWITCHES = (
+    "wifiSettings.powerToggle",   # iOS 27.2 Settings (label still "Wi-Fi")
     "Wi-Fi",   # regular hyphen — iOS 27 Settings
     "Wi‑Fi",   # U+2011 non-breaking hyphen — older Settings
 )
