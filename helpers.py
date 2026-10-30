@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import requests
@@ -202,11 +203,65 @@ def launch_app(force: bool = False, bundle_id: str | None = None,
         timeout=timeout,
     )
     response.raise_for_status()
-    global _SESSION_ID
+    global _SESSION_ID, _IDLE_OFF
     _SESSION_ID = response.json()["value"]["sessionId"]
+    _IDLE_OFF = False
+    if (bundle_id or config.BUNDLE_ID) == config.BUNDLE_ID:
+        idle_waits_off(_SESSION_ID)
     if settle:
         time.sleep(settle)
     return _SESSION_ID
+
+
+# After a gesture WDA waits for the app to go idle, animations included.
+# FreeCell does not always report idle, and XCTest then holds the reply for
+# 15-30 s (one swipe in nine on Options). FreeCell sessions turn those waits
+# off and pause for a fixed time after each gesture instead, about what WDA
+# waited on a normal tap or swipe. A new session puts WDA's waits back, so
+# the Settings app keeps them for the radio switches.
+IDLE_WAITS = ("waitForIdleTimeout", "animationCoolOffTimeout")
+TAP_PAUSE = 1.0
+SWIPE_PAUSE = 2.0
+_IDLE_OFF = False
+_PAUSES = True
+
+
+def idle_waits_off(sid: str) -> bool:
+    """Turn off WDA's waits for the app to idle. True when WDA took it."""
+    global _IDLE_OFF
+    try:
+        response = requests.post(
+            f"{config.WDA_URL}/session/{sid}/appium/settings",
+            json={"settings": {key: 0 for key in IDLE_WAITS}},
+            timeout=10,
+        )
+        _IDLE_OFF = response.ok
+    except requests.RequestException:
+        _IDLE_OFF = False
+    if not _IDLE_OFF:
+        print("  WDA's idle waits could not be turned off; gestures wait for "
+              "FreeCell to idle", flush=True)
+    return _IDLE_OFF
+
+
+def gesture_pause(pause: float = TAP_PAUSE) -> None:
+    """The pause after a gesture, where WDA no longer waits for the app."""
+    if _IDLE_OFF and _PAUSES:
+        time.sleep(pause)
+
+
+@contextmanager
+def no_gesture_pause():
+    """Taps and swipes return as soon as WDA has played them, for frames
+    that must be caught while the app is still animating."""
+    global _PAUSES
+    if not _IDLE_OFF:
+        idle_waits_off(current_session())
+    before, _PAUSES = _PAUSES, False
+    try:
+        yield
+    finally:
+        _PAUSES = before
 
 
 def tap(point: tuple[int, int], settle: float = 1.0) -> None:
@@ -251,13 +306,14 @@ def _wda_pointer(pixel: tuple[int, int]) -> tuple[int, int]:
     return int(pixel[0] / scale), int(pixel[1] / scale)
 
 
-# XCTest waits for FreeCell to go idle before it plays a gesture; on Options
-# that has taken up to 27 s, so gestures get a longer timeout than other calls.
+# With WDA's idle waits on (Settings, or when they could not be turned off)
+# a gesture on FreeCell can take 15-30 s, so gestures get a longer timeout.
 GESTURE_TIMEOUT = 60
 SLOW_GESTURE = 10.0
 
 
-def _post_gesture(actions: dict, what: str) -> requests.Response:
+def post_gesture(actions: dict, what: str, pause: float) -> requests.Response:
+    """Play W3C pointer *actions*, then *pause* where WDA no longer waits."""
     started = time.time()
     response = requests.post(
         f"{config.WDA_URL}/session/{current_session()}/actions",
@@ -268,6 +324,8 @@ def _post_gesture(actions: dict, what: str) -> requests.Response:
     took = time.time() - started
     if took > SLOW_GESTURE:
         print(f"  WDA took {took:.0f} s to play the {what}", flush=True)
+    if response.ok:
+        gesture_pause(pause)
     return response
 
 
@@ -290,7 +348,7 @@ def wda_tap(pixel: tuple[int, int], settle: float = 1.0) -> bool:
     }
     global _SESSION_ID
     for attempt in range(2):
-        response = _post_gesture(actions, "tap")
+        response = post_gesture(actions, "tap", TAP_PAUSE)
         # An app switch (an ad opening the App Store) can end the session
         # between the session check and the tap.
         if response.status_code != 404 or attempt:
@@ -310,6 +368,7 @@ def type_keys(text: str) -> bool:
         json={"value": list(text)},
         timeout=15,
     )
+    gesture_pause()
     return response.status_code == 200
 
 
@@ -333,7 +392,7 @@ def wda_swipe(start: tuple[int, int], end: tuple[int, int],
             ],
         }]
     }
-    response = _post_gesture(actions, "swipe")
+    response = post_gesture(actions, "swipe", SWIPE_PAUSE)
     response.raise_for_status()
     if settle:
         time.sleep(settle)
@@ -655,17 +714,12 @@ def rapid_tap(point: tuple[int, int], times: int = 10, gap_ms: int = 45) -> bool
             {"type": "pointerUp", "button": 0},
             {"type": "pause", "duration": gap_ms},
         ))
-    response = requests.post(
-        f"{config.WDA_URL}/session/{current_session()}/actions",
-        data=json.dumps({"actions": [{
-            "type": "pointer",
-            "id": "freecell-qa",
-            "parameters": {"pointerType": "touch"},
-            "actions": actions,
-        }]}),
-        headers={"Content-Type": "application/json"},
-        timeout=30,
-    )
+    response = post_gesture({"actions": [{
+        "type": "pointer",
+        "id": "freecell-qa",
+        "parameters": {"pointerType": "touch"},
+        "actions": actions,
+    }]}, "tap burst", TAP_PAUSE)
     response.raise_for_status()
     time.sleep(1.5)
     return True

@@ -1784,9 +1784,6 @@ def scroll_to_end(down: bool = True, max_swipes: int = 15) -> bool:
       + ("up" if end[1] < start[1] else "down") + " slowly and hold before letting go")
 def drag_hold(start, end, move_ms: int = 1200, hold_ms: int = 700) -> None:
     """Drag and hold still before lifting, so the page does not fling."""
-    import requests
-
-    sid = helpers.current_session()
     x1, y1 = helpers._wda_pointer(start)
     x2, y2 = helpers._wda_pointer(end)
     body = {"actions": [{
@@ -1801,8 +1798,7 @@ def drag_hold(start, end, move_ms: int = 1200, hold_ms: int = 700) -> None:
             {"type": "pointerUp", "button": 0},
         ],
     }]}
-    requests.post(f"{config.WDA_URL}/session/{sid}/actions", json=body,
-                  timeout=30).raise_for_status()
+    helpers.post_gesture(body, "drag", helpers.TAP_PAUSE).raise_for_status()
     time.sleep(0.8)
 
 

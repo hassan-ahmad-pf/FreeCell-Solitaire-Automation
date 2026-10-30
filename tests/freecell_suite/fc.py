@@ -285,7 +285,6 @@ def tap_named(kind: str, name: str, settle: float = 1.0, timeout: float = 0.0) -
 
 def drag_points(start, end, move_ms: int = 600, hold_ms: int = 200) -> None:
     """Press, drag and lift in WDA points."""
-    sid = helpers.current_session()
     body = {"actions": [{
         "type": "pointer", "id": "freecell-suite-drag",
         "parameters": {"pointerType": "touch"},
@@ -299,8 +298,7 @@ def drag_points(start, end, move_ms: int = 600, hold_ms: int = 200) -> None:
             {"type": "pointerUp", "button": 0},
         ],
     }]}
-    requests.post(f"{config.WDA_URL}/session/{sid}/actions", json=body,
-                  timeout=30).raise_for_status()
+    helpers.post_gesture(body, "drag", helpers.TAP_PAUSE).raise_for_status()
     time.sleep(0.6)
 
 
@@ -718,9 +716,6 @@ def play_to_foundation(max_cover: int = 4) -> tuple[Board, Board, str]:
 
 TABLEAU = 8
 CANNOT_ATTACH = re.compile(r"cannot\s+attach|attach\s+anywhere", re.I)
-# WDA's defaults: after a synthesized tap it waits up to 2 s for the app's
-# animations to settle, and up to 10 s for the app to idle.
-_IDLE_WAITS = {"animationCoolOffTimeout": 2.0, "waitForIdleTimeout": 10.0}
 
 
 def _red(card: str) -> bool:
@@ -800,23 +795,17 @@ def fill_free_cells(max_taps: int = 16) -> Board:
 
 @contextmanager
 def no_idle_wait():
-    """WDA answers taps and screenshots without waiting for the app's
-    animations to settle; its idle waits are put back afterwards."""
-    path = f"/session/{helpers.current_session()}/appium/settings"
-    before = _get(path) or {}
-    _post(path, {"settings": {key: 0 for key in _IDLE_WAITS}})
-    try:
+    """Taps return as soon as WDA has played them, with no pause for the
+    app's animations to settle."""
+    with helpers.no_gesture_pause():
         yield
-    finally:
-        _post(path, {"settings": {key: before.get(key, value)
-                                  for key, value in _IDLE_WAITS.items()}})
 
 
 @says(lambda b, card, name, seconds=2.0: f"Tap {card}, which has nowhere to go, and capture "
                                          f"the screen as fast as possible for {seconds:.0f} s")
 def tap_and_watch(b: Board, card: str, name: str, seconds: float = 2.0) -> list[tuple[float, str]]:
     """Tap *card* and grab frames back to back for *seconds*. A card message
-    shows for under a second, and WDA's usual wait for the animations to
+    shows for under a second, and the usual pause for the animations to
     settle after a tap would outlast it. (seconds after the tap, path) per frame."""
     grabbed = []
     with no_idle_wait():
@@ -1391,6 +1380,7 @@ def slider_adjust(human: str, target: float) -> float | None:
               {"value": [text], "text": text}, timeout=30)
     except Exception:  # noqa: BLE001
         return None
+    helpers.gesture_pause()
     time.sleep(0.4)
     return slider_value(human)
 
