@@ -21,7 +21,8 @@ ST-04  Back returns to the main menu
 A confirmed reset always sends FreeCell to the main menu, so three visits is
 the fewest. It runs after every test that needs the wins it wipes
 (verifyMoreGamesIcons draws its strip only after a won game). Pages are
-compared above the banner ad, which changes on its own when online.
+compared above the banner ad, which changes on its own when online, and
+below the header, where iOS notification banners drop in.
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/verifyStatistics.py
 """
@@ -41,8 +42,11 @@ import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
 from caselog import says  # noqa: E402
 
-PAGE = (0, 200, 1290, 2300)
+# Below the header and tabs: another app's notification banner drops over the
+# top 430 px for a few seconds (it made 8.6% of a declined reset "change").
+PAGE = (0, 460, 1290, 2300)
 SAME = 0.02
+BANNER_GONE = 6.0
 
 
 def _open_stats(c) -> None:
@@ -211,6 +215,12 @@ def run() -> None:
         ui.settle(4.0)
         after_page = c.shot(ui.shoot("StatsResetCancelledAfter"))
         changed = fc.diff_frac(before_page, after_page, PAGE)
+        if changed > SAME:
+            caselog.step(f"Wait {BANNER_GONE:.0f} s for a notification banner to go, then "
+                         "look again")
+            time.sleep(BANNER_GONE)
+            after_page = c.shot(ui.shoot("StatsResetCancelledAfterAgain"))
+            changed = fc.diff_frac(before_page, after_page, PAGE)
         ui.expect(changed <= SAME, f"No changed {changed:.2%} of the Statistics page — "
                                    f"the scores may have been reset ({before_page}, {after_page})")
         c.note(f"No kept Statistics open; page diff {changed:.2%}")

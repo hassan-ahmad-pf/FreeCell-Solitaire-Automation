@@ -123,7 +123,12 @@ def menu() -> None:
             pass
         if helpers.in_app() and ad_up():
             close_ad("leftover")
-    if not ui.launch_to_menu():
+    if ui.launch_to_menu():
+        if wait_foreign_alert("FreeCell's main menu"):
+            ui.expect(ui.on_menu(6.0), f"the main menu was gone after the alert closed "
+                                       f"(see {ui.shoot('NoMenu')})")
+        return
+    if not (wait_foreign_alert("FreeCell") and ui.launch_to_menu()):
         raise AssertionError(f"could not reach the main menu (see {ui.shoot('NoMenu')})")
 
 
@@ -1651,6 +1656,31 @@ def close_or_wait(where: str, budget: float = 150.0) -> bool:
         time.sleep(1.5)
     raise AssertionError(f"the {where} ad was still up after {MANUAL_WAIT:.0f}s "
                          "of waiting for a hand close")
+
+
+def wait_foreign_alert(where: str) -> bool:
+    """An alert that is none of FreeCell's own prompts (iOS's "Device Added to
+    Your Account", say) is never answered by the suite: ask for a hand close
+    and wait for it. Only its first line is printed — the rest can name the
+    Apple account. True when one was up and went."""
+    if ui.prompt_now() != "" or ui.clear_overlays():
+        return False
+    text = helpers.alert_text().strip()
+    if not text:
+        return False
+    title = text.splitlines()[0]
+    print("Manual effort required at this step", flush=True)
+    print(f"  An alert FreeCell did not raise covers {where}: '{title}'. Close it on the "
+          "phone; the test continues when it is gone.", flush=True)
+    deadline = time.time() + MANUAL_WAIT
+    while time.time() < deadline:
+        if not helpers.alert_text():
+            print("  the alert was closed by hand — continuing", flush=True)
+            time.sleep(1.0)
+            return True
+        time.sleep(1.5)
+    raise AssertionError(f"the alert '{title}' covered {where} for {MANUAL_WAIT:.0f}s "
+                         "and was not closed by hand")
 
 
 @says(lambda level="easy", attempts=3: f"Start a new {level.title()} game: Play, then "

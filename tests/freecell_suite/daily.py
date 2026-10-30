@@ -59,6 +59,18 @@ QA_DAILY_WIN = (686, 1746)
 VICTORY_BACK = (140, 347)
 MONTHLY_TIP_TAP = (645, 1050)  # on the monthly-score tip, over the month's name, not a date
 
+# Victory's score font: Vision reads its "2" as "3" (72,687 as 73,687) and
+# "4" as "1" — on one score in seven built from its digits, the same way on
+# every read of a frame — and a new best pulses 65-68 px tall. Each digit is
+# matched by shape against crops of real Victory scores instead: a real frame
+# matches its digits at 0.90+, 0.11 clear of the next; 6 and 8, the closest
+# pair, match each other at 0.81.
+VICTORY_DIGITS = {str(d): f"victory_digit_{d}" for d in range(10)}
+DIGIT_MATCH = 0.85
+DIGIT_LEAD = 0.05
+DIGIT_INK = 170
+_digit_shapes: dict | None = None
+
 # The weekday header follows the phone's region: Sunday first (e.g. US) or
 # Monday first (e.g. UK). Value: the weekday the grid's first column holds.
 WEEKDAY_HEADERS = {"daily_weekdays": 0, "daily_weekdays_mon": 1}
@@ -236,16 +248,77 @@ def synthetic_win(started: bool = False) -> bool:
     return True
 
 
+def _glyphs(image, yellow: bool = False) -> list[tuple]:
+    """(mask, x, height) of each blob of ink in *image* (a path or PIL image),
+    left to right: light ink, or only the yellow of a Statistics value (its
+    "best score:" label is white)."""
+    import cv2
+    import numpy as np
+    from PIL import Image
+
+    img = image if isinstance(image, Image.Image) else Image.open(image)
+    rgb = np.asarray(img.convert("RGB")).astype(int)
+    if yellow:
+        ink = (rgb[:, :, 0] > 180) & (rgb[:, :, 1] > 140) & (rgb[:, :, 2] < 140)
+    else:
+        ink = rgb.max(axis=2) > DIGIT_INK
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(ink.astype(np.uint8), connectivity=8)
+    return sorted(((labels[y:y + h, x:x + w] == i, x, h)
+                   for i, (x, y, w, h, area) in enumerate(stats) if i and area > 30),
+                  key=lambda g: g[1])
+
+
+def _likeness(glyph, shape) -> float:
+    import cv2
+    import numpy as np
+
+    h, w = shape.shape
+    sized = cv2.resize(glyph.astype(np.uint8) * 255, (w, h), interpolation=cv2.INTER_AREA) > 127
+    return float((sized & shape).sum() / (sized | shape).sum())
+
+
+def _digits(glyphs: list[tuple], match: float = 0.0, lead: float = 0.0) -> int | None:
+    """The number *glyphs* spell, each the digit shape it is most like; None
+    when one matches its digit under *match* or by under *lead* over the next."""
+    global _digit_shapes
+    if _digit_shapes is None:
+        _digit_shapes = {d: max(_glyphs(ui.asset(name)), key=lambda g: g[0].sum())[0]
+                         for d, name in VICTORY_DIGITS.items()}
+    if not glyphs:
+        return None
+    tall = max(h for _, _, h in glyphs)
+    digits = ""
+    for glyph, _x, h in glyphs:
+        if h < 0.8 * tall:  # the thousands comma
+            continue
+        (best, digit), (second, _) = sorted(
+            ((_likeness(glyph, shape), d) for d, shape in _digit_shapes.items()), reverse=True)[:2]
+        if best < match or best - second < lead:
+            return None
+        digits += digit
+    return int(digits) if digits else None
+
+
+def read_victory(path) -> int | None:
+    """The Victory score in the crop at *path*, digit by digit; None when a
+    digit is not clearly one of the shapes."""
+    return _digits(_glyphs(path), DIGIT_MATCH, DIGIT_LEAD)
+
+
 @says("Read the score on the Victory screen")
 def victory_score(timeout: float = 8.0) -> int | None:
-    """The score Victory shows, once two reads a moment apart agree: just
-    after the win the digits are still settling, and one read then came back
-    a digit off (73,699 for 72,699)."""
+    """The score Victory shows, read by digit shape, once two reads a moment
+    apart agree. Vision reads it only if a digit matches no shape clearly."""
     deadline = time.time() + timeout
     last = None
     while True:
-        found = [n for line in ocr.read(ui.victory_score_crop()) for n in ocr.numbers(line.text)]
-        now = found[0] if found else None
+        crop = ui.victory_score_crop()
+        now = read_victory(crop)
+        if now is None:
+            found = [n for line in ocr.read(crop) for n in ocr.numbers(line.text)]
+            now = found[0] if found else None
+            print(f"  WARNING: Victory's digits matched none of their shapes clearly; Vision "
+                  f"read {now}", flush=True)
         if now is not None and now == last:
             return now
         if time.time() > deadline:
@@ -397,18 +470,51 @@ def daily_tab_on(img) -> bool:
     return int((img[y0:y1, x0:x1].min(axis=2) > 220).sum()) >= STATS_TAB_WHITE
 
 
+# Vision drops a best score's last digits now and then ("76,85" for 76,857,
+# "78" for 78,322 on the page; "7ř,7З6" for 77,736 from the line alone). The
+# digit shapes (same font, yellow) read every saved Statistics line right.
+CUT_SHORT = re.compile(r"\d[,.\u201a] ?\d{0,2}(?! ?\d)")
+
+
 def _stat_value(text: str) -> int | None:
     tail = text.partition(":")[2].strip()
     found = ocr.numbers("0" if tail in ("O", "o") else tail)  # this font's 0 reads as O
     return found[0] if found else None
 
 
-def _stat_line(shot: str, cy: float) -> int | None:
-    """The value on one Statistics line, read from a crop of that line alone:
-    in a full-page read Vision now and then turns a lone digit into "~"."""
-    lines = ocr.read(shot, box=(STATS_BOX[0], int(cy) - STATS_LINE, STATS_BOX[2],
-                                int(cy) + STATS_LINE))
+def _line_crop(shot: str, cy: float):
+    from PIL import Image
+
+    return Image.open(shot).convert("RGB").crop(
+        (STATS_BOX[0], int(cy) - STATS_LINE, STATS_BOX[2], int(cy) + STATS_LINE))
+
+
+def _stat_line(shot: str, cy: float, scale: int = 1) -> int | None:
+    """The value on one Statistics line, read from a crop of that line alone
+    (*scale* times its size): in a full-page read Vision now and then turns a
+    lone digit into "~"."""
+    from PIL import Image
+
+    line = _line_crop(shot, cy)
+    if scale != 1:
+        line = line.resize((line.width * scale, line.height * scale), Image.LANCZOS)
+    lines = ocr.read(line)
     return _stat_value(" ".join(ln.text for ln in sorted(lines, key=lambda ln: ln.x0)))
+
+
+def _best_score(shot: str, cy: float, page: int | None) -> int | None:
+    """A best score: Vision's page read once the digit shapes agree with it;
+    otherwise Vision reads the line alone, as is and at twice the size, and
+    the most common read wins (the shapes on a tie)."""
+    from collections import Counter
+
+    shapes = _digits(_glyphs(_line_crop(shot, cy), yellow=True))
+    if shapes == page:
+        return page
+    reads = [r for r in (shapes, page, _stat_line(shot, cy), _stat_line(shot, cy, scale=2))
+             if r is not None]
+    value, votes = Counter(reads).most_common(1)[0] if reads else (None, 0)
+    return value if votes >= 2 else shapes
 
 
 def stats_sections(shot: str) -> list[dict]:
@@ -419,8 +525,10 @@ def stats_sections(shot: str) -> list[dict]:
     for cy, text in ocr.rows(ocr.read(shot, box=STATS_BOX)):
         low = text.lower()
         value = _stat_value(text)
-        if (value is None and low.startswith(("best score", "games played", "games won"))
-                and "none" not in low):
+        if low.startswith("best score") and "none" not in low:
+            value = _best_score(shot, cy, None if CUT_SHORT.search(text) else value)
+        elif ((value is None or CUT_SHORT.search(text))
+                and low.startswith(("games played", "games won")) and "none" not in low):
             value = _stat_line(shot, cy)
         if low.startswith("best score"):
             sections.append({"best": value})

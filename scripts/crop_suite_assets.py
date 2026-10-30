@@ -74,6 +74,17 @@ CROPS = {
     "daily_popup_days": ("daily_score_popup", (375, 590, 460, 760)),
     "faq_daily_heading": ("daily_faq", (265, 636, 1025, 722)),
     "reset_daily_stats": ("daily_stats_bottom", (315, 2648, 978, 2716)),
+    # Victory's score digits, read by shape (daily.read_victory)
+    "victory_digit_0": ("daily_victory_75980", (424, 1270, 483, 1339)),
+    "victory_digit_1": ("daily_victory_75561", (433, 1271, 478, 1337)),
+    "victory_digit_2": ("daily_victory_74623", (364, 1270, 424, 1339)),
+    "victory_digit_3": ("daily_victory_74623", (426, 1271, 482, 1339)),
+    "victory_digit_4": ("daily_victory_74623", (208, 1270, 271, 1338)),
+    "victory_digit_5": ("daily_victory_75980", (214, 1271, 268, 1339)),
+    "victory_digit_6": ("daily_victory_74623", (304, 1270, 362, 1339)),
+    "victory_digit_7": ("daily_victory_74623", (158, 1270, 215, 1339)),
+    "victory_digit_8": ("daily_victory_75980", (364, 1270, 422, 1339)),
+    "victory_digit_9": ("daily_victory_75980", (304, 1270, 361, 1339)),
     # Maintain Card Spacing: the arrow over a folded 13-card pile (playfield lowered)
     "spacing_arrow": ("table_spacing_arrow", (546, 956, 586, 1006)),
 }

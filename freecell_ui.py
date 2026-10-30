@@ -131,7 +131,13 @@ def have(name: str) -> bool:
     return asset(name).exists()
 
 
-def _find_once(name: str):
+# Crops whose centre is not on their control: the point inside the crop to tap.
+# more_games is mostly felt above the gift; its centre missed the button on
+# 3 taps in 5, its "More Games" label on none in 10.
+TAP_AT = {"more_games": (288, 200)}
+
+
+def _find_once(name: str, at=None):
     import cv2
     import numpy as np
 
@@ -153,19 +159,22 @@ def _find_once(name: str):
     _, score, _, top_left = cv2.minMaxLoc(result)
     if score < THRESHOLD:
         return None
+    if at:
+        return (int(top_left[0] + at[0]), int(top_left[1] + at[1]))
     height, width = needle.shape[:2]
     return (int(top_left[0] + width / 2), int(top_left[1] + height / 2))
 
 
-def find(name: str):
-    """Centre of the best tpl match, or None. Uses a WDA screenshot, not Airtest."""
+def find(name: str, at=None):
+    """Centre of the best tpl match (or *at*, a point inside the crop), or
+    None. Uses a WDA screenshot, not Airtest."""
     try:
-        return _find_once(name)
+        return _find_once(name, at)
     except Exception as exc:  # noqa: BLE001
         if not helpers.is_link_error(exc):
             raise
         helpers.reconnect()
-        return _find_once(name)
+        return _find_once(name, at)
 
 
 def is_on(name: str) -> bool:
@@ -221,7 +230,7 @@ def seen(name: str, timeout: float = 8.0) -> bool:
 def tap(name: str, settle: float = 1.0) -> bool:
     if not have(name):
         return False
-    point = find(name)
+    point = find(name, TAP_AT.get(name))
     if not point:
         return False
     helpers.tap(point, settle=settle)
