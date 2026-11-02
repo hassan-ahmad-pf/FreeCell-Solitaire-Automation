@@ -182,6 +182,46 @@ def reconnect() -> str:
     return ensure_session(settle=0.8)
 
 
+# A locked phone refuses every app launch (POST /session answers 500,
+# "device was not, or could not be, unlocked"), so one auto-lock used to
+# fail every test after it. Launches wait for the phone to be unlocked.
+LOCK_WAIT = 600.0
+
+
+def is_locked() -> bool:
+    try:
+        return bool(requests.get(f"{config.WDA_URL}/wda/locked", timeout=5).json().get("value"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def wait_unlocked(timeout: float = LOCK_WAIT) -> bool:
+    """Wake a locked phone; with a passcode, ask for a hand unlock and wait.
+    True when the phone is (or was already) unlocked."""
+    if not is_locked():
+        return True
+    try:
+        requests.post(f"{config.WDA_URL}/wda/unlock", json={}, timeout=20)
+    except Exception:  # noqa: BLE001
+        pass
+    time.sleep(2.0)
+    if not is_locked():
+        print("  the phone had locked itself — woke it, continuing", flush=True)
+        return True
+    print("Manual effort required at this step", flush=True)
+    print("  The phone locked itself. Unlock it (keep FreeCell's screen as it is); the run "
+          "continues when it is unlocked. Set Settings → Display & Brightness → Auto-Lock "
+          "to Never so it does not happen again.", flush=True)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(2.0)
+        if not is_locked():
+            print("  the phone was unlocked by hand — continuing", flush=True)
+            time.sleep(1.0)
+            return True
+    return False
+
+
 def launch_app(force: bool = False, bundle_id: str | None = None,
                settle: float = 2.5, timeout: int = 30) -> str:
     """Launch an app through WDA, never Airtest's iOS start_app.
@@ -189,19 +229,19 @@ def launch_app(force: bool = False, bundle_id: str | None = None,
     Defaults to FreeCell. Pass another bundle (Settings) for radio control.
     """
     ensure_link()
-    response = requests.post(
-        f"{config.WDA_URL}/session",
-        json={
-            "capabilities": {
-                "alwaysMatch": {
-                    "bundleId": bundle_id or config.BUNDLE_ID,
-                    "forceAppLaunch": force,
-                    "shouldTerminateApp": False,
-                }
+    wait_unlocked()
+    body = {
+        "capabilities": {
+            "alwaysMatch": {
+                "bundleId": bundle_id or config.BUNDLE_ID,
+                "forceAppLaunch": force,
+                "shouldTerminateApp": False,
             }
-        },
-        timeout=timeout,
-    )
+        }
+    }
+    response = requests.post(f"{config.WDA_URL}/session", json=body, timeout=timeout)
+    if response.status_code >= 500 and is_locked() and wait_unlocked():
+        response = requests.post(f"{config.WDA_URL}/session", json=body, timeout=timeout)
     response.raise_for_status()
     global _SESSION_ID, _IDLE_OFF
     _SESSION_ID = response.json()["value"]["sessionId"]
@@ -935,6 +975,167 @@ def _tap_airplane(sid: str, want: bool, settle: float = 4.0,
             continue
         time.sleep(settle)
     return _read_airplane(sid) == want
+
+
+AUTOLOCK_ROW = "AUTOLOCK"   # Display & Brightness → Auto-Lock, label "Auto-Lock, Never"
+
+
+def _tap_rect(sid: str, el: str) -> bool:
+    rect = _attr(sid, el, "rect") if el else None
+    if not rect:
+        return False
+    try:
+        _wda_post(f"/session/{sid}/wda/tap",
+                  {"x": int(rect["x"] + rect["width"] / 2),
+                   "y": int(rect["y"] + rect["height"] / 2)})
+    except Exception:  # noqa: BLE001
+        return False
+    return True
+
+
+def _read_auto_lock(sid: str) -> str:
+    el = _element(sid, AUTOLOCK_ROW, timeout=6.0)
+    label = _attr(sid, el, "label") if el else ""
+    return label.split(",", 1)[1].strip() if label and "," in label else ""
+
+
+def auto_lock_never() -> tuple[bool, str]:
+    """Set Settings → Display & Brightness → Auto-Lock to Never, so the phone
+    cannot lock itself mid-run. -> (Never now?, the value seen). Low Power
+    Mode holds Auto-Lock at 30 s and greys Never out."""
+    sid = _open_settings()
+    value = ""
+    try:
+        display = None
+        for _ in range(6):
+            display = _typed_element(sid, "Display & Brightness", "XCUIElementTypeButton") \
+                or _element(sid, "com.apple.settings.displayAndBrightness")
+            if display and _attr(sid, display, "visible") in (True, "true", "1", 1):
+                break
+            display = None
+            try:
+                _wda_post(f"/session/{sid}/wda/dragfromtoforduration",
+                          {"fromX": 200, "fromY": 700, "toX": 200, "toY": 300,
+                           "duration": 0.3})
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(1.0)
+        if not _tap_rect(sid, display):
+            return False, ""
+        time.sleep(1.5)
+        value = _read_auto_lock(sid)
+        if value.lower() == "never":
+            return True, value
+        if not _tap_rect(sid, _element(sid, AUTOLOCK_ROW, timeout=4.0)):
+            return False, value
+        time.sleep(1.5)
+        never = _typed_element(sid, "Never", "XCUIElementTypeCell", timeout=4.0) \
+            or _typed_element(sid, "Never", "XCUIElementTypeButton", timeout=1.0)
+        if never and _attr(sid, never, "enabled") in (False, "false", "0", 0):
+            return False, value
+        _tap_rect(sid, never)
+        time.sleep(1.0)
+        # back to Display & Brightness (the nav bar's back button carries its name)
+        _tap_rect(sid, _typed_element(sid, "Display & Brightness", "XCUIElementTypeButton",
+                                      timeout=4.0))
+        time.sleep(1.5)
+        value = _read_auto_lock(sid) or value
+        return value.lower() == "never", value
+    finally:
+        # Settings opens at its root for the radio switches that follow.
+        try:
+            _wda_post(f"/session/{sid}/wda/apps/terminate", {"bundleId": SETTINGS_BUNDLE})
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# Do Not Disturb has no switch in Settings (Focus → Do Not Disturb only sets
+# it up); it is turned on from Control Center's Focus tile. Element lookups
+# reach SpringBoard (status bar, Control Center) from any session, in under
+# a second; /source of Control Center takes 20 s, so it is not used.
+DND_MOON = "moon.fill"                  # status bar: "do not disturb"
+FOCUS_TILE = "focus-module"             # selected while a Focus is on; value names the last one
+DND_MODE = "mode-Do Not Disturb"        # the Focus list's row, Selected while on
+
+
+def _springboard_session() -> str:
+    return cached_session() or launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
+
+
+def dnd_on(wait: float = 2.0) -> bool:
+    """True when Do Not Disturb is on: its moon in the home screen's status bar.
+    The moon shows a few seconds after Focus turns on: pass a longer *wait* then."""
+    for sid in (_springboard_session(), None):
+        # A session whose app was closed can miss what is on screen, never
+        # invent it: a miss is checked again through a fresh session.
+        sid = sid or launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
+        try:
+            requests.post(f"{config.WDA_URL}/wda/homescreen", json={}, timeout=15)
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(1.5)
+        if _element(sid, DND_MOON, timeout=wait) is not None:
+            return True
+    return False
+
+
+def dnd_turn_on() -> bool:
+    """Turn Do Not Disturb on from Control Center → Focus. True when it is on."""
+    if dnd_on():
+        return True
+    sid = launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
+
+    def drag(fy: int, ty: int, fx: int = 215) -> None:
+        _wda_post(f"/session/{sid}/wda/dragfromtoforduration",
+                  {"fromX": fx, "fromY": fy, "toX": fx, "toY": ty, "duration": 0.25})
+
+    def on_screen(el) -> bool:
+        rect = _attr(sid, el, "rect") if el else None
+        return bool(rect) and 60 < rect["y"] < 880
+
+    try:
+        # From the home screen: pulled over Settings, the first try often opens nothing.
+        _wda_post("/wda/homescreen", {})
+        time.sleep(1.5)
+        drag(3, 250, fx=400)   # Control Center comes down from the top-right corner
+        time.sleep(1.2)
+        # It opens on the page it last showed. The Focus tile is on the first
+        # page: jump straight to it, and page back only if the jump does nothing.
+        tile = _element(sid, FOCUS_TILE, timeout=3.0)
+        if tile and not on_screen(tile):
+            try:
+                _wda_post(f"/session/{sid}/wda/element/{tile}/scroll", {"toVisible": True})
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(1.0)
+        for _ in range(3):
+            if on_screen(tile):
+                break
+            drag(250, 850)
+            time.sleep(1.5)
+            tile = _element(sid, FOCUS_TILE, timeout=2.0)
+        if not on_screen(tile):
+            tile = None
+        if tile is None:
+            return False
+        if not (_attr(sid, tile, "selected") and _attr(sid, tile, "value") == "Do Not Disturb"):
+            _tap_rect(sid, tile)
+            time.sleep(1.5)
+            mode = _element(sid, DND_MODE, timeout=4.0)
+            if mode is None:
+                return False
+            if not _attr(sid, mode, "selected"):
+                _tap_rect(sid, mode)
+                time.sleep(1.5)
+        # before Settings closes: lookups through a closed app's session find nothing
+        return dnd_on(wait=10.0)
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        try:
+            _wda_post(f"/session/{sid}/wda/apps/terminate", {"bundleId": SETTINGS_BUNDLE})
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def set_network(online: bool, wait: float = 75.0, restore: bool = True):

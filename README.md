@@ -14,7 +14,7 @@ FreeCell on this phone. Case IDs, titles and the run order live in
 
 ## Current status
 
-124 cases in 25 tests: 80 run on any build, 43 need the dev build (QA,
+126 cases in 26 tests: 82 run on any build, 43 need the dev build (QA,
 Synthetic Win, ads, Last Score), 1 skip (FL-06, TestFlight). `--prod` leaves
 the 43 out. DY-02 and DY-03 skip unless FreeCell was deleted and reinstalled
 without opening it.
@@ -37,6 +37,10 @@ Other things that used to fail a clean run:
   centre is felt above the button).
 - RS-03 compares Statistics below the header, where iOS notification
   banners drop in, and looks again after 6 s if the pages still differ.
+- The phone locking itself mid-run (Auto-Lock) made every launch after it
+  answer 500, so every later test failed. The run now sets Auto-Lock to
+  Never in Settings before it starts, and a launch on a locked phone wakes
+  it, or prints "Manual effort required" and waits for a hand unlock.
 - An alert FreeCell did not raise (an Apple account notice) is never
   answered. The run prints "Manual effort required" and waits for you.
 - Victory scores are read by digit shape (`assets/victory_digit_0.png` …
@@ -87,6 +91,7 @@ Statistics after the promo strip, which needs a win.
 
 | When | Tests |
 | --- | --- |
+| First, before FreeCell opens | Device setup: Auto-Lock Never (DS-01), Do Not Disturb on (DS-02) — each is set if found wrong |
 | Online, then offline | First launch (policy links only when the Terms card is up), menu, Options, Help, More Games, About |
 | Offline | QA unlock, Play, abandon, relaunch, GamePlay, Victory, difficulty levels, Daily |
 | Online from the promo strip | More Games icons, Statistics, Contact Us online, then the standalone tests |

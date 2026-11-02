@@ -23,6 +23,10 @@ pile (OP-15, OP-16), all switched from the table's Options next to Rich
 Features, run in verifyGamePlay. Each sits in its section after the cases
 with its prefix and lower IDs.
 
+verifyDeviceSetup (DS-01, DS-02) runs first, before FreeCell opens: Auto-Lock
+Never and Do Not Disturb on, so the phone neither locks itself nor drops
+banners over the run. It does not count as the first test for the network.
+
 Each test is one of:
   run  — a FreeCell port in tests/freecell_suite/<module>.py
   dev  — needs the dev build (QA code / Synthetic Win / QA page); skipped
@@ -49,6 +53,18 @@ FREECELL_ONLY = ("GP-08", "GP-09", "GP-12", "OP-10", "OP-11", "OP-12", "DY-01", 
 
 # Steps FreeCell's TestRail list has no case for.
 EXTRA_CASES = [
+    {"id": "DS-01", "title": "Device Setup - Auto-Lock is set to Never",
+     "section": "FreeCell Solitaire Obj-C > Device Setup", "type": "Functional",
+     "priority": "High",
+     "steps": [("Open Settings → Display & Brightness and read Auto-Lock.",
+                "Auto-Lock is Never (if not, set it to Never), so the phone cannot "
+                "lock itself during the run.")]},
+    {"id": "DS-02", "title": "Device Setup - Do Not Disturb is on",
+     "section": "FreeCell Solitaire Obj-C > Device Setup", "type": "Functional",
+     "priority": "High",
+     "steps": [("Look at the status bar on the home screen.",
+                "Do Not Disturb's moon shows (if not, turn it on from Control Center → "
+                "Focus), so no notification banner covers a screen under test.")]},
     {"id": "GP-25", "title": "Gameplay - Score counts when a card goes up to its foundation",
      "section": "FreeCell Solitaire Obj-C > Gameplay", "type": "Functional",
      "priority": "Medium",
@@ -116,6 +132,7 @@ DAILY_DEV = "needs the dev build (Daily games are won with Synthetic Win)"
 
 # (test, FreeCell module or None, kind, case ids, skip reason)
 RUN_ORDER = [
+    ("verifyDeviceSetup", "verifyDeviceSetup", "run", ["DS-01", "DS-02"], ""),
     ("installFromTestFlight", None, "skip", ["FL-06"],
      "the dev build was installed by hand, not from TestFlight"),
     ("verifyFirstLaunch", "verifyFirstLaunch", "run",
@@ -179,6 +196,10 @@ STANDALONE = (
     "verifyChooseLook", "verifyAds", "triggerAdPoints", "visitLastScore",
     "verifyAdFreeVersion", "submitFeedback",
 )
+
+# Runs first and sets the phone up (Auto-Lock, Do Not Disturb); it opens no
+# FreeCell screen, so the network is set for the test after it.
+DEVICE_SETUP = "verifyDeviceSetup"
 
 # The promo-strip test brings the phone online; Statistics, Contact Us online
 # and the online standalone tests run after that transition, so the runner

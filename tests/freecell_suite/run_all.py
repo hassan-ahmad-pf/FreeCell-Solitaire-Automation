@@ -161,13 +161,32 @@ def _plan(picked: list[str], dev: bool, offline: bool, everything: bool = False)
     return out
 
 
+def _keep_awake() -> None:
+    """A phone that locks itself mid-run refuses every launch after it.
+    Unlock it if it is locked now, and set Auto-Lock to Never."""
+    print("\nauto-lock: checking the phone cannot lock itself during the run", flush=True)
+    if not helpers.wait_unlocked():
+        print("WARNING: the phone is still locked", flush=True)
+        return
+    try:
+        ok, seen = helpers.auto_lock_never()
+    except Exception as exc:  # noqa: BLE001
+        ok, seen = False, f"could not read it ({exc})"
+    if ok:
+        print("auto-lock: Never", flush=True)
+    else:
+        print(f"WARNING: Auto-Lock is {seen or 'unknown'}, not Never (Low Power Mode holds it "
+              "at 30 s) — if the phone locks, the run waits for you to unlock it", flush=True)
+
+
 def _network_first(plan: list[tuple], offline: bool) -> None:
     """Set the radios in Settings before FreeCell first opens, so every run
     starts the same way: Settings, then the game, never the game sent to the
     background for Settings. verifyFirstLaunch starts online (a fresh
     install's Terms card loads its policy pages); so do the tests from
     ONLINE_FROM on. The rest start offline."""
-    first = next((name for name, _m, runs, _ids, _w in plan if runs), None)
+    first = next((name for name, _m, runs, _ids, _w in plan
+                  if runs and name != catalog.DEVICE_SETUP), None)
     if first is None:
         return
     order = [name for name, *_rest in catalog.RUN_ORDER]
@@ -508,6 +527,8 @@ def main() -> int:
     stopped = False
     try:
         try:
+            if not any(name == catalog.DEVICE_SETUP and runs for name, _m, runs, *_r in plan):
+                _keep_awake()
             _network_first(plan, offline)
             for i, (name, module, runs, ids, reason) in enumerate(plan, 1):
                 if name == catalog.ONLINE_FROM and not offline:
