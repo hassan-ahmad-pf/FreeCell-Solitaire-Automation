@@ -1,167 +1,194 @@
 # FreeCell Solitaire Automation
 
-Standalone Objective-C UI automation for FingerArts FreeCell:
+Functional regression for FingerArts FreeCell on a real iPhone:
 
 - bundle ID: `com.fingerarts.FreeCell`
-- QA code: `943010`
-- target: a real USB-connected iPhone through WebDriverAgent and Airtest
+- QA code: `943010` (About → version line → 10 emblem taps → code)
+- phone: iPhone 15 Pro Max, UDID `00008130-00010D283A31001C`, iOS 27.2
+- last full run: dev build 7.42.1 (266)
+- driver: WebDriverAgent over USB (`scripts/wda.sh`), taps and shots over HTTP
 
-All code uses FreeCell captures and FreeCell-specific assertions.
+The live suite is `tests/freecell_suite/`. Every crop and assertion is from
+FreeCell on this phone. Case IDs, titles and the run order live in
+`tests/freecell_suite/catalog.py`.
 
 ## Current status
 
-The signed WDA for this phone lives in [`wda/`](wda/README.md). `scripts/wda.sh`
-finds it automatically — do not point `WDA_PRODUCTS` at `/tmp`. Its profile
-comes from a free Apple ID and lasts 7 days, so `wda.sh` re-signs WDA into
-`log/wda-build` by itself when under a day is left (Xcode must be signed in
-to that Apple ID); `./scripts/wda.sh renew` forces it.
+124 cases in 25 tests: 80 run on any build, 43 need the dev build (QA,
+Synthetic Win, ads, Last Score), 1 skip (FL-06, TestFlight). `--prod` leaves
+the 43 out. DY-02 and DY-03 skip unless FreeCell was deleted and reinstalled
+without opening it.
+
+A full `--all` run on this phone is about 95 minutes (GamePlay ~18 min, the
+ad trigger points ~29 min). `--main` is about 40 minutes: it leaves out the
+six standalone tests (Choose Look, Ad-free, Feedback, Ads, Ad trigger
+points, Last Score).
+
+WDA no longer waits for FreeCell to go idle after a tap or swipe. FreeCell
+sometimes never reports idle (one swipe in nine on Options), and XCTest
+then holds the reply 15–30 s. A FreeCell session turns those waits off and
+pauses 1 s after a tap / 2 s after a swipe instead. Settings keeps WDA's
+own waits, so the radio switches still settle. Gestures time out at 60 s
+and a call over 10 s is logged.
+
+Other things that used to fail a clean run:
+
+- More Games is tapped on its label, not the centre of its crop (that
+  centre is felt above the button).
+- RS-03 compares Statistics below the header, where iOS notification
+  banners drop in, and looks again after 6 s if the pages still differ.
+- An alert FreeCell did not raise (an Apple account notice) is never
+  answered. The run prints "Manual effort required" and waits for you.
+- Victory scores are read by digit shape (`assets/victory_digit_0.png` …
+  `9.png`). Vision reads this font's 2 as 3.
+- A Statistics best score must agree with those shapes; if it does not,
+  more reads of the line vote (Vision has dropped trailing digits).
 
 ## One command (live console)
 
-With the phone plugged in, unlocked and online, paste into Terminal:
+Phone plugged in, unlocked and online:
 
 ```bash
 cd /Users/hassan/Automation-FA/FreeCell-Solitaire-Automation && ./scripts/regression.sh
 ```
 
-`scripts/regression.sh` starts WDA (re-signing it if due), keeps the Mac
-awake and runs the FreeCell suite on the dev build, standalone tests
-included (about 80 minutes). The console shows the plan with each test's
-time on the last run; for each test, the list of its cases in the order they
-run; then every case as it starts (`▶ 2/3 PL-02 …`), the numbered steps it
-performs (taps, checks, waits, screenshots) and its PASS / FAIL / SKIP with
-its time and note; and a status bar with the elapsed time, the current case,
-the case up next, pass and fail counts and the time left. It ends with a RESULT line,
-opens the HTML report and keeps a plain log in `log/regression_<time>.log`.
+`scripts/regression.sh` starts WDA (re-signing it if the 7-day profile is
+due), keeps the Mac awake, and runs `tests/freecell_suite/run_all.py --dev
+--all` through `scripts/present_regression.py`. The console lists each
+test's cases, then every case as it starts, the steps it takes, and PASS /
+FAIL / SKIP with its time. It writes `log/regression_<time>.log` and opens
+`log/freecell_suite_report.html`.
 
-If any case fails, the runner writes the report, runs each failed test once
-more (with the network as the first run had it) and writes the report again.
-A failed case that passes on the rerun is a plain pass in the report; its
-first failure stays only in `log/freecell_suite_results.json`
-(`first_failure`) and the console log. One that fails again, or cannot
-rerun (a fresh-install case), keeps its failure. A case that passed the
-first time keeps that pass. This is the runner's default, so
-`tests/freecell_suite/run_all.py` does it too.
+Failed tests run once more by default, with the network as on the first
+run. A case that passes there is a plain pass in the report; its first
+failure stays in `log/freecell_suite_results.json` (`first_failure`).
+`--no-rerun` turns that off.
 
 | Option | Runs |
 | --- | --- |
-| `--main` | main suite only, no standalone tests (about 35 minutes) |
+| `--main` | main suite only, no standalone tests (about 40 minutes) |
 | `verifyGamePlay verifyDaily` | only the named tests |
-| `--prod` | the App Store build (leaves out the dev-build cases) |
+| `--prod` | the App Store build (leaves out the 43 dev-build cases) |
 | `--no-open` | does not open the report at the end |
 | `--no-rerun` | does not rerun failed tests |
+| `stop` / `stop --now` | stop a run in another window; `--now` leaves the network as it is |
 
-Ctrl-C stops the run; the runner still turns the network back on. The
-first-launch and Daily tips cases need FreeCell deleted and reinstalled
-without opening it; on an install that has been opened they show SKIP.
+Ctrl-C stops the run; the runner still turns the network back on. From
+another terminal: `./scripts/regression.sh stop`. Agent-launched runs need
+`FORCE_COLOR=1` for the coloured console.
+
+## The suite
+
+Order is in `catalog.py`. Each screen is visited once where the data
+allows: first launch first (a fresh install's Terms card), the middle
+offline so no interstitial covers a deal, QA unlocked before the wins,
+More Games before QA (the Test Banner sits at the bottom of pages), and
+Statistics after the promo strip, which needs a win.
+
+| When | Tests |
+| --- | --- |
+| Online, then offline | First launch (policy links only when the Terms card is up), menu, Options, Help, More Games, About |
+| Offline | QA unlock, Play, abandon, relaunch, GamePlay, Victory, difficulty levels, Daily |
+| Online from the promo strip | More Games icons, Statistics, Contact Us online, then the standalone tests |
+
+verifyGamePlay holds the table cases: a legal move, the timer (GP-12) and
+score (GP-25), undo / hint / cells / foundations, Show Status Bar
+(OP-10), Show Card Messages (OP-11, OP-12), Rank Strip (GP-26, GP-08,
+GP-09), Auto Hint (OP-17, OP-18), and Maintain Card Spacing on a 13-card
+pile (OP-15, OP-16). Rank Strip and the Options next to Rich Features are
+switched from the table's menu → options on the same deal.
+
+verifyDaily (DY-01 … DY-16) opens the calendar, checks the tips and level
+list, plays today and a past date with Synthetic Win, reads the monthly
+score popup, and checks Daily statistics. DY-12 … DY-16 and DY-14 need the
+dev build.
+
+verifyStatistics opens Stats, declines then confirms the Daily reset
+(RS-06, RS-04, RS-05), then the Solo reset (RS-03, RS-01, RS-02). Those
+resets wipe the wins, so this test runs last among the ones that need
+them.
+
+A leftover table is never a lost app: tap Back and continue. Matching,
+shots, taps and swipes go through WDA HTTP.
+
+Without `--all` or a name, the six standalone tests stay out:
+`verifyChooseLook`, `verifyAdFreeVersion`, `submitFeedback`, `verifyAds`,
+`triggerAdPoints`, `visitLastScore`.
 
 ## Setup
 
 ```bash
 ./scripts/setup.sh
 export DEVICE_UDID=00008130-00010D283A31001C
-./scripts/wda.sh          # phone UNLOCKED and online; leave running
+./scripts/wda.sh          # phone UNLOCKED and online; it exits once WDA answers
+./.venv/bin/python tests/connect_check.py
 ```
 
-Then run the smoke test or the full regression:
+The runner itself:
 
 ```bash
-./.venv/bin/python tests/connect_check.py
-DEVICE_UDID=00008130-00010D283A31001C ./.venv/bin/python -u tests/run_all.py
+./.venv/bin/python -u tests/freecell_suite/run_all.py --dev --all
+./.venv/bin/python -u tests/freecell_suite/run_all.py --offline
+./.venv/bin/python -u tests/freecell_suite/run_all.py verifyPlay verifyGamePlay
 ```
 
-`tests/run_all.py` is the regression. It does not need you to say first vs
-subsequent launch: `verifyFirstLaunch` walks the policy links only when the
-T&C card is on screen, then the runner puts the phone in Airplane Mode and
-turns Wi-Fi off so interstitials cannot interrupt the rest. Start WDA while
-the phone is still online; do not restart WDA after the suite goes offline.
-`SKIP_OFFLINE=1` leaves the network up.
+`SKIP_OFFLINE=1` leaves the network up (ads may interrupt).
 
-FreeCell is never on screen while the network is up, because an ad it
-loads then shows later in the offline run. Going online closes FreeCell
-first (Home, then kill) and leaves it closed; going offline kills it once
-the radios are off unless they were already known to be off. The runner
-goes offline before the first case and online only at the end, after
-closing FreeCell. `verifyFirstLaunch` goes online itself only when a
-fresh install's Terms card is up (its policy links load web pages).
+FreeCell is never on screen while the network is up: an ad it loads then
+shows later in the offline run. Going online closes FreeCell first (Home,
+then kill). Do not restart WDA after the suite goes offline. The run ends
+online, FreeCell already closed.
 
-`verifyRichFeaturesOn` and `verifyRichFeaturesOff` follow GamePlay. ON goes
-main menu → Options, scrolls to Rich Features, turns it on only if it is
-off, then plays Easy and requires the timer, score, multiplier and the move
-counter beside "menu". OFF deals Easy, keeps that frame as the ON reference,
-turns Rich Features off through the table's menu → options, and requires
-all four gone on the same deal, then turns it back ON the same way and
-requires all four back (`log/RichFeaturesCompare.png`). Both switch cases
-read the switch state on Options at every step, and table frames are taken
-once the deal animation that replays after Options has stopped.
+A Mail account on the phone is needed for the Feedback cases.
 
-`verifyRankStrip` follows the same steps for Rank Strip: it reads the switch
-on the main menu's Options, turns it on only if it is off, and plays Easy.
-Then every run checks both directions on the same deal through the table's
-menu → options: reads ON → tap → reads OFF → the A…K strip is gone, then
-reads OFF → tap → reads ON → the strip is back. Each switch state is
-captured on Options (`log/RankStripOption*.png`) and the three tables sit
-side by side in `log/RankStripCompare.png`. Table frames are taken once the
-deal animation that replays after Options has stopped. The red "Test
-Banner" debug button sits over the switch column near the bottom of
-Options, so a row is nudged up the page before its switch is tapped.
+## WDA
 
-`verifySoloStats` runs after Relaunch and `verify_qa_victory` is last. Solo
-shows only the best score, so any earlier win would outrank the one Solo
-Stats checks; it always resets Solo first and requires none/0 (both empty
-crops at >= 0.95 on their own rows — anywhere else they match populated
-pages too), wins Easy, requires the
-victory **current** score to be Solo's best score (the victory "best"
-column is this week's ranking, which Reset Solo does not clear), then
-resets Solo and requires none/0.
+The signed runner for this phone is in [`wda/`](wda/README.md).
+`scripts/wda.sh` finds it — do not point `WDA_PRODUCTS` at `/tmp`. Its
+profile comes from a free Apple ID and lasts 7 days. `wda.sh` re-signs
+into `log/wda-build` when under a day is left; `./scripts/wda.sh renew`
+forces it. Xcode must be signed in to that Apple ID.
 
-`verifyRelaunch` is in that suite (after Rank Strip, before Solo Stats). It Homes,
-kills the FreeCell process, launches again, and passes when the gameplay
-screen is back. The runner then taps Back so later cases start from the
-menu.
+After a re-sign, iOS may refuse the runner until it is trusted again:
+Settings → General → VPN & Device Management → the Apple Development
+entry → Verify App / Trust, with the phone online.
+
+```bash
+./scripts/wda.sh stop     # only when asked; a finished run leaves WDA up
+```
 
 ## Capture-first workflow
 
-Every FreeCell asset is cropped from the FreeCell build. Capture the fresh
-install and every screen on the target device:
+Every FreeCell asset is cropped from this phone (`1290×2796`). Capture,
+then crop only names listed in `scripts/crop_suite_assets.py` (existing
+assets are never overwritten):
 
 ```bash
 ./.venv/bin/python tests/capture_walkthrough.py
+./.venv/bin/python scripts/crop_suite_assets.py
+./.venv/bin/python tests/verify_assets.py
 ```
-
-Crop the resulting screenshots into `assets/` using semantic names, then run
-the screen and QA tests. The QA gesture and code are already configured, but
-the exact FreeCell control locations and victory layout must be verified from
-the device.
 
 ## Obj-C baselines
 
-`baselines/` holds 43 screenshots of the Obj-C build, FreeCell 7.42.5 (279),
-on the iPhone 15 Pro Max in portrait, plus a learned motion mask
-(`<Name>.volatile.png`) for each animated screen. The Unity port is compared
-against them. **Never re-baseline them to a Unity build** — a large diff is
-the finding. `baselines/MANIFEST.md` lists how each screen is reached, the
-app state it shows and what it masks.
+`baselines/` holds 43 screenshots of the Obj-C build, FreeCell 7.42.5
+(279), on this iPhone in portrait, plus a learned motion mask
+(`<Name>.volatile.png`) for each animated screen. The Unity port is
+compared against them. **Never re-baseline them to a Unity build** — a
+large diff is the finding. `baselines/MANIFEST.md` lists how each screen
+is reached.
 
-They only need re-shooting if the Obj-C reference itself is lost. Each pass
-needs a fresh install, because phase A reads the untouched state:
+They only need re-shooting if the Obj-C reference itself is lost. Each
+pass needs a fresh install, because phase A reads the untouched state:
 
 ```bash
 DEVICE_UDID=00008130-00010D283A31001C ./.venv/bin/python -u tests/capture_baselines.py --out log/objc_pass2
 ./.venv/bin/python scripts/update_baselines.py --src log/objc_pass2 --also log/objc_baselines --replace
-./.venv/bin/python tests/compare_unity.py --dir log/objc_baselines   # an independent pass
+./.venv/bin/python tests/compare_unity.py --dir log/objc_baselines
 ```
 
-The promoted set came from the second pass. The first and a third pass
-compare clean against it, except four screens whose app state differed:
-promo icons on the picker after a win (`PlayPickerResume`, `AbandonPrompt`),
-the Daily calendar caught mid-hop, and Victory's back / menu drawn white
-instead of dim.
-
 To compare a Unity build, capture the same screen names into
-`log/unity/<build>/` (`<Name>.png`, or `<Name>_1..3.png`). The capture walk
-needs its own navigation: `capture_baselines.py` finds its way by Obj-C
-templates. Then:
+`log/unity/<build>/`, then:
 
 ```bash
 ./.venv/bin/python tests/compare_unity.py --dir log/unity/<build>
@@ -170,9 +197,15 @@ templates. Then:
 
 A pixel counts as changed when any colour channel moves more than 32. A
 screen fails when the changed share passes its `max_diff`, or one changed
-blob passes 2500 px². Measured on these captures, a recoloured or missing
-label fails, and so does a label moved 3 px. A 2 px move, or a line of small
-body text moved up to 4 px, is boxed in `log/diff/<build>/diff_<Name>.png`
-but can pass, because Obj-C's own small animations (the Victory thumbs-up,
-the Last Score arrows, the picker spades) leave blobs of that size. Read the
-diff images, not just the table.
+blob passes 2500 px². Read the diff images in `log/diff/<build>/`, not
+just the table.
+
+## Other docs
+
+| File | What it is |
+| --- | --- |
+| [`docs/OBSERVED_FREECELL.md`](docs/OBSERVED_FREECELL.md) | Screens and behaviour seen on the phone |
+| [`docs/testrail/README.md`](docs/testrail/README.md) | TestRail export (titles and steps) |
+| [`docs/CAPTURE_MANIFEST.md`](docs/CAPTURE_MANIFEST.md) | Capture list for new crops |
+| [`wda/README.md`](wda/README.md) | Signed WDA, renew, trust |
+| [`baselines/MANIFEST.md`](baselines/MANIFEST.md) | How each Obj-C baseline screen is reached |
