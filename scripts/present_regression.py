@@ -40,9 +40,36 @@ REPORT = ROOT / "scripts" / "gen_suite_report.py"
 TTY = sys.stdout.isatty()
 COLOR = TTY or os.environ.get("FORCE_COLOR", "") not in ("", "0")
 
-GREEN, RED, YELLOW, CYAN, DIM, BOLD, BAR = "1;32", "1;31", "1;33", "1;36", "2", "1", "7"
-MARKS = {"PASS": ("✓ PASS ", GREEN), "FAIL": ("✗ FAIL ", RED), "SKIP": ("– SKIP ", YELLOW),
-         "BLOCKED": ("! BLOCK", YELLOW), "ONLINE": ("~ KEPT ", DIM)}
+# One calm palette: a steel-blue accent for structure, soft green / red / amber
+# for verdicts only, greys for everything the eye can skip. 256-colour codes
+# where the terminal has them (Terminal.app, iTerm), plain ANSI otherwise.
+RICH = COLOR and ("256" in os.environ.get("TERM", "") or bool(os.environ.get("COLORTERM")))
+
+
+def _c(code256: str, basic: str) -> str:
+    return code256 if RICH else basic
+
+
+ACCENT = _c("38;5;74", "36")          # headings, rules, the running case
+GREEN = _c("38;5;78", "32")
+RED = _c("38;5;203", "31")
+YELLOW = _c("38;5;179", "33")
+CYAN = ACCENT
+TEXT = _c("38;5;253", "0")            # case titles
+MUTED = _c("38;5;246", "2")           # step text, times
+DIM = _c("38;5;242", "2")             # runner notes, details
+BOLD = "1"
+RULE = _c("38;5;238", "2")            # hairlines
+BAR = _c("38;5;252;48;5;236", "7")    # status bar
+BADGE = {                             # verdict chips
+    "PASS": _c("1;38;5;232;48;5;78", "1;30;42"),
+    "FAIL": _c("1;38;5;231;48;5;167", "1;37;41"),
+    "SKIP": _c("1;38;5;232;48;5;179", "1;30;43"),
+    "BLOCKED": _c("1;38;5;232;48;5;179", "1;30;43"),
+    "ONLINE": _c("1;38;5;252;48;5;240", "7"),
+}
+MARKS = {"PASS": ("✓", "PASS", GREEN), "FAIL": ("✗", "FAIL", RED), "SKIP": ("–", "SKIP", YELLOW),
+         "BLOCKED": ("!", "BLOCK", YELLOW), "ONLINE": ("~", "KEPT", DIM)}
 
 PLAN = re.compile(r"^\s+(\d+)/(\d+)\s+(\S+)\s*(?:SKIP — (.*))?$")
 CASES = re.compile(r"^cases:\s+(.*?) — (\d+) run")
@@ -65,6 +92,28 @@ DEV_SKIP = "needs the dev build"
 
 def paint(code: str, text: str) -> str:
     return f"\033[{code}m{text}\033[0m" if COLOR else text
+
+
+def badge(mark: str) -> str:
+    """A verdict as a coloured chip: ' PASS ' on green, ' FAIL ' on red."""
+    symbol, word, _code = MARKS[mark]
+    return paint(BADGE[mark], f" {word:<5}") if COLOR else f"{symbol} {word:<5}"
+
+
+def rule(char: str = "─", code: str = RULE, size: int = 0) -> str:
+    return paint(code, char * (size or min(width() - 1, 86)))
+
+
+def banner(con: "Console", lines: list[tuple[str, str]], code: str = ACCENT) -> None:
+    """A boxed block: [(text, colour)] inside a rounded frame."""
+    inner = min(width() - 3, 84)
+    con.emit(paint(code, "╭" + "─" * inner + "╮"))
+    for text, colour in lines:
+        for cut in textwrap.wrap(text, inner - 2, drop_whitespace=False,
+                                 break_on_hyphens=False) or [""]:
+            con.emit(paint(code, "│") + " " + paint(colour, cut) + " " * (inner - 1 - len(cut))
+                     + paint(code, "│"))
+    con.emit(paint(code, "╰" + "─" * inner + "╯"))
 
 
 def clock(seconds: float) -> str:
@@ -156,14 +205,22 @@ class Console:
             parts.append(f"next {upcoming}")
         if self.total:
             parts.append(f"{self.done}/{self.total} cases")
-        parts.append(f"{self.passed} passed")
-        parts.append(f"{self.failed} failed")
+        counts = [(f"✓ {self.passed} passed", GREEN),
+                  (f"✗ {self.failed} failed", RED if self.failed else "")]
         left = self.left()
-        if left is not None:
-            parts.append(f"~{clock(left)} left")
-        line = " " + "  ·  ".join(parts) + " "
-        sys.stdout.write("\r\033[K" + paint(BAR + (";31" if self.failed else ""),
-                                            line[:width() - 1]))
+        tail = [f"~{clock(left)} left"] if left is not None else []
+        plain = " " + "  ·  ".join(parts + [t for t, _c in counts] + tail) + " "
+        if not COLOR or len(plain) > width() - 1:
+            sys.stdout.write("\r\033[K" + paint(BAR, plain[:width() - 1]))
+        else:
+            # the counts keep the bar's background and only change their ink
+            sep = paint(BAR, "  ·  ")
+            pieces = [paint(BAR, p) for p in parts]
+            pieces += [paint(f"{BAR};1;{code}" if code else BAR, t) for t, code in counts]
+            pieces += [paint(BAR, t) for t in tail]
+            fill = paint(BAR, " " * (width() - 1 - len(plain)))
+            sys.stdout.write("\r\033[K" + paint(BAR, " ") + sep.join(pieces)
+                             + paint(BAR, " ") + fill)
         self.bar = True
 
     def next_case(self) -> str:
@@ -188,6 +245,14 @@ class Console:
     def close(self) -> None:
         self.pause()
         self.closed = True
+
+
+class Printer:
+    """banner() target once the live console has closed."""
+
+    @staticmethod
+    def emit(text: str = "") -> None:
+        print(text)
 
 
 def last_durations() -> dict[str, float]:
@@ -238,8 +303,9 @@ def handle(con: Console, raw: str) -> None:
         con.case, con.case_t0, con.steps = cid, time.time(), 0
         con.case_pos = (f"{con.listed.index(cid) + 1}/{len(con.listed)}"
                         if cid in con.listed else "")
-        where = f"{con.case_pos:>5}  " if con.case_pos else ""
-        con.emit(paint(BOLD, f"   ▶ {where}{cid:6} {m.group(2)}"))
+        where = paint(MUTED, f"{con.case_pos:>5}  ") if con.case_pos else ""
+        con.emit("   " + paint(ACCENT, "▶ ") + where + paint(f"{BOLD};{ACCENT}", f"{cid:6} ")
+                 + paint(f"{BOLD};{TEXT}", m.group(2)))
         return
 
     m = CASE_END.match(line)
@@ -262,7 +328,10 @@ def handle(con: Console, raw: str) -> None:
             if not con.rerun:
                 con.took[name] = spent
             code = GREEN if verdict == "PASS" else RED
-            con.emit(paint(code, f"   ═ {name} {verdict} in {took(spent)}"))
+            word = "passed" if verdict == "PASS" else "failed"
+            con.emit(paint(RULE, "   └─ ") + paint(TEXT, name) + "  "
+                     + paint(f"{BOLD};{code}", f"{MARKS[verdict][0]} {word}")
+                     + paint(MUTED, f" in {took(spent)}"))
         return
 
     if not con.test:
@@ -276,18 +345,22 @@ def handle(con: Console, raw: str) -> None:
         heading = ("SUMMARY SO FAR (stopped midway)" if con.stopping
                    else "FINAL SUMMARY (after the rerun)" if con.rerun else "SUMMARY")
         con.emit("")
-        con.emit(paint(CYAN, "━" * min(width() - 1, 78)))
-        con.emit(paint(CYAN, f"  {heading}"))
-        con.emit(paint(CYAN, "━" * min(width() - 1, 78)))
+        banner(con, [(heading, f"{BOLD};{TEXT}")])
         return
 
     if ERROR.match(line):
         con.emit(paint(RED, "      " + line))
     elif line.startswith("PASS: "):
-        con.wrap(line[6:], 6, DIM)
+        con.wrap(line[6:], 6, MUTED)
     elif line.startswith("FAIL: "):
         con.wrap("test failed: " + line[6:], 6, RED)
-    elif line.startswith("WARNING") or line.strip().startswith("note:"):
+    elif line.strip().startswith("note:"):
+        # bookkeeping (a rerun keeping a first-run pass): quiet, the word only in amber
+        first, *rest = textwrap.wrap(line.strip()[5:].strip(), max(width() - 13, 40)) or [""]
+        con.emit(paint(YELLOW, "      note  ") + paint(DIM, first))
+        for more in rest:
+            con.emit(paint(DIM, " " * 12 + more))
+    elif line.startswith("WARNING"):
         con.wrap(line.strip(), 6, YELLOW)
     elif line.strip():
         con.wrap("· " + line.strip(), 6, DIM)
@@ -299,9 +372,7 @@ def rerun_start(con: Console, what: str) -> None:
     con.plan, con.finished, con.estimate = [], set(), dict(con.took)
     con.pause(False)
     con.emit("")
-    con.emit(paint(YELLOW, "━" * min(width() - 1, 78)))
-    con.emit(paint(YELLOW, "  RERUN OF FAILED TESTS — " + what))
-    con.emit(paint(YELLOW, "━" * min(width() - 1, 78)))
+    banner(con, [("↻  RERUN OF FAILED TESTS", f"{BOLD};{YELLOW}"), (what, MUTED)], YELLOW)
 
 
 def rerun_case(con: Console, verdict: str, cid: str, title: str, detail: str) -> None:
@@ -311,10 +382,12 @@ def rerun_case(con: Console, verdict: str, cid: str, title: str, detail: str) ->
         if cid in con.failures:
             con.failures.remove(cid)
         con.rescued.append(cid)
-        con.emit(paint(GREEN, f"   ↻ PASS ON RERUN  {cid:6} {title}"))
+        con.emit("   " + badge("PASS") + paint(f"{BOLD};{GREEN}", " ↻ on rerun  ")
+                 + paint(f"{BOLD};{TEXT}", f"{cid:6} ") + paint(TEXT, title))
         con.wrap(detail, 13, DIM)
     else:
-        con.emit(paint(RED, f"   ↻ STILL FAILING  {cid:6} {title}"))
+        con.emit("   " + badge("FAIL") + paint(f"{BOLD};{RED}", " ↻ again     ")
+                 + paint(f"{BOLD};{TEXT}", f"{cid:6} ") + paint(TEXT, title))
         con.wrap(detail, 13, RED)
 
 
@@ -325,23 +398,27 @@ def header_line(con: Console, line: str) -> None:
         con.plan.append(name)
         est = con.estimate.get(name)
         when = f"~{took(est)}" if est and not reason else ""
-        text = f"   {int(m.group(1)):2}/{m.group(2)}  {name:26} {when:>9}"
-        con.emit(paint(YELLOW, text + "  skipped: " + reason) if reason else text)
+        place = paint(DIM, f"   {int(m.group(1)):2}/{m.group(2)}  ")
+        if reason:
+            con.emit(place + paint(YELLOW, f"{name:26} ") + paint(DIM, f"skipped — {reason}"))
+        else:
+            con.emit(place + paint(TEXT, f"{name:26} ") + paint(MUTED, f"{when:>9}"))
         return
     m = CASES.match(line)
     if m:
         con.total = int(m.group(2))
-        con.emit(paint(BOLD, f"   scope    {m.group(1)}"))
-        con.emit(paint(BOLD, f"   cases    {line.split(' — ', 1)[1]}"))
+        con.emit(paint(MUTED, f"   {'scope':9}") + paint(TEXT, m.group(1)))
+        con.emit(paint(MUTED, f"   {'cases':9}") + paint(TEXT, line.split(' — ', 1)[1]))
         con.emit("")
-        con.emit(paint(BOLD, "   tests in order (time on the last run):"))
+        con.emit(paint(f"{BOLD};{ACCENT}", "   Tests in order") + paint(MUTED, "  (time on the last run)"))
+        con.emit("   " + rule(size=min(width() - 4, 60)))
         return
     for key, label in (("device:", "device"), ("wda:", "driver"), ("build:", "build"),
                        ("network:", "network")):
         if line.startswith(key):
             if key == "network:" and "checking" in line:
                 con.emit("")
-            con.emit(paint(BOLD, f"   {label:8} {line[len(key):].strip()}"))
+            con.emit(paint(MUTED, f"   {label:9}") + paint(TEXT, line[len(key):].strip()))
             return
     if line.startswith("WARNING"):
         con.emit(paint(YELLOW, "   " + line))
@@ -355,20 +432,25 @@ def test_start(con: Console, i: int, n: int, kind: str, name: str, reason: str |
         if sum(known) >= 1:
             source = "the first run" if con.rerun else "the last run"
             con.emit("")
-            con.emit(paint(BOLD, f"   estimated time ~{clock(sum(known))} (from {source})"))
+            con.emit(paint(MUTED, f"   {'estimate':9}") + paint(f"{BOLD};{TEXT}", f"~{clock(sum(known))}")
+                     + paint(MUTED, f"  (from {source})"))
     con.test, con.test_at, con.test_t0 = name, (i, n), time.time()
     con.running, con.case, con.case_pos = kind != "SKIP", "", ""
     con.listed, con.ended = [], set()
     stamp = clock(time.time() - con.t0)
+    place = f"{i:02}/{n}"
     if kind == "SKIP":
         con.emit("")
-        con.emit(paint(YELLOW, f"── [{i:2}/{n}] {name} — skipped: {reason or ''}"))
+        con.emit(paint(YELLOW, "▌ ") + paint(DIM, f"{place}  ") + paint(YELLOW, name)
+                 + paint(DIM, f"  — skipped: {reason or ''}"))
         return
-    title = f"{'↻ rerun' if kind == 'RERUN' else '━━'} [{i:2}/{n}] {name} "
+    code = YELLOW if kind == "RERUN" else ACCENT
+    label = f"{place}  {'↻ ' if kind == 'RERUN' else ''}{name}"
+    fill = max(min(width() - 1, 86) - len(label) - len(stamp) - 5, 3)
     con.emit("")
-    con.emit(paint(YELLOW if kind == "RERUN" else CYAN,
-                   title + "━" * max(min(width(), 80) - len(title) - len(stamp) - 2, 3)
-                   + f" {stamp}"))
+    con.emit(paint(code, "▌ ") + paint(MUTED, f"{place}  ")
+             + paint(f"{BOLD};{code}", label[len(place) + 2:]) + " "
+             + paint(RULE, "─" * fill) + " " + paint(MUTED, stamp))
 
 
 def list_line(con: Console, pos: str, total: str, cid: str, title: str,
@@ -376,13 +458,14 @@ def list_line(con: Console, pos: str, total: str, cid: str, title: str,
     """The test's cases before it starts: numbered in the order they run,
     then the ones it leaves out."""
     if pos == "1":
-        con.emit(paint(BOLD, f"   {total} case{'' if total == '1' else 's'} "
-                             "in this test, in the order they run:"))
+        con.emit(paint(MUTED, f"   {total} case{'' if total == '1' else 's'}, "
+                              "in the order they run"))
     if pos != "-":
         con.listed.append(cid)
-        con.emit(f"     {pos:>2}. {cid:6} {title}")
+        con.emit(paint(DIM, f"     {pos:>2}  ") + paint(MUTED, f"{cid:6} ") + paint(TEXT, title))
     else:
-        con.emit(paint(YELLOW, f"      –  {cid:6} {title}") + paint(DIM, f"  (not run here: {why})"))
+        con.emit(paint(DIM, "      –  ") + paint(YELLOW, f"{cid:6} {title}")
+                 + paint(DIM, f"  (not run here: {why})"))
 
 
 def step_line(con: Console, text: str) -> None:
@@ -390,14 +473,14 @@ def step_line(con: Console, text: str) -> None:
     between cases (setup, cleanup) is not numbered."""
     if con.case:
         con.steps += 1
-        con.emit(paint(CYAN, f"         {con.steps:>2}. ") + text)
+        con.emit(paint(DIM, f"         {con.steps:>2}  ") + paint(MUTED, text))
     else:
-        con.emit(paint(CYAN, "          → ") + text)
+        con.emit(paint(DIM, "          ·  ") + paint(MUTED, text))
 
 
 def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
               detail: str | None) -> None:
-    label, code = MARKS[mark]
+    code = MARKS[mark][2]
     if con.rerun:
         pass  # a rerun is counted from the runner's [RERUN PASS] / [RERUN FAIL] lines
     elif mark == "PASS":
@@ -413,19 +496,22 @@ def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
     con.ended.add(cid)
     if cid == con.case:
         con.case, con.case_pos = "", ""
-    when = f"  ({took(float(secs))})" if secs else ""
-    con.emit(paint(code, f"   {label} {cid:6} {title}") + paint(BOLD, when))
+    when = f"  {took(float(secs))}" if secs else ""
+    ink = f"{BOLD};{RED}" if mark == "FAIL" else TEXT
+    con.emit("   " + badge(mark) + "  " + paint(f"{BOLD};{code}", f"{cid:6} ")
+             + paint(ink, title) + paint(MUTED, when))
     if detail:
-        con.wrap(detail, 13, RED if mark == "FAIL" else DIM)
+        con.wrap(detail, 14, RED if mark == "FAIL" else DIM)
 
 
 def summary_line(con: Console, line: str) -> None:
     m = SUMMARY_TEST.match(line)
     if m:
         verdict, name, secs, again = m.groups()
-        code = {"PASS": GREEN, "FAIL": RED}.get(verdict, YELLOW)
         spent = took(float(secs)) if secs else "not run"
-        text = paint(code, f"   {verdict}  {name:26} {spent:>9}")
+        chip = badge(verdict) if verdict in MARKS else paint(BADGE["SKIP"], f" {verdict:<5}")
+        ink = f"{BOLD};{RED}" if verdict == "FAIL" else TEXT if verdict == "PASS" else DIM
+        text = "   " + chip + "  " + paint(ink, f"{name:26}") + paint(MUTED, f" {spent:>9}")
         if again:
             text += paint(YELLOW, f"   + rerun {took(float(again))}")
         con.emit(text)
@@ -440,13 +526,21 @@ def summary_line(con: Console, line: str) -> None:
             con.emit(paint(DIM, f"   report written: {con.report}"))
         return
     if line.strip().startswith("passed on the rerun:"):
-        con.emit(paint(GREEN, line))
-    elif "failed cases:" in line or line.startswith("    ") and con.failures:
-        con.emit(paint(RED, line))
+        con.emit(paint(f"{BOLD};{GREEN}", line))
+    elif "failed cases:" in line:
+        con.emit(paint(f"{BOLD};{RED}", line))
+    elif line.startswith("    ") and con.failures:
+        # "    MG-01 title — why — rerun fail: why": the case on one line, why under it
+        head, _sep, why = line.strip().partition(" — ")
+        cid, _sp, title = head.partition(" ")
+        con.emit("    " + paint(f"{BOLD};{RED}", f"✗ {cid:6} ") + paint(TEXT, title))
+        if why:
+            con.wrap(why, 13, DIM)
     elif line.strip().startswith("cases:"):
-        con.emit(paint(BOLD, line))
+        con.emit("")
+        con.emit(paint(f"{BOLD};{TEXT}", line))
     elif line.strip():
-        con.emit(paint(DIM if "network" in line else BOLD, line))
+        con.emit(paint(DIM if "network" in line else MUTED, line))
 
 
 def show_report(con: Console) -> None:
@@ -483,11 +577,9 @@ def main() -> int:
     con = Console()
     con.open_report = open_report
     con.estimate = last_durations()
-    rule = "═" * min(width() - 1, 78)
-    con.emit(paint(CYAN, rule))
-    con.emit(paint(CYAN, "   FreeCell Solitaire — automated regression"))
-    con.emit(paint(CYAN, f"   started {datetime.now():%A %d %B %Y, %H:%M}"))
-    con.emit(paint(CYAN, rule))
+    banner(con, [("FreeCell Solitaire  ·  automated regression", f"{BOLD};{TEXT}"),
+                 (f"started {datetime.now():%A %d %B %Y, %H:%M}", MUTED)])
+    con.emit("")
 
     env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONWARNINGS="ignore")
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT), env.get("PYTHONPATH"))))
@@ -521,30 +613,43 @@ def main() -> int:
 
     total = time.time() - con.t0
     executed = con.passed + con.failed
-    print()
-    print(paint(CYAN, rule))
+    lines: list[tuple[str, str]] = []
     if stopped:
         code = 130
-        print(paint(YELLOW, f"   STOPPED after {clock(total)} — {con.passed} passed, "
-                            f"{con.failed} failed so far"))
+        frame = YELLOW
+        lines.append((f"STOPPED after {clock(total)}  ·  {con.passed} passed, "
+                      f"{con.failed} failed so far", f"{BOLD};{YELLOW}"))
     elif con.failed:
-        print(paint(RED, f"   RESULT  ✗ {con.failed} of {executed} cases failed "
-                         f"({', '.join(con.failures)}){' after a rerun' if con.rerun else ''}"
-                         f"  ·  {clock(total)}"))
+        frame = RED
+        lines.append((f"✗  RESULT  {con.failed} of {executed} cases failed"
+                      f"{' after a rerun' if con.rerun else ''}  ·  {clock(total)}",
+                      f"{BOLD};{RED}"))
+        lines.append((f"   {', '.join(con.failures)}", RED))
     elif executed:
-        print(paint(GREEN, f"   RESULT  ✓ all {executed} cases passed  ·  {clock(total)}"))
+        frame = GREEN
+        lines.append((f"✓  RESULT  all {executed} cases passed  ·  {clock(total)}",
+                      f"{BOLD};{GREEN}"))
     else:
-        print(paint(RED, f"   the runner stopped before any case ran (exit {code}) — "
-                         f"see {log_path}"))
+        frame = RED
+        lines.append((f"the runner stopped before any case ran (exit {code})", f"{BOLD};{RED}"))
     if con.rescued and not stopped:
-        print(paint(GREEN, f"           {len(con.rescued)} passed on the rerun after failing "
-                           f"the first time: {', '.join(con.rescued)}"))
+        lines.append((f"   {len(con.rescued)} passed on the rerun after failing the first "
+                      f"time: {', '.join(con.rescued)}", GREEN))
     if con.skipped:
-        print(paint(YELLOW, f"           {con.skipped} skipped on this install (not failures)"))
+        lines.append((f"   {con.skipped} skipped on this install (not failures)", YELLOW))
+    lines.append(("", MUTED))
+
+    def short(path: str | Path) -> str:
+        try:
+            return str(Path(path).resolve().relative_to(ROOT))
+        except ValueError:
+            return str(path)
+
     if con.report:
-        print(f"   report  {con.report}")
-    print(f"   log     {log_path}")
-    print(paint(CYAN, rule))
+        lines.append((f"report  {short(con.report)}", MUTED))
+    lines.append((f"log     {short(log_path)}", MUTED))
+    print()
+    banner(Printer(), lines, frame)
     show_report(con)
     return code
 
