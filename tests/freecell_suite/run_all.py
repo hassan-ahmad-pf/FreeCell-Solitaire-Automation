@@ -17,15 +17,16 @@ tests/freecell_suite/catalog.py says where every test stands:
   skip   cannot run on this install (FL-06: not installed from TestFlight)
 
 A bare run is the main suite; the standalone tests (Choose Look, Ad-free,
-Feedback, and the dev-only Ads, Ad trigger points, Last Score) run only when
+Feedback, and the dev-only Ads and Ad trigger points) run only when
 named or with --all, which slots each in where its screen and network fit.
-Every invocation merges into the same results, so the report covers both.
+Every invocation merges into the same results JSON; the HTML report is
+only the tests in this invocation.
 
 Network: the radios are set in Settings before FreeCell first opens;
 verifyFirstLaunch opens the policy links online, then goes offline for the
 middle of the suite; at the promo-strip step (skipped on prod) the phone
-comes back online for the reset tests and Contact Us online. The run ends
-online.
+comes back online for the reset tests and Contact Us online. The report is
+written first; then the phone is left online.
 
 Prereqs: FreeCell freshly installed from the App Store and NOT opened (the
 first test reads the first launch), phone online and unlocked, WDA up via
@@ -42,12 +43,15 @@ Run:  ./.venv/bin/python -u tests/freecell_suite/run_all.py                # mai
 For a live, coloured console (presentations): ./scripts/regression.sh
 
 Results: log/freecell_suite_results.json after every test, then
-scripts/gen_suite_report.py writes log/freecell_suite_report.html.
+scripts/gen_suite_report.py writes log/reports/<version>_<build>/
+FreeCell_<version>_<build>_<scope>_<time>.html. A named module's report
+holds only that module. log/freecell_suite_report.html is a link to the
+latest.
 
-When a test fails, the report is written, each failed test runs once more
-(the network set as on the first run), and the report is written again.
-A failed case that passes on the rerun is a plain pass in the report; the
-results JSON keeps its first failure (first_failure). --no-rerun turns
+When a case fails, the rest of that test and the suite keep going. After
+every test has finished — and before the report — only the failed cases
+are tried once more. A first-run pass is kept and not run again. The
+results JSON keeps the first failure (first_failure). --no-rerun turns
 this off.
 
 Stopped midway (Ctrl+C, or ./scripts/regression.sh stop), the runner writes
@@ -56,12 +60,15 @@ results, the rest read "not run". Then it puts the network back on.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
+import inspect
 import json
 import os
 import signal
 import subprocess
 import sys
+import textwrap
 import time
 from datetime import datetime
 
@@ -77,7 +84,6 @@ import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
 
 RESULTS_PATH = config.LOG / "freecell_suite_results.json"
-REPORT_PATH = config.LOG / "freecell_suite_report.html"
 REPORT_SCRIPT = os.path.join(ROOT, "scripts", "gen_suite_report.py")
 
 # Every template a port taps or asserts. Checked up front so a missing crop
@@ -131,11 +137,79 @@ def preflight() -> list[str]:
     return problems
 
 
+def _is_caselog_case(node: ast.With) -> bool:
+    for item in node.items:
+        call = item.context_expr
+        if not isinstance(call, ast.Call):
+            continue
+        func = call.func
+        if isinstance(func, ast.Attribute) and func.attr == "case":
+            return True
+        if isinstance(func, ast.Name) and func.id == "case":
+            return True
+    return False
+
+
+class _WrapSkippedCases(ast.NodeTransformer):
+    """Catch caselog.SkipThisCase around each case() so a rerun can skip
+    a passed case's body and still run the next one."""
+
+    def visit_With(self, node: ast.With):
+        self.generic_visit(node)
+        if not _is_caselog_case(node):
+            return node
+        return ast.Try(
+            body=[node],
+            handlers=[ast.ExceptHandler(
+                type=ast.Attribute(value=ast.Name(id="caselog", ctx=ast.Load()),
+                                   attr="SkipThisCase", ctx=ast.Load()),
+                name=None, body=[ast.Pass()])],
+            orelse=[], finalbody=[])
+
+
+def _install_case_skip(mod) -> bool:
+    """Wrap every function that uses caselog.case() so SkipThisCase from a
+    kept case does not stop the test. verifyDaily's play helpers live
+    outside run(); wrapping only run() still aborted on DY-22 / DY-53."""
+    if getattr(mod, "_case_skip_wrapped", False):
+        return True
+    wrapped_any = False
+    for name, fn in list(vars(mod).items()):
+        if not callable(fn) or getattr(fn, "_case_skip_wrapped", False):
+            continue
+        try:
+            src = inspect.getsource(fn)
+        except (OSError, TypeError):
+            continue
+        if "case(" not in src:
+            continue
+        try:
+            tree = ast.parse(textwrap.dedent(src))
+            tree = _WrapSkippedCases().visit(tree)
+            ast.fix_missing_locations(tree)
+            exec(compile(tree, inspect.getsourcefile(fn) or mod.__file__, "exec"),
+                 mod.__dict__)
+            wrapped = getattr(mod, name, None)
+            if wrapped is not None:
+                wrapped._case_skip_wrapped = True
+                wrapped_any = True
+        except Exception as exc:  # noqa: BLE001
+            print(f"  WARNING: could not wrap {mod.__name__}.{name} for "
+                  f"per-case rerun ({exc})", flush=True)
+    run = getattr(mod, "run", None)
+    if run is not None and wrapped_any:
+        run._case_skip_wrapped = True
+    if wrapped_any:
+        mod._case_skip_wrapped = True
+    return wrapped_any
+
+
 def _load(module: str):
     path = os.path.join(HERE, f"{module}.py")
     spec = importlib.util.spec_from_file_location(f"freecell_suite_{module}", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    _install_case_skip(mod)
     return mod
 
 
@@ -148,6 +222,8 @@ def _plan(picked: list[str], dev: bool, offline: bool, everything: bool = False)
     out = []
     for name, module, kind, ids, why in catalog.RUN_ORDER:
         if picked and name not in picked and module not in picked:
+            continue
+        if not picked and name in catalog.PARKED:
             continue
         if not picked and not offline and not everything and name in catalog.STANDALONE:
             continue
@@ -350,8 +426,10 @@ def _last_seconds() -> dict[str, float]:
 
 
 def _run_one(i: int, total: int, name: str, module: str, ids: list[str], dev: bool,
-             offline: bool, word: str = "START") -> tuple[dict, list[dict]]:
-    """Run one test; its test row and case rows."""
+             offline: bool, word: str = "START",
+             only: list[str] | None = None) -> tuple[dict, list[dict]]:
+    """Run one test; its test row and case rows. *only* is the case ids a
+    rerun should execute; the others keep their first-run pass."""
     print(f"\n>>> [{i}/{total}] {word:6} {name}", flush=True)
     _list_cases(ids, dev, offline)
     caselog.begin(name)
@@ -359,7 +437,14 @@ def _run_one(i: int, total: int, name: str, module: str, ids: list[str], dev: bo
     t0 = time.time()
     error = ""
     try:
-        _load(module).run()
+        mod = _load(module)
+        if only and not getattr(mod.run, "_case_skip_wrapped", False):
+            only = None
+        caselog.rerun_only(only)
+        try:
+            mod.run()
+        finally:
+            caselog.rerun_only(None)
     except Exception as exc:  # noqa: BLE001
         error = str(exc) or type(exc).__name__
         print(f"FAIL: {error}", flush=True)
@@ -374,14 +459,14 @@ def _run_one(i: int, total: int, name: str, module: str, ids: list[str], dev: bo
 
 def _rerun(plan: list[tuple], tests: list[dict], cases: list[dict], dev: bool,
            offline: bool) -> None:
-    """Run each test that failed once more. A case that failed takes the
-    rerun's result only if it passes there; a case that passed keeps its
-    first result. The network is set as the first run had it."""
+    """Run only the cases that failed. A case that failed takes the
+    rerun's result only if it passes there; a case that passed is not
+    run again. The network is set as the first run had it."""
     redo = [p for p in plan if p[0] in {t["name"] for t in tests if t["status"] == "fail"}]
     first = {c["id"]: c for c in cases if c["status"] == "fail"}
     print("\n" + "-" * 64, flush=True)
     print(f"  RERUN — {len(first)} failed case(s) in {len(redo)} test(s); "
-          "each test runs once more", flush=True)
+          "only those cases run again", flush=True)
     for c in first.values():
         print(f"    {c['id']} {c['title']}  ({c['test']})", flush=True)
     order = [name for name, *_rest in catalog.RUN_ORDER]
@@ -392,7 +477,8 @@ def _rerun(plan: list[tuple], tests: list[dict], cases: list[dict], dev: bool,
                 fc.go_online()
             else:
                 fc.go_offline()
-        row, rows = _run_one(i, len(redo), name, module, ids, dev, offline, "RERUN")
+        row, rows = _run_one(i, len(redo), name, module, ids, dev, offline, "RERUN",
+                             only=[cid for cid in ids if cid in first])
         again = {r["id"]: r for r in rows}
         for cid in ids:
             new = again.get(cid)
@@ -453,13 +539,16 @@ def _summary(tests: list[dict], cases: list[dict], heading: str) -> list[dict]:
 
 def _report() -> None:
     try:
-        proc = subprocess.run([sys.executable, REPORT_SCRIPT, "--results", str(RESULTS_PATH),
-                               "--out", str(REPORT_PATH)],
+        proc = subprocess.run([sys.executable, REPORT_SCRIPT, "--results", str(RESULTS_PATH)],
                               capture_output=True, text=True, timeout=180)
         if proc.returncode:
             print(f"WARNING: report generation failed: {proc.stderr.strip()}", flush=True)
-        else:
-            print(f"  report: {REPORT_PATH}", flush=True)
+            return
+        written = ""
+        for line in (proc.stdout or "").splitlines():
+            if line.startswith("wrote "):
+                written = line[6:].strip()
+        print(f"  report: {written or proc.stdout.strip()}", flush=True)
     except Exception as exc:  # noqa: BLE001
         print(f"WARNING: report generation failed: {exc}", flush=True)
 
@@ -470,6 +559,7 @@ def main() -> int:
     os.environ["FREECELL_SUITE_BUILD"] = "dev" if dev else "prod"
     offline = "--offline" in args
     picked = [a for a in args if not a.startswith("-")]
+    picked = ["visitLastScore" if a == "visitLastScoreOnline" else a for a in picked]
     everything = "--all" in args
     rerun = "--no-rerun" not in args
     plan = _plan(picked, dev, offline, everything)
@@ -509,13 +599,15 @@ def main() -> int:
     for i, (name, _module, runs, ids, reason) in enumerate(plan, 1):
         print(f"  {i:2}/{total}  {name:24} {'' if runs else 'SKIP — ' + reason}", flush=True)
 
+    planned = [name for name, _m, _runs, _ids, _w in plan]
     payload = {
         "schema": 1, "suite": "FreeCell regression suite",
         "build_kind": "dev" if dev else "prod", "started": _iso(started),
+        "scope": catalog.scope_label(planned),
         "device": {"model": helpers.device_model(), "ios": helpers.os_version(),
                    "udid": config.DEVICE_UDID, "screen": "1290x2796"},
         "app": {"name": "FreeCell", "version": build[0], "build": build[1]},
-        "plan": [name for name, _m, runs, _ids, _w in plan if runs],
+        "plan": planned,
         "tests": [], "cases": [],
     }
     tests, cases = payload["tests"], payload["cases"]
@@ -525,9 +617,12 @@ def main() -> int:
 
     current: tuple[str, float] | None = None  # the test running, and since when
     stopped = False
+    failed: list = []
     try:
         try:
-            if not any(name == catalog.DEVICE_SETUP and runs for name, _m, runs, *_r in plan):
+            if (catalog.DEVICE_SETUP not in catalog.PARKED
+                    and not any(name == catalog.DEVICE_SETUP and runs
+                                for name, _m, runs, *_r in plan)):
                 _keep_awake()
             _network_first(plan, offline)
             for i, (name, module, runs, ids, reason) in enumerate(plan, 1):
@@ -557,7 +652,6 @@ def main() -> int:
 
             if rerun and any(t["status"] == "fail" for t in tests):
                 _summary(tests, cases, f"{heading} — first run")
-                _report()
                 try:
                     _rerun(plan, tests, cases, dev, offline)
                 except Exception as exc:  # noqa: BLE001
@@ -573,7 +667,12 @@ def main() -> int:
             payload["duration_seconds"] = round(time.time() - started, 1)
             _write(payload, kept)
             _summary(tests, cases, f"{heading} — stopped midway")
-            _report()
+        else:
+            payload["finished"] = _iso()
+            payload["duration_seconds"] = round(time.time() - started, 1)
+            _write(payload, kept)
+            failed = _summary(tests, cases, heading)
+        _report()
     finally:
         if os.environ.get("FREECELL_SUITE_ONLINE") != "1":
             print("\n  putting the network back on", flush=True)
@@ -583,13 +682,6 @@ def main() -> int:
                 print(f"  WARNING: could not turn the network back on: {exc}", flush=True)
     if stopped:
         return 130
-
-    payload["finished"] = _iso()
-    payload["duration_seconds"] = round(time.time() - started, 1)
-    _write(payload, kept)
-
-    failed = _summary(tests, cases, heading)
-    _report()
     return 1 if failed else 0
 
 

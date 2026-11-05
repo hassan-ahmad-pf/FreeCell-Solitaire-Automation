@@ -35,6 +35,12 @@ import helpers  # noqa: E402
 FRESH_INSTALL = ("FL-04", "FL-05", "FL-02", "FL-03")
 ATT_WAIT = 12.0
 _ATT_SEEN = []
+_ATT_SHOT = ""
+_answer_tracking = ui.answer_tracking
+
+
+def _att_up() -> bool:
+    return helpers.ATT_TEXT in helpers.alert_text().lower() or ui.is_on("att_prompt")
 
 
 def _freecell_first_launch():
@@ -47,7 +53,12 @@ def _freecell_first_launch():
 
 
 def _allow_tracking() -> bool:
-    if ui.answer_tracking():
+    """Shoot the prompt while it is up, then Allow — same as FL-02's Terms shot."""
+    global _ATT_SHOT
+    if _att_up() and not _ATT_SHOT:
+        _ATT_SHOT = str(ui.shoot("FirstLaunchATT"))
+        print(f"  tracking prompt is up — saved {_ATT_SHOT}", flush=True)
+    if _answer_tracking():
         _ATT_SEEN.append(time.time())
         return True
     return False
@@ -82,6 +93,16 @@ def _game_center_while_online() -> None:
 
 
 def run() -> None:
+    # The link walk calls ui.answer_tracking; keep one Allow path that
+    # photographs the prompt before it is dismissed.
+    ui.answer_tracking = _allow_tracking
+    try:
+        _run_first_launch()
+    finally:
+        ui.answer_tracking = _answer_tracking
+
+
+def _run_first_launch() -> None:
     first = _freecell_first_launch()
     first._reveal_terms_card = _reveal_card
     first._start_without_clearing_overlays()
@@ -91,10 +112,12 @@ def run() -> None:
         first._online_for_links()
         with caselog.case("FL-04") as c:
             first._walk_link(*first.LINKS[0])
+            caselog.step("Check the Terms page opened and closed back to the card")
             c.shot(config.LOG / "first_launch_terms_page.png")
             c.note("Terms & Conditions page opened and closed back to the card")
         with caselog.case("FL-05") as c:
             first._walk_link(*first.LINKS[1])
+            caselog.step("Check the Privacy page opened and closed back to the card")
             c.shot(config.LOG / "first_launch_privacy_page.png")
             c.note("Privacy Policy page opened and closed back to the card")
         with caselog.case("FL-02") as c:
@@ -116,6 +139,8 @@ def run() -> None:
                                  "(is Settings → Privacy → Tracking → Allow Apps to "
                                  "Request to Track on?)")
             ui.expect(not helpers.alert_text(), "a prompt is still up after Allow")
+            if _ATT_SHOT:
+                c.shot(_ATT_SHOT)
             c.note("tracking prompt shown and Allowed")
     else:
         for cid in FRESH_INSTALL:

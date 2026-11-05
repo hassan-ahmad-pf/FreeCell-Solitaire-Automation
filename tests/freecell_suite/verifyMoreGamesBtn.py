@@ -53,6 +53,7 @@ def run() -> None:
         ui.back()
         caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(6.0), "More Games back did not return to the main menu")
+        c.shot(ui.shoot("MoreGamesBack"))
         c.note("back on the main menu")
     print("PASS: More Games opened in the app, swiped to Card Games and Spiderette, "
           "and returned")

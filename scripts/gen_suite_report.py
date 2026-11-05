@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Generate the FreeCell suite's HTML report.
 
-Header, pass-rate ring, run chips, filters, "Needs attention", then every
-TestRail case grouped by section with its screenshots — fed by
-tests/freecell_suite/run_all.py's log/freecell_suite_results.json. Each case carries its own status and
-evidence; dev-build cases show as skipped with the reason.
+Header, pass-rate ring, run chips, filters, "Needs attention", then the
+cases of this run grouped by section with screenshots — fed by
+tests/freecell_suite/run_all.py's log/freecell_suite_results.json. A named
+module's report lists only that module. Files go in
+log/reports/<version>_<build>/. The browser tab title has version, build,
+scope and result.
 
 Run:  ./.venv/bin/python scripts/gen_suite_report.py
 """
@@ -32,7 +34,12 @@ import config  # noqa: E402
 HEADER_LOGO = os.path.join(ROOT, "assets", "report_icon.png")  # the App Store icon
 DISPLAY_FONT = os.path.join(ROOT, "assets", "report_font_outfit.woff2")  # SIL OFL, see *_OFL.txt
 DEFAULT_RESULTS = os.path.join(config.LOG, "freecell_suite_results.json")
-DEFAULT_OUT = os.path.join(config.LOG, "freecell_suite_report.html")
+LATEST = os.path.join(config.LOG, "freecell_suite_report.html")
+SCOPE_WORDS = {
+    "full": "full regression",
+    "main": "main suite",
+    "suite": "regression",
+}
 
 CSS = r"""
 :root { color-scheme: light;
@@ -409,6 +416,76 @@ def _format_duration(seconds) -> str:
     return f"{minutes}m {remainder:02d}s"
 
 
+def _safe(text: str) -> str:
+    return "".join(c if c.isalnum() or c in "._-+" else "_" for c in str(text)) or "unknown"
+
+
+def _file_stamp(payload: dict) -> str:
+    try:
+        return datetime.fromisoformat(str(payload.get("started") or "")).strftime("%Y-%m-%d_%H%M")
+    except (TypeError, ValueError):
+        return datetime.now().strftime("%Y-%m-%d_%H%M")
+
+
+def _scope_key(payload: dict) -> str:
+    return payload.get("scope") or catalog.scope_label(payload.get("plan") or [])
+
+
+def _scope_words(payload: dict) -> str:
+    key = _scope_key(payload)
+    return SCOPE_WORDS.get(key, key)
+
+
+def _app_bits(payload: dict) -> tuple[str, str]:
+    app = payload.get("app") or {}
+    return str(app.get("version") or "unknown"), str(app.get("build") or "0")
+
+
+def report_path(payload: dict) -> str:
+    """log/reports/<version>_<build>/FreeCell_<version>_<build>_<scope>_<time>.html"""
+    version, number = _app_bits(payload)
+    folder = os.path.join(config.LOG, "reports", f"{_safe(version)}_{_safe(number)}")
+    name = (f"FreeCell_{_safe(version)}_{_safe(number)}_{_safe(_scope_key(payload))}"
+            f"_{_file_stamp(payload)}.html")
+    return os.path.join(folder, name)
+
+
+def _page_title(payload: dict, counts: dict) -> str:
+    """Shown in the browser tab, and in full when you hover it."""
+    version, number = _app_bits(payload)
+    device = payload.get("device") or {}
+    passed, failed = counts.get("passed", 0), counts.get("failed", 0)
+    if failed:
+        result = f"{passed} passed, {failed} failed"
+    elif passed:
+        result = f"{passed} passed"
+    else:
+        result = "no cases executed"
+    bits = [f"FreeCell {version} ({number})", _scope_words(payload), result]
+    if device.get("model"):
+        bits.append(device["model"])
+    if device.get("ios"):
+        bits.append(f"iOS {device['ios']}")
+    run_time = _format_run_time(payload.get("finished") or payload.get("started"))
+    if run_time and run_time != "No run recorded":
+        bits.append(run_time)
+    return " · ".join(bits)
+
+
+def _point_latest(out_path: str) -> None:
+    reports = os.path.join(config.LOG, "reports")
+    if not os.path.abspath(out_path).startswith(os.path.abspath(reports) + os.sep):
+        return
+    os.makedirs(config.LOG, exist_ok=True)
+    rel = os.path.relpath(out_path, config.LOG)
+    try:
+        if os.path.lexists(LATEST):
+            os.remove(LATEST)
+        os.symlink(rel, LATEST)
+    except OSError:
+        pass
+
+
 def _format_run_time(value) -> str:
     if not value:
         return "No run recorded"
@@ -576,10 +653,11 @@ def _filters(counts: dict) -> str:
     return f'<div class="filters" role="group" aria-label="Filter cases">{"".join(buttons)}</div>'
 
 
-def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
+def build(results_path: str = DEFAULT_RESULTS, out_path: str | None = None,
           stopped: bool = False) -> str:
     """*stopped*: the run was stopped midway, even if its results do not say
-    so (the runner was killed before it could)."""
+    so (the runner was killed before it could). A named module's report
+    lists only that module's cases."""
     try:
         with open(results_path, encoding="utf-8") as fh:
             payload = json.load(fh)
@@ -593,9 +671,11 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
     rows = []
     for case in catalog.CASES:
         cid = case["id"]
+        owner = catalog.owner(cid)
+        if planned and owner not in planned:
+            continue
         row = recorded.get(cid)
         if row is None:
-            owner = catalog.owner(cid)
             reason = (catalog.DEV_CASES.get(cid)
                       or (catalog.entry(owner) or [None] * 5)[4] or "not run in this invocation")
             status = "dev" if reason.startswith("needs") else "skip"
@@ -645,20 +725,24 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
              f"{kinds.get('skip', 0) + kinds.get('block', 0)} skipped")
     if kinds.get("stop"):
         scope += f" · {kinds['stop']} not run (stopped)"
-    subtitle = (f"Regression report · stopped midway — the cases run so far on the "
+    what = _scope_words(payload)
+    subtitle = (f"{html.escape(what)} · stopped midway — the cases run so far on the "
                 f"{html.escape(payload.get('build_kind', 'prod'))} build" if stopped else
-                f"Regression report · the full FreeCell suite on the "
-                f"{html.escape(payload.get('build_kind', 'prod'))} build")
+                f"{html.escape(what)} · {html.escape(payload.get('build_kind', 'prod'))} "
+                f"build {html.escape(app_value)}")
     logo = _image_uri(HEADER_LOGO, box=(256, 256))
     mark = (f'<img class="mark" src="{logo}" alt="FreeCell Solitaire logo">'
             if logo else '<div class="mark">F</div>')
     build_kind = payload.get("build_kind", "prod")
     run_time = _format_run_time(payload.get("finished") or payload.get("started"))
+    tab_title = html.escape(_page_title(payload, counts))
+    if not out_path:
+        out_path = report_path(payload)
 
     document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FreeCell Solitaire — Regression Report</title>
+<title>{tab_title}</title>
 <style>{_font_face()}{CSS}</style></head><body><div class="deck" aria-hidden="true"></div>
 <div class="crown" aria-hidden="true"><div class="crown-in"><div class="crown-bob">{CROWN_SVG}</div></div></div>
 <div class="wrap">
@@ -676,6 +760,7 @@ def build(results_path: str = DEFAULT_RESULTS, out_path: str = DEFAULT_OUT,
 {_chip("Screen", device.get("screen"))}
 {_chip("Duration", _format_duration(payload.get("duration_seconds")))}
 {_chip("Run", run_time)}
+{_chip("Tests", what)}
 {_chip("Scope", scope)}
 </div>
 {_filters(counts)}
@@ -692,13 +777,15 @@ screenshots are compressed JPEG evidence from log/</footer>
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(document)
     os.replace(tmp, out_path)
+    _point_latest(out_path)
     return out_path
 
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--results", default=DEFAULT_RESULTS)
-    parser.add_argument("--out", default=DEFAULT_OUT)
+    parser.add_argument("--out", default=None,
+                        help="HTML path; default is log/reports/<version>_<build>/...")
     parser.add_argument("--stopped", action="store_true",
                         help="the run was stopped midway: its unreached cases read not run")
     args = parser.parse_args(argv)

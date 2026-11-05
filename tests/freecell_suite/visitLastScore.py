@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
-"""visitLastScore: Play → LAST SCORE and its Game Center links. [ONLINE]
+"""visitLastScore: Play → LAST SCORE while already online after the promo strip.
 
-LS-01  Play → LAST SCORE opens a screen headed "Last Won Game Score"
+LS-01  Play → LAST SCORE opens "Last Won Game Score" and shows the won
+       game's score (current / rank / best)
 LS-02  the forward arrow, 4 taps 2 s apart, steps week → month → overall →
        day → week and stays on the screen
-LS-03  leaderboards opens Game Center (OK on its first-time notice); its back
-       arrow reaches Leaderboards; back again and a tap below the dashboard
-       returns to Last Score
-LS-04  the same for achievements, headed Achievements
 LS-05  back leaves for the main menu
 
-Needs a won game since Statistics were last reset (triggerAdPoints' wins
-normally provide it; without one, an Easy game is won through Synthetic Win
-first) and a signed-in Game Center account, online.
-
-FreeCell's leaderboards link opens the board of the level last won ("Easy •
-Scores"); its back arrow is what shows Leaderboards. The Game Center sheet is
-a remote view FreeCell's tree does not carry, so its headings and back arrow
-are matched by their white lettering (find_ink): the sheet is translucent,
-whatever is behind it tints the colours. The notice card before the first
-sheet is FreeCell's own and is read from the tree.
+Sits before verifyStatistics: a Solo reset would wipe the won score. Needs
+a won game since Statistics were last reset (Victory / Daily / Difficulty
+usually provide it; without one, an Easy game is won through Synthetic Win
+first).
 
 Run:  ./.venv/bin/python -u tests/freecell_suite/visitLastScore.py
 """
@@ -27,12 +18,12 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.dirname(os.path.dirname(HERE))]
 
 import caselog  # noqa: E402
+import daily  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
 import helpers  # noqa: E402
@@ -42,16 +33,6 @@ TAPS = 4
 TAP_DELAY = 2.0
 PERIOD_CHANGED = 0.01
 PERIOD_SAME = 0.02
-SHEET_BOTTOM = (645, int(2796 * 0.95))
-
-
-def _ink(name: str, timeout: float = 8.0):
-    deadline = time.time() + timeout
-    while True:
-        point = ui.find_ink(name)
-        if point or time.time() >= deadline:
-            return point
-        time.sleep(0.5)
 
 
 def _period_box(arrow) -> tuple[int, int, int, int]:
@@ -59,57 +40,14 @@ def _period_box(arrow) -> tuple[int, int, int, int]:
     return (int(0.15 * 1290), arrow[1] - 100, int(0.85 * 1290), arrow[1] + 125)
 
 
+@says("Open Last Score: Play, then LAST SCORE")
 def _open_last_score() -> None:
     if not ui.tap("menu_play", settle=2.0):
-        caselog.step("Tap Play on the main menu")
         helpers.wda_tap(ui.MENU_PLAY, settle=2.0)
     ui.expect(ui.expect_screen("play", timeout=6.0), "Play did not open the picker")
-    caselog.step("Tap LAST SCORE in the level picker")
     helpers.wda_tap(ui.LAST_SCORE, settle=3.0)
     if not ui.seen("screen_last_score", timeout=6.0) and fc.ad_up():
         fc.close_or_wait("LAST SCORE")
-
-
-@says("Tap OK on the first-time Game Center notice", done=True)
-def _notice() -> bool:
-    """OK FreeCell's first-time Game Center card if it came up."""
-    if not fc.named("StaticText", "Game Center", timeout=1.5):
-        return False
-    shot = ui.shoot("game_center_notice")
-    ui.expect(fc.tap_named("Button", "OK", settle=5.0),
-              f"the Game Center notice has no OK button to press — {shot}")
-    return True
-
-
-@says("Close Game Center: its back arrow, then a tap below the dashboard")
-def _close_sheet(link: str) -> None:
-    """Back to the dashboard, then a tap below it, back on Last Score."""
-    back = _ink("gc_back", timeout=4.0)
-    ui.expect(back, f"Game Center's sheet after '{link}' has no back arrow (top-left)")
-    helpers.tap(back, settle=3.0)
-    helpers.wda_tap(SHEET_BOTTOM, settle=3.0)
-    ui.expect(ui.seen("screen_last_score", timeout=8.0),
-              f"after '{link}', back and a tap below the dashboard did not return "
-              "to Last Score")
-
-
-def _game_center(link: str, control: str, heading: str, title: str, c) -> None:
-    ui.expect(ui.tap(control, settle=4.5), f"Last Score has no '{link}' link to tap")
-    _notice()
-    ui.expect(not ui.is_on("screen_last_score"),
-              f"tapping '{link}' presented nothing — Last Score is still showing. "
-              "Check the phone is online and signed in to Game Center")
-    ui.expect(_ink("gc_back", timeout=10.0),
-              f"'{link}' covered Last Score, but not with Game Center's sheet")
-    if not ui.find_ink(heading):
-        c.shot(ui.shoot(f"game_center_{link}_board"))
-        caselog.step("Tap Game Center's back arrow to reach its main page")
-        helpers.tap(ui.find_ink("gc_back"), settle=3.0)
-    caselog.step(f"Check Game Center shows its {title} page")
-    ui.expect(_ink(heading, timeout=6.0),
-              f"Game Center opened from '{link}' but never showed its {title} page")
-    c.shot(ui.shoot(f"game_center_{link}"))
-    _close_sheet(link)
 
 
 @says("Win an Easy game with Synthetic Win first, so there is a last score to show")
@@ -125,27 +63,60 @@ def _win_once() -> None:
     ui.expect(ui.on_menu(4.0) or ui.to_menu(), "not on the main menu after the setup win")
 
 
-def run() -> None:
-    fc.go_online()
+def _stay_online() -> bool:
+    """Keep the promo-icons session if it is already up. True when this
+    module had to go online or reopen the menu."""
+    fresh = False
+    if not ui.known_online():
+        fc.go_online()
+        fresh = True
+    if ui.on_menu(2.0):
+        return fresh
     fc.menu()
-    fc.game_center_on()
+    return True
+
+
+def _ensure_last_score() -> None:
+    if ui.seen("screen_last_score", timeout=2.0):
+        return
+    if not ui.on_menu(2.0):
+        ui.to_menu() or ui.on_menu(4.0)
+    _open_last_score()
+    if ui.seen("screen_last_score", timeout=4.0):
+        return
+    print("  no won game since Statistics were reset — winning an Easy game first",
+          flush=True)
+    ui.expect(ui.to_menu(), "could not leave the picker for the setup win")
+    _win_once()
+    _open_last_score()
+    ui.expect(ui.seen("screen_last_score", timeout=4.0),
+              "LAST SCORE did not open a screen headed 'Last Won Game Score' — "
+              "a won game is needed first")
+
+
+def run() -> None:
+    _stay_online()
 
     with caselog.case("LS-01") as c:
-        _open_last_score()
-        if not ui.seen("screen_last_score", timeout=4.0):
-            print("  no won game since Statistics were reset — winning an Easy game first",
-                  flush=True)
-            ui.expect(ui.to_menu(), "could not leave the picker for the setup win")
-            _win_once()
-            _open_last_score()
+        _ensure_last_score()
         caselog.step("Check the screen is headed 'Last Won Game Score'")
         ui.expect(ui.seen("screen_last_score", timeout=4.0),
                   "LAST SCORE did not open a screen headed 'Last Won Game Score' — "
                   "a won game is needed first")
-        c.shot(ui.shoot("last_score"))
-        c.note("header: Last Won Game Score")
+        shot = c.shot(ui.shoot("last_score"))
+        caselog.step("Check current / rank / best and the won game's score are showing")
+        ui.expect(ui.is_on("screen_victory"),
+                  "Last Score has no current / rank / best columns for the won game")
+        table = daily.check_victory_table(shot)
+        shown = table["score"]
+        ui.expect(isinstance(shown["current"], int) and shown["current"] > 0,
+                  "Last Score opened but the won game's score is not showing")
+        c.note(f"header: Last Won Game Score; current {shown['current']:,}  "
+               f"rank {shown['rank']}  best {shown['best']} "
+               f"(online, after the promo strip)")
 
     with caselog.case("LS-02") as c:
+        _ensure_last_score()
         arrow = ui.find("last_score_next")
         ui.expect(arrow, "Last Score has no forward arrow beside 'ranking for'")
         box = _period_box(arrow)
@@ -168,17 +139,8 @@ def run() -> None:
                   "the forward arrow navigated off Last Score")
         c.note(f"{TAPS} taps: every tap changed the period, the 4th is back at the start")
 
-    with caselog.case("LS-03") as c:
-        _game_center("leaderboards", "victory_leaderboards", "gc_leaderboards",
-                     "Leaderboards", c)
-        c.note("Game Center → Leaderboards, back and dismissed onto Last Score")
-
-    with caselog.case("LS-04") as c:
-        _game_center("achievements", "victory_achieve", "gc_achievements",
-                     "Achievements", c)
-        c.note("Game Center → Achievements, back and dismissed onto Last Score")
-
     with caselog.case("LS-05") as c:
+        _ensure_last_score()
         ui.back(settle=2.0)
         if not ui.on_menu(3.0):
             ui.expect(ui.to_menu(), "back from Last Score did not lead to the main menu")
@@ -187,7 +149,8 @@ def run() -> None:
         c.shot(ui.shoot("last_score_back"))
         c.note("back on the main menu")
 
-    print("PASS: Last Score opens, cycles its period, and opens and closes Game Center")
+    print("PASS: Last Score opens with the won score, cycles its period, and "
+          "back returns to the main menu")
 
 
 if __name__ == "__main__":

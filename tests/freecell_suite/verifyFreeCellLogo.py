@@ -45,6 +45,7 @@ def run() -> None:
                      "FAQ, More Games, Feedback)")
         missing = [name for name in LINKS if not ui.is_on(name)]
         ui.expect(not missing, f"About is missing {missing}")
+        c.shot(ui.shoot("AboutLinks"))
         c.note("version line and all five links present")
     with caselog.case("AB-04") as c:
         ui.expect(ui.tap("about_faq", settle=2.5), "frequently asked questions could not be tapped")

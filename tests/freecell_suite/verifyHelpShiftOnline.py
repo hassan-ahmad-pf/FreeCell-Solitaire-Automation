@@ -28,9 +28,9 @@ def run() -> None:
     fc.menu()
     ui.expect(ui.open_options(), "Options did not open from the main menu")
     ui.expect(ui.is_on("contact_us"), "Contact Us is missing from Options")
-    ui.expect(ui.tap("contact_us", settle=4.0), "Contact Us could not be tapped")
 
     with caselog.case("HS-01") as c:
+        ui.expect(ui.tap("contact_us", settle=4.0), "Contact Us could not be tapped")
         title = fc.support_title(timeout=24.0)
         shot = c.shot(ui.shoot("HelpShiftOnline"))
         caselog.step("Check Contact Us left Options and PeopleFun Support loaded")

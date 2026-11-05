@@ -36,6 +36,7 @@ def run() -> None:
         caselog.step("Check the picker lists Easy, Medium, Hard, Expert and Master")
         missing = [level for level in ui.DIFFICULTIES if not ui.is_on(f"difficulty_{level}")]
         ui.expect(not missing, f"the picker does not list {missing}")
+        c.shot(ui.shoot("PlayLevels"))
         c.note("Easy, Medium, Hard, Expert, Master listed")
     with caselog.case("PL-03") as c:
         ui.expect(ui.tap("difficulty_easy", settle=2.0), "Easy could not be tapped")

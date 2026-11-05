@@ -32,7 +32,8 @@ OP-18  with Auto Hint ON (switched from the table's Options), the table stays
        still for a few seconds after a move, then the next card to play
        pulses as the hint; tapping that card plays it; the switch is then
        turned back OFF
-OP-15  on that deal a 13-card pile is built with legal moves; with the
+OP-15  on that deal a 13-card pile is built (a saved recipe if this deal
+       was seen before, otherwise planned legal moves); with the
        playfield lowered it no longer fits, so Maintain Card Spacing (ON by
        default) tucks its top cards away under an arrow; tapping the arrow
        spreads the whole pile out
@@ -137,8 +138,7 @@ def run() -> None:
     ui.await_rules_prompt()
 
     with caselog.case("GP-12") as c:
-        caselog.step(f"Wait {IDLE:.0f} s without touching the cards")
-        time.sleep(IDLE)
+        caselog.wait(IDLE, "without touching the cards")
         idle = c.shot(ui.shoot("GamePlayIdle"))
         timer0, score0 = fc.hud(idle)
         footer = fc.table_footer(idle)
@@ -148,8 +148,7 @@ def run() -> None:
         ui.expect(any(TAP_TO_START in line.lower() for line in footer),
                   f"the footer reads {footer}, not '{TAP_TO_START}' (see {idle})")
         _before, _after, card = fc.play_to_foundation()
-        caselog.step(f"Wait {TIMER_RUN:.0f} s for the timer to run")
-        time.sleep(TIMER_RUN)
+        caselog.wait(TIMER_RUN, "for the timer to run")
         moved, timer1, score1 = fc.hud_after_move("GamePlayCardUp")
         c.shot(moved)
         caselog.step("Check the timer has started")

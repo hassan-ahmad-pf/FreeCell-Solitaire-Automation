@@ -649,12 +649,12 @@ def kill_app() -> bool:
     return True
 
 
-def alert_text() -> str:
+def alert_text(timeout: float = 8.0) -> str:
     """Current native alert message, or '' if none (or WDA cannot see it)."""
     try:
         response = requests.get(
             f"{config.WDA_URL}/session/{current_session()}/alert/text",
-            timeout=8,
+            timeout=timeout,
         )
         if response.status_code != 200:
             return ""
@@ -726,7 +726,7 @@ def allow_tracking(sid: str | None = None) -> bool:
     sid = sid or current_session()
     try:
         response = requests.get(
-            f"{config.WDA_URL}/session/{sid}/alert/text", timeout=8)
+            f"{config.WDA_URL}/session/{sid}/alert/text", timeout=2)
         text = (response.json().get("value") or "") if response.ok else ""
         if not isinstance(text, str) or ATT_TEXT not in text.lower():
             return False
@@ -737,7 +737,7 @@ def allow_tracking(sid: str | None = None) -> bool:
         )
     except Exception:  # noqa: BLE001
         return False
-    time.sleep(1.5)
+    time.sleep(0.35)
     if accepted.ok:
         print("  answered the tracking prompt: Allow", flush=True)
     return accepted.ok
@@ -978,6 +978,7 @@ def _tap_airplane(sid: str, want: bool, settle: float = 4.0,
 
 
 AUTOLOCK_ROW = "AUTOLOCK"   # Display & Brightness → Auto-Lock, label "Auto-Lock, Never"
+DISPLAY_ID = "com.apple.settings.displayAndBrightness"
 
 
 def _tap_rect(sid: str, el: str) -> bool:
@@ -995,52 +996,124 @@ def _tap_rect(sid: str, el: str) -> bool:
 
 def _read_auto_lock(sid: str) -> str:
     el = _element(sid, AUTOLOCK_ROW, timeout=6.0)
-    label = _attr(sid, el, "label") if el else ""
-    return label.split(",", 1)[1].strip() if label and "," in label else ""
+    label = (_attr(sid, el, "label") or "") if el else ""
+    if "," in label:
+        return label.split(",", 1)[1].strip()
+    parts = label.split(None, 1)
+    return parts[1].strip() if len(parts) > 1 else ""
+
+
+def _row_on_screen(rect) -> bool:
+    return bool(rect) and 140 < rect.get("y", 0) < 800
+
+
+def _open_display(sid: str):
+    """Scroll Settings until Display & Brightness is on screen, then open it.
+
+    On iOS 27 the row's name is com.apple.settings.displayAndBrightness (the
+    visible label is not the accessibility name). It sits below the first
+    screen; overscrolling past it makes the row unreadable again."""
+    display = None
+    for _ in range(8):
+        display = _element(sid, DISPLAY_ID, timeout=1.2)
+        rect = _attr(sid, display, "rect") if display else None
+        if display and _attr(sid, display, "visible") in (True, "true", "1", 1) \
+                and _row_on_screen(rect):
+            if _tap_rect(sid, display):
+                time.sleep(1.5)
+                return display
+            return None
+        try:
+            _wda_post(f"/session/{sid}/wda/dragfromtoforduration",
+                      {"fromX": 200, "fromY": 780, "toX": 200, "toY": 280,
+                       "duration": 0.35})
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(1.0)
+    return None
+
+
+def _never_row(sid: str):
+    for kind in ("XCUIElementTypeCell", "XCUIElementTypeButton",
+                 "XCUIElementTypeStaticText"):
+        el = _typed_element(sid, "Never", kind, timeout=1.5)
+        if el:
+            return el
+    return _element(sid, "Never", timeout=1.0)
+
+
+def _low_power_off(sid: str) -> bool:
+    """Turn Low Power Mode off so Auto-Lock can be Never. True when it is off."""
+    battery = _typed_element(sid, "Battery", "XCUIElementTypeButton", timeout=3.0) \
+        or _element(sid, "Battery", timeout=2.0)
+    if not _tap_rect(sid, battery):
+        return False
+    time.sleep(1.5)
+    sw = _element(sid, "Low Power Mode", timeout=4.0)
+    if sw and str(_attr(sid, sw, "value")) in ("1", "true", "True"):
+        rect = _attr(sid, sw, "rect") or {}
+        if rect:
+            try:
+                _wda_post(f"/session/{sid}/wda/tap",
+                          {"x": int(rect["x"] + rect["width"] - _SWITCH_INSET),
+                           "y": int(rect["y"] + rect["height"] / 2)})
+            except Exception:  # noqa: BLE001
+                _tap_rect(sid, sw)
+            time.sleep(1.2)
+    sw = _element(sid, "Low Power Mode", timeout=2.0)
+    off = not sw or str(_attr(sid, sw, "value")) not in ("1", "true", "True")
+    _tap_rect(sid, _typed_element(sid, "Settings", "XCUIElementTypeButton", timeout=3.0))
+    time.sleep(1.2)
+    return off
+
+
+def _confirm_auto_lock(sid: str) -> str:
+    """The Auto-Lock value on Display & Brightness. Empty if that row is gone
+    (still on the picker): BackButton once, then read again. Never reuse an
+    older value — that is what marked a set Never as still 30 seconds."""
+    seen = _read_auto_lock(sid)
+    if seen:
+        return seen
+    if _tap_rect(sid, _element(sid, "BackButton", timeout=3.0)):
+        time.sleep(1.5)
+    return _read_auto_lock(sid)
 
 
 def auto_lock_never() -> tuple[bool, str]:
     """Set Settings → Display & Brightness → Auto-Lock to Never, so the phone
     cannot lock itself mid-run. -> (Never now?, the value seen). Low Power
-    Mode holds Auto-Lock at 30 s and greys Never out."""
+    Mode holds Auto-Lock at 30 s and greys Never out; that is turned off
+    and the set is tried once more."""
     sid = _open_settings()
     value = ""
     try:
-        display = None
-        for _ in range(6):
-            display = _typed_element(sid, "Display & Brightness", "XCUIElementTypeButton") \
-                or _element(sid, "com.apple.settings.displayAndBrightness")
-            if display and _attr(sid, display, "visible") in (True, "true", "1", 1):
-                break
-            display = None
-            try:
-                _wda_post(f"/session/{sid}/wda/dragfromtoforduration",
-                          {"fromX": 200, "fromY": 700, "toX": 200, "toY": 300,
-                           "duration": 0.3})
-            except Exception:  # noqa: BLE001
-                pass
-            time.sleep(1.0)
-        if not _tap_rect(sid, display):
+        if not _open_display(sid):
             return False, ""
-        time.sleep(1.5)
         value = _read_auto_lock(sid)
         if value.lower() == "never":
             return True, value
-        if not _tap_rect(sid, _element(sid, AUTOLOCK_ROW, timeout=4.0)):
-            return False, value
-        time.sleep(1.5)
-        never = _typed_element(sid, "Never", "XCUIElementTypeCell", timeout=4.0) \
-            or _typed_element(sid, "Never", "XCUIElementTypeButton", timeout=1.0)
-        if never and _attr(sid, never, "enabled") in (False, "false", "0", 0):
-            return False, value
-        _tap_rect(sid, never)
-        time.sleep(1.0)
-        # back to Display & Brightness (the nav bar's back button carries its name)
-        _tap_rect(sid, _typed_element(sid, "Display & Brightness", "XCUIElementTypeButton",
-                                      timeout=4.0))
-        time.sleep(1.5)
-        value = _read_auto_lock(sid) or value
-        return value.lower() == "never", value
+        for attempt in range(2):
+            if not _tap_rect(sid, _element(sid, AUTOLOCK_ROW, timeout=4.0)):
+                return False, value
+            time.sleep(1.5)
+            never = _never_row(sid)
+            if never and _attr(sid, never, "enabled") in (False, "false", "0", 0):
+                if attempt == 0:
+                    _wda_post(f"/session/{sid}/wda/apps/terminate",
+                              {"bundleId": SETTINGS_BUNDLE})
+                    sid = _open_settings()
+                    if _low_power_off(sid) and _open_display(sid):
+                        value = _read_auto_lock(sid)
+                        if value.lower() == "never":
+                            return True, value
+                        continue
+                return False, value
+            _tap_rect(sid, never)
+            time.sleep(1.2)
+            value = _confirm_auto_lock(sid)
+            if value.lower() == "never":
+                return True, value
+        return False, value
     finally:
         # Settings opens at its root for the radio switches that follow.
         try:
@@ -1054,34 +1127,72 @@ def auto_lock_never() -> tuple[bool, str]:
 # reach SpringBoard (status bar, Control Center) from any session, in under
 # a second; /source of Control Center takes 20 s, so it is not used.
 DND_MOON = "moon.fill"                  # status bar: "do not disturb"
+DND_MARKS = (DND_MOON, "do not disturb")
 FOCUS_TILE = "focus-module"             # selected while a Focus is on; value names the last one
-DND_MODE = "mode-Do Not Disturb"        # the Focus list's row, Selected while on
+DND_MODE = "mode-Do Not Disturb"        # older Focus list id
+DND_ROWS = (DND_MODE, "Do Not Disturb")  # iOS 27 list uses the plain name
 
 
-def _springboard_session() -> str:
-    return cached_session() or launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
+def _live_session() -> str:
+    """A WDA session that still answers. Auto-Lock ends by closing Settings,
+    which leaves the cached id pointing at a dead session — lookups through
+    that miss the status bar, so Do Not Disturb used to Home twice."""
+    sid = cached_session()
+    if sid:
+        try:
+            _wda_get(f"/session/{sid}/window/size", timeout=5)
+            return sid
+        except Exception:  # noqa: BLE001
+            pass
+    return launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
+
+
+def _status_dnd(sid: str, wait: float) -> bool:
+    """True when a Do Not Disturb mark is in the status bar (near the top)."""
+    deadline = time.time() + wait
+    while True:
+        for name in DND_MARKS:
+            el = _element(sid, name, timeout=0.0)
+            rect = _attr(sid, el, "rect") if el else None
+            if rect and rect.get("y", 99) < 80:
+                return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.4)
+
+
+def _focus_dnd_row(sid: str):
+    """The Do Not Disturb row on the Control Center Focus list. iOS 27's
+    name is still mode-Do Not Disturb (label 'Do Not Disturb, On'); the
+    list takes a moment to publish after the Focus tile is tapped."""
+    deadline = time.time() + 6.0
+    while time.time() < deadline:
+        el = _element(sid, DND_MODE, timeout=1.0) \
+            or _element(sid, "Do Not Disturb", timeout=0.4)
+        rect = _attr(sid, el, "rect") if el else None
+        if rect and 80 < rect.get("y", 0) < 900 and rect.get("width", 0) > 150:
+            return el
+        time.sleep(0.3)
+    return None
 
 
 def dnd_on(wait: float = 2.0) -> bool:
     """True when Do Not Disturb is on: its moon in the home screen's status bar.
     The moon shows a few seconds after Focus turns on: pass a longer *wait* then."""
-    for sid in (_springboard_session(), None):
-        # A session whose app was closed can miss what is on screen, never
-        # invent it: a miss is checked again through a fresh session.
-        sid = sid or launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
-        try:
-            requests.post(f"{config.WDA_URL}/wda/homescreen", json={}, timeout=15)
-        except Exception:  # noqa: BLE001
-            pass
-        time.sleep(1.5)
-        if _element(sid, DND_MOON, timeout=wait) is not None:
-            return True
-    return False
+    sid = _live_session()
+    try:
+        requests.post(f"{config.WDA_URL}/wda/homescreen", json={}, timeout=15)
+    except Exception:  # noqa: BLE001
+        pass
+    time.sleep(1.2)
+    return _status_dnd(sid, wait)
 
 
-def dnd_turn_on() -> bool:
-    """Turn Do Not Disturb on from Control Center → Focus. True when it is on."""
-    if dnd_on():
+def dnd_turn_on(*, already_off: bool = False) -> bool:
+    """Turn Do Not Disturb on from Control Center → Focus. True when it is on.
+    Pass already_off when the caller just read the moon, so this does not
+    Home and look again before opening Control Center."""
+    if not already_off and dnd_on():
         return True
     sid = launch_app(bundle_id=SETTINGS_BUNDLE, settle=1.0, timeout=60)
 
@@ -1118,17 +1229,38 @@ def dnd_turn_on() -> bool:
             tile = None
         if tile is None:
             return False
-        if not (_attr(sid, tile, "selected") and _attr(sid, tile, "value") == "Do Not Disturb"):
-            _tap_rect(sid, tile)
+        # iOS 27: the centre of the Focus tile opens the list; the moon
+        # icon on its left toggles the last Focus. The list row does not
+        # turn DND on (it stays "On tonight" / selected while the moon is
+        # off). Toggle the icon, then Home and read the status bar.
+        rect = _attr(sid, tile, "rect") or {}
+        if rect and _attr(sid, tile, "value") == "Do Not Disturb":
+            try:
+                _wda_post(f"/session/{sid}/wda/tap",
+                          {"x": int(rect["x"] + 28),
+                           "y": int(rect["y"] + rect["height"] / 2)})
+            except Exception:  # noqa: BLE001
+                _tap_rect(sid, tile)
             time.sleep(1.5)
-            mode = _element(sid, DND_MODE, timeout=4.0)
-            if mode is None:
-                return False
-            if not _attr(sid, mode, "selected"):
-                _tap_rect(sid, mode)
+        else:
+            _tap_rect(sid, tile)
+            time.sleep(1.8)
+            mode = _focus_dnd_row(sid)
+            if mode:
+                mrect = _attr(sid, mode, "rect") or {}
+                if mrect:
+                    _wda_post(f"/session/{sid}/wda/tap",
+                              {"x": int(mrect["x"] + 28),
+                               "y": int(mrect["y"] + mrect["height"] / 2)})
+                else:
+                    _tap_rect(sid, mode)
                 time.sleep(1.5)
-        # before Settings closes: lookups through a closed app's session find nothing
-        return dnd_on(wait=10.0)
+        try:
+            requests.post(f"{config.WDA_URL}/wda/homescreen", json={}, timeout=15)
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(1.2)
+        return _status_dnd(sid, 8.0)
     except Exception:  # noqa: BLE001
         return False
     finally:

@@ -51,6 +51,10 @@ LABELS = {
     "att_allow": "Allow on the tracking prompt",
     "contact_us": "Contact Us on Options",
     "about_version": "the version line on About",
+    "hint_undo": "'tap to undo' under the cards",
+    "hint_hints": "'tap for hints' (the hint deck, bottom right)",
+    "hint_lower": "'tap to lower / raise' under the cards",
+    "hint_deck": "the hint deck, bottom right",
 }
 _LABEL_PLACES = (
     ("menu_", "on the main menu"), ("drawer_", "in the table menu"),
@@ -59,6 +63,7 @@ _LABEL_PLACES = (
     ("gc_", "in Game Center"), ("look_", "in Choose Look"), ("help_", "on Help"),
     ("faq_", "on the FAQ"), ("qa_", "on the QA page"), ("tc_", "on the Terms card"),
     ("last_score_", "on Last Score"), ("stats_", "on Statistics"), ("ad_", "on the ad"),
+    ("hint_", "on the table"),
 )
 _WORDS = {"faq": "FAQ", "qa": "QA", "x": "X"}
 
@@ -132,9 +137,38 @@ def have(name: str) -> bool:
 
 
 # Crops whose centre is not on their control: the point inside the crop to tap.
-# more_games is mostly felt above the gift; its centre missed the button on
-# 3 taps in 5, its "More Games" label on none in 10.
-TAP_AT = {"more_games": (288, 200)}
+# more_games is mostly felt above the gift; its centre missed the button.
+# choose_look's centre sits between the cards and the label. look_close's
+# crop still has wood above the X.
+TAP_AT = {
+    "more_games": (288, 200),
+    "choose_look": (300, 155),
+    "look_close": (67, 80),
+}
+
+
+def _letter_offset(needle):
+    """Centre of white/silver lettering in a BGR crop, or None.
+
+    Menu words are gray-white on teal. The crop's geometric centre is often
+    empty felt or the promo wood (About), which is a live strip and eats the
+    tap. Ignore saturated felt/wood; keep near-gray highlights.
+    """
+    import numpy as np
+
+    mx = needle.max(axis=2)
+    mn = needle.min(axis=2)
+    letters = (mx >= 160) & ((mx - mn) <= 50)
+    if int(letters.sum()) < 80:
+        return None
+    ys, xs = np.where(letters)
+    return (float(xs.mean()), float(ys.mean()))
+
+
+def _tap_offset(name, needle):
+    if name in TAP_AT:
+        return TAP_AT[name]
+    return _letter_offset(needle)
 
 
 def _find_once(name: str, at=None):
@@ -159,6 +193,8 @@ def _find_once(name: str, at=None):
     _, score, _, top_left = cv2.minMaxLoc(result)
     if score < THRESHOLD:
         return None
+    if at is None:
+        at = _tap_offset(name, needle)
     if at:
         return (int(top_left[0] + at[0]), int(top_left[1] + at[1]))
     height, width = needle.shape[:2]
@@ -226,11 +262,11 @@ def seen(name: str, timeout: float = 8.0) -> bool:
     return False
 
 
-@says(lambda name, settle=1.0: f"Tap {label(name)}", done=True)
+@says(lambda name, settle=1.0: f"Tap {label(name)}")
 def tap(name: str, settle: float = 1.0) -> bool:
     if not have(name):
         return False
-    point = find(name, TAP_AT.get(name))
+    point = find(name)
     if not point:
         return False
     helpers.tap(point, settle=settle)
@@ -363,7 +399,7 @@ def close_house_promo(wait: float = 0.0) -> bool:
         time.sleep(0.4)
 
 
-@says("Leave the game table (Back)", done=True)
+@says("Leave the game table (Back)")
 def leave_table(settle: float = 1.6) -> bool:
     """If the gameplay screen is up, tap Back. Never cold-launch from here."""
     settle_prompts()
@@ -383,7 +419,7 @@ def leave_table(settle: float = 1.6) -> bool:
     return True
 
 
-@says("Close the Daily calendar", done=True)
+@says("Close the Daily calendar")
 def leave_daily(settle: float = 1.6) -> bool:
     """Close the Daily calendar if it is up."""
     if not (is_on("screen_daily") or is_on("daily_back")):
@@ -396,7 +432,7 @@ def leave_daily(settle: float = 1.6) -> bool:
     return True
 
 
-@says("Close Statistics", done=True)
+@says("Close Statistics")
 def leave_stats(settle: float = 1.4) -> bool:
     """Close Statistics via its own back control — never the menu Daily button."""
     if not expect_screen("stats", timeout=0.8):
@@ -483,27 +519,34 @@ def answer_tracking() -> bool:
     """Allow the ATT prompt, by alert text or, failing that, by its crop."""
     if helpers.allow_tracking():
         return True
-    return is_on("att_prompt") and tap("att_allow", settle=1.5)
+    return is_on("att_prompt") and tap("att_allow", settle=0.4)
 
 
-def clear_overlays(rounds: int = 6) -> int:
+def clear_overlays(rounds: int = 8, wait: float = 2.5) -> int:
     """Dismiss first-launch T&C and ATT, ATT first.
 
     ATT can sit on top of the T&C card; a Continue tap would land on it.
+    After Continue the tracking prompt takes a moment — keep looking for
+    *wait* seconds instead of giving up on the first empty frame.
     """
     cleared = 0
+    deadline = None  # wait for the next gate only after one was dismissed
     for _ in range(rounds):
         did = answer_tracking()
         if not did and is_on("tc_continue"):
-            did = tap("tc_continue", settle=2.0)
+            did = tap("tc_continue", settle=0.4)
         if not did:
-            alert = helpers.alert_text().lower()
+            alert = helpers.alert_text(timeout=2).lower()
             if alert and any(gate in alert for gate in FIRST_LAUNCH_GATES):
                 did = helpers.accept_alert()
-        if not did:
+        if did:
+            cleared += 1
+            deadline = time.time() + wait
+            time.sleep(0.2)
+            continue
+        if deadline is None or time.time() >= deadline:
             break
-        cleared += 1
-        time.sleep(0.8)
+        time.sleep(0.2)
     return cleared
 
 
@@ -653,7 +696,9 @@ def launch_to_menu(force: bool = False) -> bool:
     clear_overlays()
     settle_prompts()
     close_house_promo()
-    if on_menu(3.0):
+    if on_menu(1.0):
+        return True
+    if clear_overlays(wait=1.5) and on_menu(1.5):
         return True
     if leave_table() and on_menu(4.0):
         return True
@@ -671,8 +716,8 @@ def launch_to_menu(force: bool = False) -> bool:
         tap("look_close", settle=1.2)
         if on_menu(3.0):
             return True
-    time.sleep(2.5)
-    clear_overlays()
+    if clear_overlays(wait=1.0) and on_menu(2.0):
+        return True
     if leave_table() and on_menu(4.0):
         return True
     leave_daily()
@@ -1385,7 +1430,7 @@ def _locate_in(name: str, img):
     return (int(top_left[0] + width / 2), int(top_left[1] + height / 2))
 
 
-@says("Open the table menu (menu button, top right)", done=True)
+@says("Open the table menu (menu button, top right)")
 def open_table_drawer() -> bool:
     """Tap the table's "menu" so the replay / options / new drawer slides up."""
     if is_on("drawer_options"):

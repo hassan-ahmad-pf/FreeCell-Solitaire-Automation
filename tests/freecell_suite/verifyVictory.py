@@ -8,6 +8,7 @@ covers the Victory screen afterwards.
 VI-01  Easy, Synthetic Win, the Victory screen
 VI-02  ranking header, current / rank / best, leaderboards, achievements,
        help, new and stats are all drawn
+VI-08  current / rank / best values for score, time, moves and run
 VI-03  the footer says "easy level"
 VI-04  Victory's own back returns to the main menu
 
@@ -26,6 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.dirname(os.path.dirname(HERE))]
 
 import caselog  # noqa: E402
+import daily  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
 
@@ -64,13 +66,23 @@ def run() -> None:
         missing = [f"{d} ({n})" for n, d in PARTS.items() if not ui.is_on(n)]
         ui.expect(not missing, f"the Victory screen is missing {len(missing)} "
                                f"element(s): {'; '.join(missing)}")
+        c.shot(ui.shoot("VictoryParts"))
         c.note(f"all {len(PARTS)} parts drawn")
+
+    with caselog.case("VI-08") as c:
+        shot = c.shot(ui.shoot("VictoryTableValues"))
+        table = daily.check_victory_table(shot, daily_farm=False)
+        score = table["score"]
+        c.note(f"current {score['current']:,}  rank {score['rank']}  "
+               f"best {score['best']}; time {table['time']['current']}  "
+               f"moves {table['moves']['current']}  run {table['run']['current']}")
 
     with caselog.case("VI-03") as c:
         caselog.step(f"Check the footer says '{LEVEL} level', the game just played")
         ui.expect(ui.is_on(f"victory_level_{LEVEL}"),
                   f"the Victory footer does not say '{LEVEL} level', so it does not "
                   "reflect the game just played")
+        c.shot(ui.shoot("VictoryLevel"))
         c.note(f"footer: {LEVEL} level")
 
     with caselog.case("VI-04") as c:

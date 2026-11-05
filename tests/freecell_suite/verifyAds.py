@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""verifyAds: pin AppLovin in MAX's debugger, then the leave-game ad. [ONLINE]
+"""verifyAds: pin AppLovin, play while it fills, then one leave-game interstitial. [ONLINE]
 
-FreeCell's Dev Panel is its QA page — tap the menu's CONFIDENTIAL watermark
-with QA on — and its Max Debugger button is the page's "Max: Adapters" row,
-which opens AppLovin's MAX Mediation Debugger. The debugger is native UIKit
-with a real accessibility tree.
+FreeCell's QA page (menu CONFIDENTIAL, QA on) has Max: Adapters, which
+opens AppLovin's MAX Mediation Debugger. The debugger is native UIKit.
 
-AD-01  online, QA on, the QA page opens and offers Max: Adapters
-AD-02  Adapters opens the MAX Mediation Debugger, FreeCell still in front
-AD-03  the Ads section's Select Live Network (or Live Network) row is on screen
-AD-04  its picker opens and AppLovin carries the checkmark
-AD-06  debugger closed, a game, 30 s, Back: an interstitial plays inside
-       FreeCell and its close controls (store X, then the ad X) close it.
-       If Back shows none, the next resume shows it, which also passes.
-AD-07  after the ad, the game table is showing again (FreeCell's Back ad
-       closes onto the menu, so the paused game is resumed)
+1  Setup: tap CONFIDENTIAL — the QA page shows Max: Adapters
+2  Setup: Max: Adapters opens the MAX debugger, still in FreeCell
+3  Setup: scroll the debugger to Select Live Network
+4  Setup: tick AppLovin as the live network
+5  Setup: leave the debugger, play and close any ad already cached from
+   before AppLovin was ticked (there is no flush), then deal Easy and keep
+   playing cards so MAX can fill a fresh AppLovin interstitial
+6  Ad: Back from that table — interstitial inside FreeCell, then close it
+   (store X, then the ad X). If Back is empty, the next Resume counts.
+7  After the ad: Back landed on the menu — Resume; the gameplay screen is showing
+
+Ads arrive after you leave, not instantly; the closer taps the X as soon
+as one is up. AppLovin needs time after it is ticked; AD-05 spends 20 s
+on the table playing so a fill can land, not a longer idle sit.
 
 Rows scrolled out of view stay in the debugger's tree with untappable rects,
 so rows are looked up visible-only. "AppLovin" is also listed under the
@@ -46,7 +49,7 @@ LIVE_NETWORK = "Select Live Network"
 LIVE_NETWORK_SELECTED = "Live Network"
 NETWORK = "AppLovin"
 SWIPES = 8
-TABLE_WAIT = 32.0
+FILL_PLAY = 20.0
 BACK_AD_WAIT = 20.0
 ENTER_AD_WAIT = 20.0
 
@@ -73,7 +76,7 @@ def _scroll_to_live_row() -> tuple[str, dict] | None:
         found = _live_row()
         if found:
             return found
-        helpers.wda_swipe((645, 2100), (645, 1000), duration_ms=500, settle=1.5)
+        helpers.wda_swipe((645, 2100), (645, 1000), duration_ms=400, settle=0.6)
     return _live_row()
 
 
@@ -85,7 +88,7 @@ def _same_row(a: dict | None, b: dict | None) -> bool:
 
 
 def _open_debugger() -> None:
-    ui.expect(ui.tap("qa_page_adapters", settle=5.0),
+    ui.expect(ui.tap("qa_page_adapters", settle=1.2),
               "the QA page has no 'Max: Adapters' row to tap")
 
 
@@ -94,12 +97,26 @@ def _unwind() -> None:
     if _window(LIVE_NETWORK, timeout=1.0):
         print(f"  a previous run left the {LIVE_NETWORK!r} window open — backing out",
               flush=True)
-        fc.tap_named("Button", "BackButton", settle=2.0)
+        fc.tap_named("Button", "BackButton", settle=0.8)
     if _debugger_open(timeout=1.0):
         print("  a previous run left the debugger open — closing it", flush=True)
-        fc.tap_named("Button", "Done", settle=2.0)
+        fc.tap_named("Button", "Done", settle=0.8)
     if ui.is_on("qa_page_back"):
-        ui.tap("qa_page_back", settle=2.0)
+        ui.tap("qa_page_back", settle=0.8)
+
+
+def _leave_debugger() -> None:
+    """Back out of the live-network picker, the debugger and the QA page."""
+    if _window(LIVE_NETWORK, timeout=1.0):
+        ui.expect(fc.tap_named("Button", "BackButton", settle=0.8),
+                  f"could not back out of the {LIVE_NETWORK!r} picker")
+    if _debugger_open(timeout=1.5):
+        ui.expect(fc.tap_named("Button", "Done", settle=0.8),
+                  "the debugger has no Done button")
+        ui.expect(not _debugger_open(timeout=2.0), "the debugger did not close")
+    if ui.is_on("qa_page_back"):
+        ui.expect(ui.tap("qa_page_back", settle=0.8), "the QA page has no back control")
+    ui.expect(ui.on_menu(6.0), "back from the QA page did not reach the main menu")
 
 
 @says("Go back into the game: Play, then Resume")
@@ -110,13 +127,13 @@ def _resume_table() -> None:
     ui.settle_prompts()
     if not ui.on_menu(3.0):
         ui.expect(ui.to_menu(), "could not reach the menu to resume the game")
-    if not ui.tap("menu_play", settle=2.0):
-        helpers.wda_tap(ui.MENU_PLAY, settle=2.0)
+    if not ui.tap("menu_play", settle=1.0):
+        helpers.wda_tap(ui.MENU_PLAY, settle=1.0)
     ui.expect(ui.wait_for("difficulty_easy", timeout=6.0), "Play did not open the picker")
     if ui.is_on("resume"):
-        ui.expect(ui.tap("resume", settle=2.0), "Resume could not be tapped")
+        ui.expect(ui.tap("resume", settle=1.0), "Resume could not be tapped")
     else:
-        ui.expect(ui.tap("difficulty_easy", settle=2.0), "Easy could not be tapped")
+        ui.expect(ui.tap("difficulty_easy", settle=1.0), "Easy could not be tapped")
         ui.answer_prompt("abandon")
 
 
@@ -132,13 +149,13 @@ def run() -> None:
 
     with caselog.case("AD-01") as c:
         fc.ensure_qa()
-        ui.expect(ui.tap("qa_watermark", settle=3.0),
+        ui.expect(ui.tap("qa_watermark", settle=1.2),
                   "the menu has no CONFIDENTIAL watermark to open the QA page from")
         caselog.step("Check the QA page opened with its 'Max: Adapters' row")
         ui.expect(ui.seen("qa_page_adapters", timeout=6.0),
                   "the QA page did not open, or it has no 'Max: Adapters' row")
         c.shot(ui.shoot("ad_dev_panel"))
-        c.note("QA page open, offers Max: Adapters")
+        c.note("setup — QA page open, Max: Adapters showing")
 
     with caselog.case("AD-02") as c:
         _open_debugger()
@@ -148,14 +165,14 @@ def run() -> None:
                   f"{helpers.active_app() or 'unknown'}")
         ui.expect(helpers.in_app(), "the debugger left FreeCell")
         c.shot(ui.shoot("ad_max_debugger"))
-        c.note(f"{DEBUGGER} open, FreeCell in front")
+        c.note(f"setup — {DEBUGGER} open, still in FreeCell")
 
     with caselog.case("AD-03") as c:
         found = _scroll_to_live_row()
         if not found:
             print("  Ads section not in view — reopening the debugger from the top",
                   flush=True)
-            fc.tap_named("Button", "Done", settle=2.0)
+            fc.tap_named("Button", "Done", settle=0.8)
             _open_debugger()
             ui.expect(_debugger_open(timeout=12.0), "reopening Adapters did not bring "
                                                     "the debugger back")
@@ -164,14 +181,14 @@ def run() -> None:
                          f"into view in {SWIPES} swipes")
         row_label, row = found
         c.shot(ui.shoot("ad_ads_section"))
-        c.note(f"Ads section: {row_label!r} on screen")
+        c.note(f"setup — Ads section, {row_label!r} on screen")
 
     with caselog.case("AD-04") as c:
         already = row_label == LIVE_NETWORK_SELECTED and _same_row(
             row, fc.visible_rect("StaticText", NETWORK))
         print(f"  {NETWORK} already the live network: {already}", flush=True)
         caselog.step(f"Tap '{row_label}' in the debugger")
-        fc.tap_rect(row, settle=3.0)
+        fc.tap_rect(row, settle=1.0)
         caselog.step(f"Check the '{LIVE_NETWORK}' picker opened and lists {NETWORK}")
         ui.expect(_window(LIVE_NETWORK), f"tapping {row_label!r} did not open the "
                                          f"{LIVE_NETWORK!r} picker")
@@ -181,29 +198,46 @@ def run() -> None:
         print(f"  a network was already ticked: {bool(tick)}", flush=True)
         if not _same_row(pick, fc.rect(tick) if tick else None):
             caselog.step(f"Tap {NETWORK} to make it the live network")
-            fc.tap_rect(pick, settle=3.0)
+            fc.tap_rect(pick, settle=1.0)
         caselog.step(f"Check the checkmark is on {NETWORK}")
         tick = fc.named("Button", "checkmark", timeout=8.0)
         ui.expect(_same_row(fc.visible_rect("StaticText", NETWORK),
                             fc.rect(tick) if tick else None),
                   f"the checkmark is not on {NETWORK} after selecting it")
         c.shot(ui.shoot("ad_applovin"))
-        c.note(f"{NETWORK} ticked on {LIVE_NETWORK}")
+        c.note(f"setup — {NETWORK} ticked on {LIVE_NETWORK}")
+
+    with caselog.case("AD-05") as c:
+        _leave_debugger()
+        print("  setup: AppLovin is pinned. Any ad already in cache is from before "
+              "that pin — playing it now to waste it.", flush=True)
+        wasted = fc.waste_cached_ad()
+        if wasted:
+            print("  setup: old cached ad is gone. Sitting on a new deal so MAX can "
+                  f"fill a fresh {NETWORK} interstitial.", flush=True)
+        else:
+            print(f"  setup: cache was empty. Sitting on a new deal so {NETWORK} can fill.",
+                  flush=True)
+        if not ui.at_table(timeout=2.0):
+            if not ui.on_menu(3.0):
+                fc.menu()
+            fc.enter_game("easy")
+        n = fc.play_to_fill(FILL_PLAY, f"a fresh {NETWORK} ad can load")
+        caselog.step("Check the game table is still showing after the fill play")
+        ui.expect(ui.at_table(timeout=4.0), "play left the game table")
+        c.shot(ui.shoot("ad_fill_play"))
+        c.note(("wasted the pre-AppLovin cached ad, then " if wasted else "")
+               + f"played {n} moves on Easy after {NETWORK} so a fresh ad can fill")
 
     with caselog.case("AD-06") as c:
-        ui.expect(fc.tap_named("Button", "BackButton", settle=2.0),
-                  f"could not back out of the {LIVE_NETWORK!r} picker")
-        ui.expect(fc.tap_named("Button", "Done", settle=2.0),
-                  "the debugger has no Done button")
-        ui.expect(not _debugger_open(timeout=2.0), "the debugger did not close")
-        ui.expect(ui.tap("qa_page_back", settle=2.0), "the QA page has no back control")
-        ui.expect(ui.on_menu(6.0), "back from the QA page did not reach the main menu")
-        fc.loaded_table("the leave-game ad")
-        caselog.step(f"Wait {TABLE_WAIT:.0f} s on the game table (ads have a cooldown)")
-        time.sleep(TABLE_WAIT)
+        if not ui.at_table(timeout=2.0):
+            _leave_debugger()
+            fc.enter_game("easy")
+            fc.play_to_fill(FILL_PLAY, f"{NETWORK} can fill")
         ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
         where = "leave-game"
         if not fc.wait_ad(timeout=BACK_AD_WAIT):
+            caselog.step("No interstitial on Back — Resume and wait for one")
             print("  no interstitial on Back — trying the next resume", flush=True)
             where = "resume"
             _resume_table()
@@ -216,7 +250,7 @@ def run() -> None:
         fc.close_or_wait(where)
         if where in fc.MANUAL_CLOSES:
             c.note("passed manually — the ad was closed by hand")
-        c.note(f"{where} interstitial played inside FreeCell and closed")
+        c.note(f"ad — {where} interstitial inside FreeCell, then closed")
 
     with caselog.case("AD-07") as c:
         if not ui.at_table(timeout=6.0):
@@ -228,10 +262,10 @@ def run() -> None:
         caselog.step("Check the game table is showing after the ad")
         ui.expect(ui.at_table(timeout=10.0), "the game table is not showing after the ad")
         c.shot(ui.shoot("ad_back_on_table"))
-        c.note("back on the game table")
+        c.note("after the ad — Resume put the paused game back on the gameplay screen")
 
-    print(f"PASS: {NETWORK} pinned in MAX's debugger, the leave-game ad closed, back "
-          "on the table")
+    print(f"PASS: {NETWORK} pinned in MAX's debugger, cards played while it filled, "
+          "the leave-game ad closed, back on the table")
 
 
 if __name__ == "__main__":

@@ -20,7 +20,8 @@ ST-04  Back returns to the main menu
 
 A confirmed reset always sends FreeCell to the main menu, so three visits is
 the fewest. It runs after every test that needs the wins it wipes
-(verifyMoreGamesIcons draws its strip only after a won game). Pages are
+(verifyMoreGamesIcons draws its strip only after a won game; visitLastScore
+then reads that score in the same online session). Pages are
 compared above the banner ad, which changes on its own when online, and
 below the header, where iOS notification banners drop in.
 
@@ -173,6 +174,7 @@ def run() -> None:
 
     with caselog.case("RS-05", soft=True) as c:
         ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press the second Yes")
+        caselog.step("Check the main menu came back after both Yes")
         ui.expect(ui.on_menu(10.0), "the main menu did not come back after both Yes")
         _stats("daily")
         after, shot = _read("DailyStatsAfterReset")
@@ -201,6 +203,9 @@ def run() -> None:
         _stats("solo")
         ui.expect(ui.scroll_to_bottom("reset_solo_stats", max_swipes=20),
                   "could not scroll down to Reset Solo Statistics")
+        caselog.step("Check Reset Solo Statistics is at the bottom of the Solo tab")
+        ui.expect(ui.is_on("reset_solo_stats"),
+                  "Reset Solo Statistics is not showing at the bottom of Solo")
         c.shot(ui.shoot("StatsBottom"))
         c.note("Reset Solo Statistics reached at the bottom")
 
@@ -216,9 +221,7 @@ def run() -> None:
         after_page = c.shot(ui.shoot("StatsResetCancelledAfter"))
         changed = fc.diff_frac(before_page, after_page, PAGE)
         if changed > SAME:
-            caselog.step(f"Wait {BANNER_GONE:.0f} s for a notification banner to go, then "
-                         "look again")
-            time.sleep(BANNER_GONE)
+            caselog.wait(BANNER_GONE, "for a notification banner to go, then look again")
             after_page = c.shot(ui.shoot("StatsResetCancelledAfterAgain"))
             changed = fc.diff_frac(before_page, after_page, PAGE)
         ui.expect(changed <= SAME, f"No changed {changed:.2%} of the Statistics page — "
@@ -236,6 +239,7 @@ def run() -> None:
         ui.expect(fc.wait_alert("safe side", timeout=6.0),
                   "the second 'safe side' confirmation did not appear")
         ui.expect(helpers.answer_alert("Yes", settle=1.5), "could not press the second Yes")
+        caselog.step("Check the main menu came back after both Yes")
         ui.expect(ui.on_menu(10.0), "the main menu did not come back after both Yes")
         _stats("solo")
         cleared = c.shot(ui.shoot("ResetStatsAfter"))
@@ -251,6 +255,7 @@ def run() -> None:
         fc.clear_ad("Statistics back", wait=3.0 if fc.is_online() else 0.0)
         caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(6.0), "Statistics back did not return to the main menu")
+        c.shot(ui.shoot("StatsBack"))
         c.note("back on the main menu")
 
     caselog.raise_if_failed()

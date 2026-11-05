@@ -82,11 +82,14 @@ def run() -> None:
                        if value.lower() not in subject]
             ui.expect(not missing, f"the subject {draft['subject']!r} does not name "
                                    f"{', '.join(missing)}")
+            c.shot(ui.shoot("SubmitFeedbackSubject"))
             c.note(draft["subject"])
     finally:
         with caselog.case("FB-05") as c:
             discarded = fc.mail_discard()
+            caselog.step("Check the Mail draft was deleted and nothing was sent")
             ui.expect(discarded, "the draft could not be deleted — check Mail; nothing was sent")
+            c.shot(ui.shoot("SubmitFeedbackDeleted"))
             c.note("draft deleted, nothing sent")
 
     with caselog.case("FB-06") as c:

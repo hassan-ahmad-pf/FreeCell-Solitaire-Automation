@@ -77,6 +77,7 @@ def _walk_link(tag: str, link: str, page: str, label: str) -> None:
                 f"could not tap the card's {label} link (see {missed})")
     shot = None
     try:
+        caselog.wait(5.0, "for the policy page to finish loading")
         if not ui.seen(page, timeout=12.0):
             failed = helpers.screenshot(f"first_launch_{tag}_page_failed")
             raise AssertionError(

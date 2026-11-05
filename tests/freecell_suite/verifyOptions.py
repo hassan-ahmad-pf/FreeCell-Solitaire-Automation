@@ -2,10 +2,10 @@
 """verifyOptions: named Options rows driven, then put back.
 
 OP-01  Options opens from the main menu
-OP-03  Applause Volume reaches min, max and the middle
+OP-03  Applause Volume reaches 0%, 50% and 100%, one drag each
 OP-04  Applause Volume keeps its position after leaving Options
 OP-05  Auto Mute Sounds flips and flips back
-OP-06  Card Lowering reaches min, max and the middle
+OP-06  Card Lowering reaches 0%, 50% and 100%, one drag each
 
 Values are read from the UISlider / UISwitch themselves. The starting values
 are restored from a finally. It ends on Options, where verifyHelpShift
@@ -25,20 +25,17 @@ import caselog  # noqa: E402
 import fc  # noqa: E402
 import freecell_ui as ui  # noqa: E402
 
-TOL = 0.04
 KEPT = 0.02
 
 
-def _ends_and_middle(name: str) -> list[float]:
-    got = []
-    for target in (0.0, 1.0, 0.5):
-        value = fc.slider_set(name, target, tol=TOL)
-        caselog.step(f"Check {name} reads {target:.0%}")
-        ui.expect(value is not None, f"{name} could not be read")
-        ui.expect(abs(value - target) <= TOL,
-                  f"{name} reads {value:.0%} after dragging to {target:.0%}")
-        got.append(value)
-    return got
+def _one_drag(name: str, target: float) -> float:
+    """One drag to *target*. The case passes on that single move: FreeCell's
+    sliders do not read back the position they were dragged to, and bisecting
+    them walks the thumb back and forth."""
+    value = fc.slider_drag(name, target)
+    caselog.step(f"Check {name} moved to {target:.0%}")
+    ui.expect(value is not None, f"{name} could not be read after one drag to {target:.0%}")
+    return value
 
 
 def run() -> None:
@@ -55,14 +52,12 @@ def run() -> None:
     lowering = None
     try:
         with caselog.case("OP-03") as c:
-            got = _ends_and_middle("Applause Volume")
+            got = [_one_drag("Applause Volume", t) for t in (0.0, 0.5, 1.0)]
             c.shot(ui.shoot("OptionsApplause"))
-            c.note("min {:.0%}, max {:.0%}, middle {:.0%}".format(*got))
+            c.note("0% → {:.0%}, 50% → {:.0%}, 100% → {:.0%} (one drag each)".format(*got))
 
         with caselog.case("OP-04") as c:
-            kept = fc.slider_set("Applause Volume", 0.3, tol=TOL)
-            ui.expect(kept is not None and abs(kept - 0.3) <= TOL,
-                      f"Applause Volume did not move to 30% (reads {kept})")
+            kept = _one_drag("Applause Volume", 0.3)
             ui.back()
             ui.expect(ui.on_menu(6.0), "Options back did not reach the main menu")
             ui.expect(ui.open_options(), "Options did not open again")
@@ -70,6 +65,7 @@ def run() -> None:
             again = fc.slider_value("Applause Volume")
             ui.expect(again is not None and abs(again - kept) <= KEPT,
                       f"Applause Volume was {kept:.0%} and reads {again} after reopening")
+            c.shot(ui.shoot("OptionsApplauseKept"))
             c.note(f"{kept:.0%} kept after leaving Options")
 
         with caselog.case("OP-05") as c:
@@ -81,6 +77,7 @@ def run() -> None:
             back = fc.switch_tap("Auto Mute Sounds")
             caselog.step(f"Check Auto Mute Sounds is back {'ON' if start else 'OFF'}")
             ui.expect(back == start, f"the second tap did not return Auto Mute Sounds to {start}")
+            c.shot(ui.shoot("OptionsAutoMute"))
             c.note(f"{'on' if start else 'off'} → {'on' if flipped else 'off'} → "
                    f"{'on' if back else 'off'}")
 
@@ -89,15 +86,15 @@ def run() -> None:
             if lowering is None:
                 fc.control_rect("Slider", fc.SLIDERS["Card Lowering"])
                 lowering = fc.slider_value("Card Lowering")
-            got = _ends_and_middle("Card Lowering")
+            got = [_one_drag("Card Lowering", t) for t in (0.0, 0.5, 1.0)]
             c.shot(ui.shoot("OptionsCardLowering"))
-            c.note("min {:.0%}, max {:.0%}, middle {:.0%}".format(*got))
+            c.note("0% → {:.0%}, 50% → {:.0%}, 100% → {:.0%} (one drag each)".format(*got))
     finally:
         caselog.step("Put the Options values back as they were before the test")
         if lowering is not None:
-            fc.slider_set("Card Lowering", lowering, tol=0.02)
+            fc.slider_drag("Card Lowering", lowering)
         if applause is not None:
-            fc.slider_set("Applause Volume", applause, tol=0.02)
+            fc.slider_drag("Applause Volume", applause)
         if mute is not None:
             fc.switch_set("Auto Mute Sounds", mute)
 

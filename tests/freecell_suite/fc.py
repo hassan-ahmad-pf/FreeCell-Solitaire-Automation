@@ -18,11 +18,13 @@ from __future__ import annotations
 import fcntl
 import heapq
 import itertools
+import json
 import os
 import re
 import sys
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import NamedTuple
 
 import requests
@@ -75,7 +77,7 @@ def main(run) -> None:
     try:
         run()
     except Exception as exc:  # noqa: BLE001
-        print(f"FAIL: {exc}")
+        print(f"FAIL: {exc}", flush=True)
         sys.exit(1)
 
 
@@ -278,7 +280,7 @@ NAMED = {"BackButton": "Back", "close icon": "the close icon",
          "Mail.compose.popoverAlert.deleteDraft": "Delete Draft"}
 
 
-@says(lambda kind, name, settle=1.0, timeout=0.0: f"Tap {NAMED.get(name, name)}", done=True)
+@says(lambda kind, name, settle=1.0, timeout=0.0: f"Tap {NAMED.get(name, name)}")
 def tap_named(kind: str, name: str, settle: float = 1.0, timeout: float = 0.0) -> bool:
     eid = named(kind, name, timeout=timeout)
     r = rect(eid) if eid else None
@@ -288,7 +290,8 @@ def tap_named(kind: str, name: str, settle: float = 1.0, timeout: float = 0.0) -
     return True
 
 
-def drag_points(start, end, move_ms: int = 600, hold_ms: int = 200) -> None:
+def drag_points(start, end, move_ms: int = 600, hold_ms: int = 200,
+                pause: float | None = None, settle: float = 0.6) -> None:
     """Press, drag and lift in WDA points."""
     body = {"actions": [{
         "type": "pointer", "id": "freecell-suite-drag",
@@ -303,49 +306,24 @@ def drag_points(start, end, move_ms: int = 600, hold_ms: int = 200) -> None:
             {"type": "pointerUp", "button": 0},
         ],
     }]}
-    helpers.post_gesture(body, "drag", helpers.TAP_PAUSE).raise_for_status()
-    time.sleep(0.6)
+    helpers.post_gesture(body, "drag", helpers.TAP_PAUSE if pause is None else pause
+                         ).raise_for_status()
+    if settle:
+        time.sleep(settle)
 
 
 # ── QA ─────────────────────────────────────────────────────────────
 
-# The QA page's interstitial SHOW (pixels) is grey until an interstitial has
-# loaded and black once one has; it updates while the page is open.
-QA_SHOW = (290, 995, 470, 1065)
+# Extra live play (or a sit on the menu) so MAX has time to fill.
+FILL_PLAY = 20.0
+# FreeCell's ads can land ~10 s after their trigger.
+LATE_AD = 12.0
 
 
-def inter_loaded() -> bool:
-    """On the QA page: an interstitial is loaded and ready to show."""
-    img = ui.screen_rgb()
-    if not ui._locate_in("qa_page_adapters", img):
-        return False
-    x0, y0, x1, y1 = QA_SHOW
-    return int((img[y0:y1, x0:x1].min(axis=2) < 90).sum()) > 500
-
-
-def await_inter(timeout: float = 300.0) -> float:
-    """On the QA page: wait until an interstitial is loaded. Seconds waited."""
-    t0 = time.time()
-    loaded = inter_loaded()
-    while not loaded and time.time() - t0 < timeout:
-        time.sleep(2.0)
-        loaded = inter_loaded()
-    ui.expect(loaded, f"no interstitial loaded within {timeout:.0f}s (the QA page's SHOW "
-                      "stayed grey) — no ad fill, so the ad point cannot be measured")
-    return time.time() - t0
-
-
-@says("Open the QA page and wait until an ad has loaded")
-def wait_inter_loaded(timeout: float = 300.0) -> float:
-    """From the main menu: wait on the QA page until an interstitial is
-    loaded, then return to the menu. Seconds waited."""
-    ui.expect(ui.tap("qa_watermark", settle=1.5) and ui.seen("qa_page_adapters", 4.0),
-              "the QA page did not open from the menu's CONFIDENTIAL watermark")
-    try:
-        return await_inter(timeout)
-    finally:
-        ui.tap("qa_page_back", settle=1.5)
-        ui.expect(ui.on_menu(6.0), "back from the QA page did not reach the main menu")
+def wait_for_fill(seconds: float = FILL_PLAY) -> float:
+    """Sit *seconds* so MAX can fill. Used on the menu, where there is no play."""
+    caselog.wait(seconds, "waiting for an interstitial to load")
+    return seconds
 
 
 @says(lambda deal: "Deal a new game: Play, Easy, Yes to abandon the old one" if deal
@@ -364,38 +342,111 @@ def enter_from_menu(deal: bool) -> None:
         helpers.answer_alert("Yes", settle=1.0)
 
 
-# FreeCell's ads can land ~10 s after their trigger.
-LATE_AD = 12.0
+def play_to_fill(seconds: float, why: str = "an ad can fill") -> int:
+    """Keep playing Easy so MAX can fill while the game is running.
 
-
-@says(lambda label, ready_wait=300.0: "Get onto the game table with an ad loaded and ready "
-                                      "(checked on the QA page)")
-def loaded_table(label: str, ready_wait: float = 300.0) -> None:
-    """Onto the table with an interstitial loaded and no cooldown running.
-
-    FreeCell's ads do not always fill, so an ad point is measured only
-    once the QA page shows one loaded: menu, QA page until
-    SHOW, then Resume. An ad on the way in uses that one up, so the detour
-    starts again.
+    A Victory mid-play stops this clock, deals Easy again, and starts a fresh
+    fill wait — leaving Victory must not eat the play time. Returns the move
+    count; seconds on the current table are on play_to_fill.on_table.
     """
-    for _ in range(3):
-        if ui.at_table(timeout=1.0):
-            ui.expect(ui.tap("back_game", settle=1.0), "the table's Back could not be tapped")
-        clear_ad(f"{label} setup", wait=LATE_AD)
-        if not ui.on_menu(3.0):
-            menu()
-        waited = wait_inter_loaded(ready_wait)
-        enter_from_menu(deal=False)
-        if clear_ad(f"{label} resume", wait=LATE_AD):
-            print("  entering the game showed an ad, which used up the loaded one — "
-                  "waiting for the next", flush=True)
+    ui.expect(ui.at_table(timeout=8.0), "Easy did not reach the table")
+    ui.await_rules_prompt()
+    moved = 0
+    table_t0 = time.time()
+    need = seconds
+    while need > 0.5:
+        restarted = False
+        with caselog.live(need, why, announce=f"Play {need:.0f} s so {why}") as deadline:
+            while time.time() < deadline:
+                if ui.expect_screen("victory", timeout=0.3):
+                    print("  the deal ended in Victory — dealing Easy again so play continues",
+                          flush=True)
+                    restarted = True
+                    break
+                try:
+                    _before, _after, card = play_one_move()
+                    moved += 1
+                    left = max(deadline - time.time(), 0)
+                    print(f"  moved {card} ({moved} moves, {left:.0f}s of play left)",
+                          flush=True)
+                    if moved % 4 == 0:
+                        ui.tap("hint_undo", settle=0.5)
+                    continue
+                except AssertionError:
+                    if ui.tap("hint_undo", settle=0.5):
+                        print("  no legal move — undo and try again", flush=True)
+                        continue
+                    need = 0
+                    break
+            else:
+                need = 0
+        if restarted:
+            if ad_up():
+                close_or_wait("Victory during fill play")
+            ui.leave_victory()
+            enter_game("easy")
+            ui.await_rules_prompt()
+            table_t0 = time.time()
+            need = seconds
             continue
-        ui.settle_prompts()
-        ui.expect(ui.at_table(timeout=8.0), "Resume did not reach the game table")
-        print(f"  interstitial loaded (QA SHOW after {waited:.0f}s) — on the table for "
-              f"{label}", flush=True)
+        break
+    if moved == 0 and ui.at_table(timeout=4.0):
+        try:
+            _before, _after, card = play_one_move()
+            moved += 1
+            print(f"  moved {card} ({moved} moves) after the fill wait", flush=True)
+        except AssertionError:
+            pass
+    ui.expect(moved > 0, "could not play any card while the ad was filling")
+    play_to_fill.on_table = time.time() - table_t0
+    return moved
+
+
+play_to_fill.on_table = 0.0
+
+
+@says(lambda label: f"Get onto the game table for {label}")
+def _reach_table(label: str) -> None:
+    if ad_up():
+        close_or_wait(f"{label} leftover")
+    if ui.at_table(timeout=2.0):
         return
-    raise AssertionError(f"could not reach the table with an interstitial loaded for {label}")
+    if ui.expect_screen("victory", timeout=0.5):
+        ui.leave_victory()
+        enter_game("easy")
+        ui.settle_prompts()
+        ui.expect(ui.at_table(timeout=8.0), "Easy did not reach the table after Victory")
+        return
+    if not ui.on_menu(3.0):
+        menu()
+    enter_from_menu(deal=False)
+    if ad_up():
+        close_or_wait(f"{label} resume")
+        ui.settle_prompts()
+        if not ui.at_table(timeout=4.0):
+            enter_from_menu(deal=False)
+    ui.settle_prompts()
+    if ui.at_table(timeout=4.0):
+        return
+    enter_game("easy")
+    ui.settle_prompts()
+    ui.expect(ui.at_table(timeout=8.0), "could not reach the game table")
+
+
+def loaded_table(label: str, fill_play: float = FILL_PLAY) -> float:
+    """Onto the table, then *fill_play* seconds of live cards so MAX can fill.
+
+    Returns seconds already spent on the table (the trigger clock can count
+    them, so it does not sit another 30 s).
+    """
+    _reach_table(label)
+    if not fill_play:
+        return 0.0
+    n = play_to_fill(fill_play, f"{label} can fill")
+    played = play_to_fill.on_table
+    print(f"  on the table for {label}, {n} moves ({played:.0f}s) so an ad can fill",
+          flush=True)
+    return played
 
 
 def ensure_qa() -> None:
@@ -451,6 +502,15 @@ def tap_back_to_app(settle: float = 3.0, timeout: float = 10.0) -> bool:
 
 _STORE_MARK = "▻"
 _STORE_LOADING = ("loading…", "loading...", "loading")
+_STORE_NOT_READY = ("cannot connect", "couldn't be loaded", "couldn’t be loaded",
+                    "try again")
+REDIRECT_WAIT = 5.0
+
+
+def wait_redirect(where: str = "the page") -> None:
+    """App Store / Safari / support pages depend on the network; do not
+    pass or fail until this settle finishes."""
+    caselog.wait(REDIRECT_WAIT, f"for {where} to finish loading")
 
 
 @says("Read the app name on the App Store page")
@@ -466,10 +526,12 @@ def store_title(timeout: float = 30.0) -> str:
         for eid in find_elements("type == 'XCUIElementTypeStaticText'", timeout=10):
             value = attr(eid, "value") or attr(eid, "label")
             text = " ".join(str(value or "").replace(_STORE_MARK, " ").split())
-            if text and text.lower() not in _STORE_LOADING:
+            if text and text.lower() not in _STORE_LOADING and not any(
+                    mark in text.lower() for mark in _STORE_NOT_READY):
                 return text
         return ""
 
+    wait_redirect("the App Store page")
     deadline = time.time() + timeout
     last = ""
     while time.time() < deadline:
@@ -611,7 +673,7 @@ def board(tree: dict | None = None) -> Board | None:
     return Board(cards, top_y, rects, {"F": foundations, "C": cells, "T": columns})
 
 
-def read_board(timeout: float = 8.0) -> Board | None:
+def read_board(timeout: float = 8.0, gap: float = 0.6) -> Board | None:
     deadline = time.time() + timeout
     while True:
         try:
@@ -622,7 +684,7 @@ def read_board(timeout: float = 8.0) -> Board | None:
             return got
         if time.time() >= deadline:
             return got
-        time.sleep(0.6)
+        time.sleep(gap)
 
 
 def settled_board(timeout: float = 10.0) -> Board | None:
@@ -936,10 +998,10 @@ def plan_pile(b: Board, target: int) -> list[tuple[str, tuple]] | None:
     return None
 
 
-def move_card(b: Board, card: str, dest: tuple) -> None:
+def move_card(b: Board, card: str, dest: tuple, quick: bool = False) -> None:
     """Drag *card* onto a column or into a free cell; tap it up to its foundation."""
     if dest[0] == "F":
-        tap_card(b, card, settle=0.8)
+        tap_card(b, card, settle=0.35 if quick else 0.8)
         return
     if dest[0] == "T":
         bottom = b.bottom(dest[1])
@@ -947,7 +1009,11 @@ def move_card(b: Board, card: str, dest: tuple) -> None:
     else:
         used = {i for _c, (a, i, _d) in b.cards.items() if a == "C"}
         end = b.places["C"][next(i for i in range(4) if i not in used)]
-    drag_points(_centre(b.rects[card]), end)
+    if quick:
+        drag_points(_centre(b.rects[card]), end, move_ms=380, hold_ms=80,
+                    pause=0.28, settle=0.12)
+    else:
+        drag_points(_centre(b.rects[card]), end)
 
 
 def _landed(b: Board | None, card: str, dest: tuple) -> bool:
@@ -955,12 +1021,56 @@ def _landed(b: Board | None, card: str, dest: tuple) -> bool:
     return bool(got) and got[0] == dest[0] and (dest[0] != "T" or got[1] == dest[1])
 
 
+def board_key(b: Board) -> str:
+    """Deal fingerprint: every card's place, so a saved recipe can replay."""
+    return ",".join(f"{c}:{a}:{i}:{d}" for c, (a, i, d) in sorted(b.cards.items()))
+
+
+_RECIPE_FILE = Path(__file__).resolve().parent / "long_pile_recipes.json"
+_RECIPE_CAP = 80
+
+
+def _load_recipes() -> list:
+    try:
+        return json.loads(_RECIPE_FILE.read_text(encoding="utf-8")).get("recipes", [])
+    except (OSError, ValueError):
+        return []
+
+
+def _recipe_moves(key: str, target: int) -> list[tuple[str, tuple]] | None:
+    for rec in _load_recipes():
+        if rec.get("board") == key and rec.get("target") == target:
+            return [(card, (dest[0], dest[1])) for card, dest in rec.get("moves", [])]
+    return None
+
+
+def _write_recipes(recipes: list) -> None:
+    _RECIPE_FILE.write_text(json.dumps({"recipes": recipes[:_RECIPE_CAP]}, indent=2) + "\n",
+                            encoding="utf-8")
+
+
+def _store_recipe(key: str, target: int, path: list[tuple[str, tuple]]) -> None:
+    recipes = [r for r in _load_recipes()
+               if not (r.get("board") == key and r.get("target") == target)]
+    recipes.insert(0, {
+        "board": key,
+        "target": target,
+        "moves": [[card, [dest[0], dest[1]]] for card, dest in path],
+    })
+    _write_recipes(recipes)
+
+
+def _drop_recipe(key: str, target: int) -> None:
+    _write_recipes([r for r in _load_recipes()
+                    if not (r.get("board") == key and r.get("target") == target)])
+
+
 @says("Deal a new game: menu, New, Yes")
 def new_deal() -> Board:
     ui.expect(ui.open_table_drawer(), "the in-game menu did not open for New")
-    ui.expect(ui.tap("drawer_new", settle=2.0), "New could not be tapped")
+    ui.expect(ui.tap("drawer_new", settle=1.0), "New could not be tapped")
     if wait_alert("abandon", timeout=2.0):
-        helpers.answer_alert("Yes", settle=1.5)
+        helpers.answer_alert("Yes", settle=1.0)
     ui.settle_prompts()
     ui.expect(ui.at_table(timeout=8.0), "New did not leave a game table")
     b = settled_board()
@@ -969,15 +1079,24 @@ def new_deal() -> Board:
 
 
 @says(lambda target=13, max_moves=24, deals=6: f"Build a {target}-card pile in one column: "
-      f"plan legal moves, then drag the cards one by one")
+      f"replay a saved recipe, or plan legal moves and drag the cards")
 def build_long_pile(target: int = 13, max_moves: int = 24, deals: int = 6) -> tuple[Board, list[str]]:
     """Play this deal until one column holds *target* cards; a deal with no
-    plan of *max_moves* or fewer is swapped for a new one. Run with the
-    playfield raised, where the pile still fits. (board, the pile top first)."""
+    plan of *max_moves* or fewer is swapped for a new one. A deal seen
+    before reuses its saved moves (no search). Run with the playfield
+    raised, where the pile still fits. (board, the pile top first)."""
     b = settled_board()
     ui.expect(b is not None and len(b) == 52, "could not read the 52 cards off the table")
     path = None
+    start_key = ""
+    from_recipe = False
     for deal in range(deals):
+        start_key = board_key(b)
+        path = _recipe_moves(start_key, target)
+        if path:
+            from_recipe = True
+            print(f"  recipe hit — {len(path)} moves, no search", flush=True)
+            break
         path = plan_pile(b, target)
         if path and len(path) <= max_moves:
             break
@@ -988,16 +1107,18 @@ def build_long_pile(target: int = 13, max_moves: int = 24, deals: int = 6) -> tu
             b = new_deal()
     ui.expect(path, f"none of {deals} deals had a {target}-card pile within {max_moves} moves")
     print(f"  {len(path)} moves to a {target}-card pile", flush=True)
+    planned = list(path)
     made = replans = 0
     while path:
         card, dest = path.pop(0)
-        move_card(b, card, dest)
-        ui.answer_prompt("tip")
+        move_card(b, card, dest, quick=True)
+        if made == 0:
+            ui.answer_prompt("tip")
         made += 1
-        after = read_board()
+        after = read_board(timeout=3.0, gap=0.25)
         if not _landed(after, card, dest):
             after = settled_board()
-        if not _landed(after, card, dest) or len(b.moved(after)) != 1:
+        if not _landed(after, card, dest) or (after and len(b.moved(after)) != 1):
             replans += 1
             ui.expect(after is not None and replans <= 3,
                       f"move {made} ({card} to {dest}) did not go as planned "
@@ -1012,6 +1133,10 @@ def build_long_pile(target: int = 13, max_moves: int = 24, deals: int = 6) -> tu
     pile = b.column(col)
     ui.expect(len(pile) >= target, f"the longest column has {len(pile)} cards after {made} "
                                    f"moves, not {target} (board: {b.text()})")
+    if replans == 0 and start_key:
+        _store_recipe(start_key, target, planned)
+    elif from_recipe and start_key:
+        _drop_recipe(start_key, target)
     print(f"  column {col + 1} holds {len(pile)} cards after {made} moves", flush=True)
     return b, pile
 
@@ -1278,8 +1403,7 @@ def hud(shot: str) -> tuple[int | None, int | None]:
         if match:
             timer = int(match.group(1)) * 60 + int(match.group(2))
         elif score is None and SCORE_ONLY.fullmatch(text.strip()):
-            found = ocr.numbers(text)
-            score = found[0] if found else None
+            score = ocr.score(text)
     return timer, score
 
 
@@ -1499,7 +1623,8 @@ LANDMARKS = ("menu_play", "back_game", "page_back", "daily_back", "screen_play",
              "drawer_options", "table_menu", "screen_about", "screen_help",
              "screen_faq", "screen_stats", "screen_more_games", "screen_table",
              "tableau", "hint_hints", "hint_undo", "screen_choose_look",
-             "screen_victory", "screen_last_score")
+             "screen_victory", "screen_last_score", "tc_continue", "att_prompt",
+             "qa_watermark")
 CLOSE_NAMES = ("Close", "close", "Close Advertisement", "Close ad", "Dismiss",
                "Skip", "skip", "Done", "closeButton", "close button", "X")
 MANUAL_WAIT = 300.0
@@ -1516,34 +1641,37 @@ def freecell_ui_showing() -> bool:
     return bool(helpers.alert_text())
 
 
-def ad_up() -> bool:
+def ad_up(confirm: float = 0.35) -> bool:
     """True when FreeCell is in front but none of its own screens is showing,
-    twice a second apart (a screen transition shows no landmark either)."""
+    *confirm* seconds apart (a screen transition shows no landmark either)."""
     if not helpers.in_app() or freecell_ui_showing():
         return False
-    time.sleep(1.0)
+    time.sleep(confirm)
     return helpers.in_app() and not freecell_ui_showing()
 
 
-@says(lambda timeout=20.0: f"Wait up to {timeout:.0f} s for an ad to appear")
-def wait_ad(timeout: float = 20.0) -> bool:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if not helpers.in_app():
-            return False
-        if ad_up():
-            return True
-        time.sleep(1.0)
+@says(lambda timeout=20.0, what="waiting for an interstitial to load":
+      f"Wait up to {timeout:.0f} s {what}")
+def wait_ad(timeout: float = 20.0, what: str = "waiting for an interstitial to load") -> bool:
+    with caselog.live(timeout, what, announce=False) as deadline:
+        while time.time() < deadline:
+            if not helpers.in_app():
+                return False
+            if ad_up():
+                return True
+            time.sleep(0.3)
     return False
 
 
 # The creatives' X is drawn, not published in the tree: ad_close is its white
 # glyph, matched only in the top corners (pixels) so ad artwork elsewhere
-# cannot be mistaken for it. AD_X_POINTS are measured X centres (points),
-# tapped only after the glyph has had time to appear.
+# cannot be mistaken for it. AD_X_POINTS are measured X centres (points).
+# Named close and the glyph are tried first; if both miss, the measured X
+# is tapped at once (then the same way again on the next screen — store X,
+# then ad X). A miss is retried shortly; sitting on the video is not needed.
 AD_CORNERS = ((0, 0, 400, 600), (890, 0, 1290, 600))
 AD_X_POINTS = ((29, 83),)
-AD_X_AFTER = 20.0
+AD_X_RETRY = 1.0
 # Some playable end cards draw no X until their App Store sheet has been
 # opened and closed. A tap shows an "Open Store" pill (top-left, pixels) for
 # about a second only, so it is pressed straight off the next screenshot.
@@ -1558,7 +1686,7 @@ def _tap_close_control() -> str:
     r = rect(eid) if eid else None
     if not r or r.get("width", 0) <= 0:
         return ""
-    tap_rect(r, settle=2.0)
+    tap_rect(r, settle=0.4)
     return f"named {attr(eid, 'name') or attr(eid, 'label') or 'close'!r}"
 
 
@@ -1570,7 +1698,7 @@ def _tap_ad_x() -> str:
         hit = ui.find_ink("ad_close", img[y0:y1, x0:x1])
         if hit:
             point = (x0 + hit[0], y0 + hit[1])
-            helpers.tap(point, settle=2.0)
+            helpers.tap(point, settle=0.4)
             return f"ad_close at {point}"
     return ""
 
@@ -1583,7 +1711,7 @@ def _tap_open_store() -> str:
     if not hit:
         return ""
     point = (x0 + hit[0], y0 + hit[1])
-    helpers.tap(point, settle=2.5)
+    helpers.tap(point, settle=0.5)
     return f"Open Store at {point}"
 
 
@@ -1592,7 +1720,6 @@ def close_ad(where: str, budget: float = 150.0) -> bool:
     """Close an interstitial chain (video, store sheet, playable) by its
     close controls until FreeCell's own UI is back."""
     deadline = time.time() + budget
-    started = time.time()
     last_measured = 0.0
     taps = []
     while time.time() < deadline:
@@ -1610,7 +1737,7 @@ def close_ad(where: str, budget: float = 150.0) -> bool:
             taps.append(hit)
             continue
         now = time.time()
-        if now - started >= AD_X_AFTER and now - last_measured >= AD_X_AFTER:
+        if last_measured == 0.0 or now - last_measured >= AD_X_RETRY:
             for x, y in AD_X_POINTS:
                 tap_point(x, y, settle=0.2)
             last_measured = now
@@ -1618,10 +1745,8 @@ def close_ad(where: str, budget: float = 150.0) -> bool:
             store = _tap_open_store()
             if store:
                 taps.append(store)
-            else:
-                time.sleep(1.8)
             continue
-        time.sleep(2.0)
+        time.sleep(0.4)
     shot = ui.shoot(f"ad_unclosed_{re.sub(r'[^a-z0-9]+', '_', where.lower())}")
     print(f"  could not close the {where} ad within {budget:.0f}s — see {shot}",
           flush=True)
@@ -1630,9 +1755,77 @@ def close_ad(where: str, budget: float = 150.0) -> bool:
 
 @says(lambda where, wait=3.0: f"An ad came up ({where}) — close it", done=True)
 def clear_ad(where: str, wait: float = 3.0) -> bool:
-    """Close an ad if one shows within *wait* seconds. True when one closed."""
-    if wait_ad(timeout=wait):
+    """Close an ad if one shows within *wait* seconds. True when one closed.
+
+    Offline cases pass wait=0: no countdown, no 'waiting for an
+    interstitial' line. A leftover cover is still closed if it is already up.
+    """
+    if wait <= 0:
+        return close_or_wait(where) if ad_up() else False
+    if wait_ad(timeout=wait, what=f"waiting for an interstitial after {where}"):
         return close_or_wait(where)
+    return False
+
+
+WASTE_WAIT = 10.0
+
+
+@says("Waste any interstitial already sitting in cache")
+def waste_cached_ad() -> bool:
+    """Play and close an ad that loaded before AppLovin was pinned or the
+    trigger cases started. There is no flush API — showing it is the dump.
+    True when one was thrown away. Never fails the run if the cache is empty."""
+    print("  setup: an interstitial may already be cached from going online.",
+          flush=True)
+    print("  setup: we cannot flush that cache — the only dump is to play it "
+          "and close it, then let a fresh ad load.", flush=True)
+    caselog.step("Waste the already-cached interstitial so later cases get a fresh fill")
+
+    if ad_up():
+        print("  setup: a cached ad is already on screen — playing it now to waste it",
+              flush=True)
+        close_or_wait("cached ad already on screen")
+        print("  setup: cached ad wasted. A new fill can load for the cases.",
+              flush=True)
+        return True
+
+    if not ui.at_table(timeout=2.0):
+        if not ui.on_menu(2.0):
+            menu()
+        print("  setup: dealing Easy so we can leave the table and play the cached ad",
+              flush=True)
+        enter_game("easy")
+        if ad_up():
+            print("  setup: entering the table showed the cached ad — closing it (wasted)",
+                  flush=True)
+            close_or_wait("cached ad on deal")
+            print("  setup: cached ad wasted. A new fill can load for the cases.",
+                  flush=True)
+            return True
+        ui.settle_prompts()
+
+    if not ui.at_table(timeout=4.0):
+        print("  setup: could not reach a table to waste a cached ad — continuing",
+              flush=True)
+        return False
+
+    print("  setup: leaving the table (Back) to play the cached ad if one is ready",
+          flush=True)
+    if not ui.tap("back_game", settle=1.0):
+        print("  setup: Back could not be tapped — continuing without wasting a cache",
+              flush=True)
+        return False
+
+    if wait_ad(timeout=WASTE_WAIT, what="waiting for the already-cached interstitial"):
+        print("  setup: cached interstitial came up — closing it so it is wasted",
+              flush=True)
+        close_or_wait("cached ad")
+        print("  setup: cached ad wasted. A new fill can load for the cases.",
+              flush=True)
+        return True
+
+    print("  setup: no cached interstitial was ready — nothing to waste, continuing",
+          flush=True)
     return False
 
 
@@ -1709,6 +1902,7 @@ SUPPORT_TITLES = ("PeopleFun Support", "Helpshift")
 @says("Wait for the support page to load and read its title")
 def support_title(timeout: float = 24.0) -> str:
     """The loaded support page's header, or "" if it never appeared."""
+    wait_redirect("the support page")
     deadline = time.time() + timeout
     while time.time() < deadline:
         for title in SUPPORT_TITLES:

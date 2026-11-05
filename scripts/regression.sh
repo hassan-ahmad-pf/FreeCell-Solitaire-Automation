@@ -2,6 +2,7 @@
 # One command for a FreeCell regression with a live console.
 #
 #   ./scripts/regression.sh                    # full regression, dev build (~80 min)
+#   ./scripts/regression.sh --pick             # numbered list: type a module, or full / main
 #   ./scripts/regression.sh --main             # main suite only (~35 min)
 #   ./scripts/regression.sh verifyGamePlay verifyDaily   # just these tests
 #   ./scripts/regression.sh --prod             # the App Store build
@@ -54,7 +55,7 @@ stop_run() {
     # shellcheck disable=SC2086
     [[ -z "${runner// }" ]] || kill -KILL $runner 2>/dev/null || true
     echo ">>> regression stopped at once; its window writes the report of the tests finished"
-    echo "    so far (log/freecell_suite_report.html). The phone's network was left as it was;"
+    echo "    so far (log/reports/<version>_<build>/). The phone's network was left as it was;"
     echo "    if it is offline, turn Airplane Mode off and Wi-Fi on before the next run."
     return 0
   fi
@@ -65,7 +66,8 @@ stop_run() {
   for _ in $(seq 1 240); do
     if ! pgrep -if "python[^ ]* .*tests/freecell_suite/run_all\.py" >/dev/null; then
       echo ">>> regression stopped; its window shows the summary, and the report so far is"
-      echo "    log/freecell_suite_report.html. WDA is still up (./scripts/wda.sh stop ends it)."
+      echo "    log/reports/<version>_<build>/ (log/freecell_suite_report.html is the latest)."
+      echo "    WDA is still up (./scripts/wda.sh stop ends it)."
       return 0
     fi
     sleep 1
@@ -83,21 +85,112 @@ if [[ "${1:-}" == "stop" ]]; then
   exit 0
 fi
 
+# Numbered menu: 1 full, 2 main, then every runnable module. Sets picked.
+pick_run() {
+  if [[ ! -t 0 ]]; then
+    echo ">>> --pick needs a terminal so you can type a number." >&2
+    echo "    Or name a test: ./scripts/regression.sh verifyAds" >&2
+    exit 2
+  fi
+  local choice token
+  echo
+  echo "FreeCell tests — type a number and press Enter:"
+  echo
+  PYTHONPATH="$ROOT" ./.venv/bin/python -u - <<'PY'
+import sys
+sys.path.insert(0, "tests/freecell_suite")
+import catalog
+
+mods = catalog.pickable()
+main = [f"{i} {name}" for i, (name, _n, _kind) in enumerate(mods, start=3)
+        if name not in catalog.STANDALONE and name not in catalog.PARKED]
+
+print("   1  * Run full regression")
+print("   2  * Run main suite only")
+line = "      "
+for i, item in enumerate(main):
+    piece = item if i == len(main) - 1 else item + ", "
+    if len(line) + len(piece) > 76 and line.strip():
+        print(line.rstrip())
+        line = "      " + piece
+    else:
+        line += piece
+if line.strip():
+    print(line.rstrip())
+print()
+for i, (name, n, kind) in enumerate(mods, start=3):
+    extra = []
+    if kind == "dev":
+        extra.append("dev")
+    if name in catalog.STANDALONE:
+        extra.append("not in main")
+    if name in catalog.PARKED:
+        extra.append("parked")
+    tag = f"  ({', '.join(extra)})" if extra else ""
+    cases = "1 case" if n == 1 else f"{n} cases"
+    print(f"  {i:2}  {name:<28} {cases}{tag}")
+print()
+print("   q  cancel")
+PY
+  echo
+  while true; do
+    read -r -p "Number: " choice
+    case "$choice" in
+      q|Q|"") echo ">>> cancelled."; exit 0 ;;
+      1) picked="--all"; return 0 ;;
+      2) picked="--main"; return 0 ;;
+      *)
+        token="$(PYTHONPATH="$ROOT" ./.venv/bin/python -u - <<PY
+import sys
+sys.path.insert(0, "tests/freecell_suite")
+import catalog
+mods = [name for name, _n, _kind in catalog.pickable()]
+try:
+    n = int("$choice")
+except ValueError:
+    sys.exit(1)
+i = n - 3
+if 0 <= i < len(mods):
+    print(mods[i])
+else:
+    sys.exit(1)
+PY
+)" && { picked="$token"; return 0; }
+        echo "    type 1, 2, a module number, or q"
+        ;;
+    esac
+  done
+}
+
 build="--dev"
 scope="--all"
 extra=()
+pick=0
 for arg in "$@"; do
   case "$arg" in
     --prod) build="" ;;
     --dev) build="--dev" ;;
     --main) scope="" ;;
     --all) scope="--all" ;;
+    --pick|pick) pick=1 ;;
     --no-open|--no-rerun) extra+=("$arg") ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
     *) extra+=("$arg"); scope="" ;;
   esac
 done
+
+if [[ "$pick" == "1" ]]; then
+  picked=""
+  pick_run
+  case "$picked" in
+    --all) scope="--all" ;;
+    --main) scope="" ;;
+    *) extra+=("$picked"); scope="" ;;
+  esac
+  echo ">>> running $picked"
+  echo
+fi
 
 # Before WDA: a re-sign would restart it under a run already going.
 busy="$(pgrep -if "python[^ ]* .*(tests/freecell_suite/[A-Za-z_]+|scripts/present_regression)\.py" \

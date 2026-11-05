@@ -45,6 +45,7 @@ def run() -> None:
     if not fc.tap_named("Button", "close icon", settle=2.0):
         caselog.step("Tap the X at the top left of the support page")
         fc.tap_point(*SUPPORT_X, settle=2.0)
+    caselog.step("Check Options is showing again")
     ui.expect(ui.expect_screen("options", timeout=8.0),
               "closing the support page did not return to Options")
     ui.back()

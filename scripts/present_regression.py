@@ -7,11 +7,12 @@ its cases in the order they run, then each case as it starts (▶ n/N), the
 numbered steps it performs, and its end (PASS / FAIL / SKIP and its time),
 with the runner's notes dimmed. A status bar kept at the bottom shows the
 case running and its clock, the case up next, progress, passes and failures,
-and the time left (estimated from the last run). A rerun of failed tests (the runner's default) shows as its own
-section, and a case that passes there moves from failed to passed. The
-plain output is saved to log/regression_<time>.log, and the HTML report
-opens at the end (--no-open keeps it closed). Stopped midway, the report
-of the cases run so far is written and opened at once.
+and the time left (estimated from the last run). After every case has run,
+failed cases are tried once more (the runner's default); that rerun shows
+as its own section, and a case that passes there moves from failed to
+passed. The report is written after the rerun (--no-open keeps it closed).
+Stopped midway, the report of the cases run so far is written and opened
+at once.
 
 Colours and the status bar need a terminal. Output to a pipe or an agent's
 shell is plain unless FORCE_COLOR=1, which brings the colours back (the
@@ -32,6 +33,14 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
+
+# Line-buffer this process too: Cursor / piped terminals otherwise hold
+# the pretty lines until a block fills.
+try:
+    sys.stdout.reconfigure(line_buffering=True, write_through=True)
+    sys.stderr.reconfigure(line_buffering=True, write_through=True)
+except Exception:
+    pass
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "tests" / "freecell_suite" / "run_all.py"
@@ -76,8 +85,11 @@ CASES = re.compile(r"^cases:\s+(.*?) — (\d+) run")
 TEST_START = re.compile(r"^>>> \[(\d+)/(\d+)\] (START|SKIP|RERUN)\s+(\S+)(?: — (.*))?$")
 TEST_END = re.compile(r"^<<< \[(\d+)/(\d+)\] (PASS|FAIL|SKIP)\s+(\S+)(?:\s+\(\s*([\d.]+)s\))?")
 CASE_RUN = re.compile(r"^\s+\[RUN \] (\S+) ?(.*)$")
+CASE_KEEP = re.compile(r"^\s+\[KEEP\] (\S+) ?(.*)$")
 CASE_LIST = re.compile(r"^\s+\[LIST\] (\d+|-)/(\d+) (\S+) (.+?)(?: \(not run here: (.*)\))?$")
 STEP = re.compile(r"^\s+\[STEP\] (.*)$")
+NOTE = re.compile(r"^\s+\[NOTE\] (.*)$")
+WAIT = re.compile(r"^\s+\[WAIT\] (.*)$")
 CASE_END = re.compile(r"^\s+\[(PASS|FAIL|SKIP|BLOCKED|ONLINE)\] (\S+) (.+?)"
                       r"(?: \((\d+(?:\.\d+)?)s\))?(?: — (.*))?$")
 SUMMARY_TEST = re.compile(r"^  (PASS|FAIL|SKIP|STOP)  (\S+)\s+\((?:\s*([\d.]+)s|not started)\)"
@@ -114,6 +126,7 @@ def banner(con: "Console", lines: list[tuple[str, str]], code: str = ACCENT) -> 
             con.emit(paint(code, "│") + " " + paint(colour, cut) + " " * (inner - 1 - len(cut))
                      + paint(code, "│"))
     con.emit(paint(code, "╰" + "─" * inner + "╯"))
+    con.emit("")
 
 
 def clock(seconds: float) -> str:
@@ -151,6 +164,7 @@ class Console:
         self.listed: list[str] = []  # the running test's cases, in the order they run
         self.ended: set[str] = set()
         self.steps = 0
+        self.last_wait = False
         self.bar = False
         self.closed = False
         self.paused = False
@@ -167,9 +181,22 @@ class Console:
 
     def emit(self, text: str = "") -> None:
         with self.lock:
+            self.last_wait = False
             if self.bar:
                 sys.stdout.write("\r\033[K")
             sys.stdout.write(text + "\n")
+            self._draw()
+            sys.stdout.flush()
+
+    def rewrite(self, text: str) -> None:
+        """Replace the last line — a wait countdown tick, not a new step."""
+        with self.lock:
+            if self.bar:
+                sys.stdout.write("\r\033[K")
+            if TTY:
+                sys.stdout.write("\033[1A\033[K")
+            sys.stdout.write(text + "\n")
+            self.last_wait = True
             self._draw()
             sys.stdout.flush()
 
@@ -199,7 +226,7 @@ class Console:
                  f"{self.test}"]
         if self.case:
             where = f"{self.case_pos} " if self.case_pos else ""
-            parts.append(f"now {where}{self.case} {clock(now - self.case_t0)}")
+            parts.append(f"now {where}{clock(now - self.case_t0)}")
         upcoming = self.next_case()
         if upcoming:
             parts.append(f"next {upcoming}")
@@ -224,7 +251,8 @@ class Console:
         self.bar = True
 
     def next_case(self) -> str:
-        return next((c for c in self.listed if c not in self.ended and c != self.case), "")
+        nxt = next((c for c in self.listed if c not in self.ended and c != self.case), "")
+        return str(self.listed.index(nxt) + 1) if nxt else ""
 
     def tick(self) -> None:
         while not self.closed:
@@ -276,6 +304,14 @@ def handle(con: Console, raw: str) -> None:
     if m:
         step_line(con, m.group(1))
         return
+    m = NOTE.match(line)
+    if m:
+        note_line(con, m.group(1))
+        return
+    m = WAIT.match(line)
+    if m:
+        wait_line(con, m.group(1))
+        return
     if con.summary:
         if not line.startswith("-" * 20):
             summary_line(con, line)
@@ -297,15 +333,23 @@ def handle(con: Console, raw: str) -> None:
         list_line(con, *m.groups())
         return
 
+    m = CASE_KEEP.match(line)
+    if m:
+        n = (con.listed.index(m.group(1)) + 1) if m.group(1) in con.listed else 0
+        where = paint(MUTED, f"{n:>2}/{len(con.listed)}  ") if n else ""
+        con.emit("   " + paint(DIM, "· keep  ") + where + paint(DIM, m.group(2) or m.group(1)))
+        return
+
     m = CASE_RUN.match(line)
     if m:
         cid = m.group(1)
         con.case, con.case_t0, con.steps = cid, time.time(), 0
         con.case_pos = (f"{con.listed.index(cid) + 1}/{len(con.listed)}"
                         if cid in con.listed else "")
-        where = paint(MUTED, f"{con.case_pos:>5}  ") if con.case_pos else ""
-        con.emit("   " + paint(ACCENT, "▶ ") + where + paint(f"{BOLD};{ACCENT}", f"{cid:6} ")
-                 + paint(f"{BOLD};{TEXT}", m.group(2)))
+        n = (con.listed.index(cid) + 1) if cid in con.listed else 0
+        where = paint(MUTED, f"{n:>2}/{len(con.listed)}  ") if n else ""
+        con.emit("")
+        con.emit("   " + paint(ACCENT, "▶ ") + where + paint(f"{BOLD};{TEXT}", m.group(2)))
         return
 
     m = CASE_END.match(line)
@@ -329,9 +373,11 @@ def handle(con: Console, raw: str) -> None:
                 con.took[name] = spent
             code = GREEN if verdict == "PASS" else RED
             word = "passed" if verdict == "PASS" else "failed"
+            con.emit("")
             con.emit(paint(RULE, "   └─ ") + paint(TEXT, name) + "  "
                      + paint(f"{BOLD};{code}", f"{MARKS[verdict][0]} {word}")
                      + paint(MUTED, f" in {took(spent)}"))
+            con.emit("")
         return
 
     if not con.test:
@@ -382,12 +428,16 @@ def rerun_case(con: Console, verdict: str, cid: str, title: str, detail: str) ->
         if cid in con.failures:
             con.failures.remove(cid)
         con.rescued.append(cid)
+        n = (con.listed.index(cid) + 1) if cid in con.listed else ""
+        tag = f"{n:>2}  " if n else ""
         con.emit("   " + badge("PASS") + paint(f"{BOLD};{GREEN}", " ↻ on rerun  ")
-                 + paint(f"{BOLD};{TEXT}", f"{cid:6} ") + paint(TEXT, title))
+                 + paint(f"{BOLD};{TEXT}", tag) + paint(TEXT, title))
         con.wrap(detail, 13, DIM)
     else:
+        n = (con.listed.index(cid) + 1) if cid in con.listed else ""
+        tag = f"{n:>2}  " if n else ""
         con.emit("   " + badge("FAIL") + paint(f"{BOLD};{RED}", " ↻ again     ")
-                 + paint(f"{BOLD};{TEXT}", f"{cid:6} ") + paint(TEXT, title))
+                 + paint(f"{BOLD};{TEXT}", tag) + paint(TEXT, title))
         con.wrap(detail, 13, RED)
 
 
@@ -443,6 +493,7 @@ def test_start(con: Console, i: int, n: int, kind: str, name: str, reason: str |
         con.emit("")
         con.emit(paint(YELLOW, "▌ ") + paint(DIM, f"{place}  ") + paint(YELLOW, name)
                  + paint(DIM, f"  — skipped: {reason or ''}"))
+        con.emit("")
         return
     code = YELLOW if kind == "RERUN" else ACCENT
     label = f"{place}  {'↻ ' if kind == 'RERUN' else ''}{name}"
@@ -451,6 +502,7 @@ def test_start(con: Console, i: int, n: int, kind: str, name: str, reason: str |
     con.emit(paint(code, "▌ ") + paint(MUTED, f"{place}  ")
              + paint(f"{BOLD};{code}", label[len(place) + 2:]) + " "
              + paint(RULE, "─" * fill) + " " + paint(MUTED, stamp))
+    con.emit("")
 
 
 def list_line(con: Console, pos: str, total: str, cid: str, title: str,
@@ -460,11 +512,12 @@ def list_line(con: Console, pos: str, total: str, cid: str, title: str,
     if pos == "1":
         con.emit(paint(MUTED, f"   {total} case{'' if total == '1' else 's'}, "
                               "in the order they run"))
+        con.emit("")
     if pos != "-":
         con.listed.append(cid)
-        con.emit(paint(DIM, f"     {pos:>2}  ") + paint(MUTED, f"{cid:6} ") + paint(TEXT, title))
+        con.emit(paint(DIM, f"     {pos:>2}  ") + paint(TEXT, title))
     else:
-        con.emit(paint(DIM, "      –  ") + paint(YELLOW, f"{cid:6} {title}")
+        con.emit(paint(DIM, "      –  ") + paint(YELLOW, title)
                  + paint(DIM, f"  (not run here: {why})"))
 
 
@@ -476,6 +529,26 @@ def step_line(con: Console, text: str) -> None:
         con.emit(paint(DIM, f"         {con.steps:>2}  ") + paint(MUTED, text))
     else:
         con.emit(paint(DIM, "          ·  ") + paint(MUTED, text))
+
+
+def note_line(con: Console, text: str) -> None:
+    """A case finding, printed as soon as it is recorded — not held for PASS."""
+    con.emit(paint(GREEN, "         ·  ") + paint(TEXT, text))
+
+
+def wait_line(con: Console, text: str) -> None:
+    """Seconds left in a wait, with the fill bar. On a real terminal the same
+    line is rewritten each second; a pipe only keeps the first tick, every
+    5 s, and the last 5 s."""
+    n = int(text.split("s", 1)[0]) if text[:1].isdigit() else 0
+    if not TTY and con.last_wait and n > 5 and n % 5:
+        return
+    body = paint(DIM, "          ·  ") + paint(ACCENT if "█" in text else MUTED, text)
+    if TTY and con.last_wait:
+        con.rewrite(body)
+    else:
+        con.emit(body)
+        con.last_wait = True
 
 
 def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
@@ -498,7 +571,9 @@ def case_line(con: Console, mark: str, cid: str, title: str, secs: str | None,
         con.case, con.case_pos = "", ""
     when = f"  {took(float(secs))}" if secs else ""
     ink = f"{BOLD};{RED}" if mark == "FAIL" else TEXT
-    con.emit("   " + badge(mark) + "  " + paint(f"{BOLD};{code}", f"{cid:6} ")
+    n = (con.listed.index(cid) + 1) if cid in con.listed else 0
+    tag = f"{n:>2}  " if n else ""
+    con.emit("   " + badge(mark) + "  " + paint(f"{BOLD};{code}", tag)
              + paint(ink, title) + paint(MUTED, when))
     if detail:
         con.wrap(detail, 14, RED if mark == "FAIL" else DIM)
@@ -533,7 +608,9 @@ def summary_line(con: Console, line: str) -> None:
         # "    MG-01 title — why — rerun fail: why": the case on one line, why under it
         head, _sep, why = line.strip().partition(" — ")
         cid, _sp, title = head.partition(" ")
-        con.emit("    " + paint(f"{BOLD};{RED}", f"✗ {cid:6} ") + paint(TEXT, title))
+        n = (con.listed.index(cid) + 1) if cid in con.listed else 0
+        tag = f"{n}" if n else cid
+        con.emit("    " + paint(f"{BOLD};{RED}", f"✗ {tag:<3} ") + paint(TEXT, title))
         if why:
             con.wrap(why, 13, DIM)
     elif line.strip().startswith("cases:"):
@@ -552,11 +629,10 @@ def show_report(con: Console) -> None:
 def report_now(con: Console) -> None:
     """The runner was killed before it wrote its report: write one from the
     results it saved after each finished test."""
-    out = ROOT / "log" / "freecell_suite_report.html"
     con.emit(paint(YELLOW, "   writing the report of the tests finished so far…"))
     try:
         proc = subprocess.run([sys.executable, str(REPORT), "--results", str(RESULTS),
-                               "--out", str(out), "--stopped"],
+                               "--stopped"],
                               capture_output=True, text=True, timeout=180)
     except (OSError, subprocess.SubprocessError, KeyboardInterrupt) as exc:
         con.emit(paint(RED, f"   no report: {exc or 'interrupted'}"))
@@ -564,7 +640,11 @@ def report_now(con: Console) -> None:
     if proc.returncode:
         con.emit(paint(RED, f"   no report: {proc.stderr.strip()[-300:]}"))
         return
-    con.report = str(out)
+    written = ""
+    for line in (proc.stdout or "").splitlines():
+        if line.startswith("wrote "):
+            written = line[6:].strip()
+    con.report = written or str(ROOT / "log" / "freecell_suite_report.html")
 
 
 def main() -> int:
@@ -585,16 +665,20 @@ def main() -> int:
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT), env.get("PYTHONPATH"))))
     proc = subprocess.Popen([sys.executable, "-u", "-W", "ignore", str(RUNNER), *args],
                             cwd=ROOT, env=env, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                            errors="replace", bufsize=1)
+                            stderr=subprocess.STDOUT, bufsize=0)
     threading.Thread(target=con.tick, daemon=True).start()
     stopped = False
     with open(log_path, "w", encoding="utf-8") as log:
         def pump() -> None:
-            for raw in proc.stdout:
-                log.write(raw)
+            stream = proc.stdout
+            while True:
+                raw = stream.readline()
+                if not raw:
+                    break
+                line = raw.decode("utf-8", errors="replace")
+                log.write(line)
                 log.flush()
-                handle(con, raw)
+                handle(con, line)
         try:
             pump()
         except KeyboardInterrupt:

@@ -36,8 +36,9 @@ def scroll_until(name: str, max_swipes: int = MAX_SWIPES) -> bool:
         except requests.RequestException:
             # WDA answers a swipe only once the app idles; a busy page can
             # outlast the request timeout while the swipe itself still lands.
-            time.sleep(3.0)
-        ui.settle(3.0)
+            time.sleep(1.0)
+        # The swipe already pauses; one extra second is enough for the page
+        # to draw the next screenful.
     return ui.is_on(name)
 
 
@@ -59,6 +60,7 @@ def run() -> None:
         ui.back()
         caselog.step("Check the main menu is showing")
         ui.expect(ui.on_menu(6.0), "Help back did not return to the main menu")
+        c.shot(ui.shoot("HelpBack"))
         c.note("back on the main menu")
     print("PASS: Help opened, scrolled to its FAQ link, and returned")
 

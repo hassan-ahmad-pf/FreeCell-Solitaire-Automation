@@ -34,8 +34,8 @@ def run() -> None:
     with caselog.case("DS-01", soft=True) as c:
         caselog.step("Open Settings → Display & Brightness and read Auto-Lock; set it to Never")
         ok, seen = helpers.auto_lock_never()
-        ui.expect(ok, f"Auto-Lock is {seen or 'unreadable'}, not Never "
-                      "(Low Power Mode holds it at 30 s)")
+        ui.expect(ok, f"Auto-Lock is {seen or 'unreadable'}, not Never")
+        c.shot(ui.shoot("DeviceSetupAutoLock"))
         c.note("Auto-Lock is Never")
 
     with caselog.case("DS-02", soft=True) as c:
@@ -43,7 +43,7 @@ def run() -> None:
         was_on = helpers.dnd_on()
         if not was_on:
             caselog.step("Turn Do Not Disturb on from Control Center → Focus")
-        ui.expect(was_on or helpers.dnd_turn_on(),
+        ui.expect(was_on or helpers.dnd_turn_on(already_off=True),
                   "Do Not Disturb is off and Control Center → Focus did not turn it on")
         c.shot(ui.shoot("DeviceSetupDND"))
         c.note("Do Not Disturb is on" if was_on else "Do Not Disturb was off — turned it on")
